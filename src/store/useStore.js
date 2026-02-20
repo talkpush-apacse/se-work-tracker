@@ -92,6 +92,10 @@ export function useStore() {
     setPoints(prev => prev.filter(p => p.id !== id));
   }, []);
 
+  const updatePoint = useCallback((id, data) => {
+    setPoints(prev => prev.map(p => p.id === id ? { ...p, ...data } : p));
+  }, []);
+
   // Computed helpers
   const getProjectPoints = useCallback((projectId) => {
     return points.filter(p => p.projectId === projectId);
@@ -139,7 +143,7 @@ export function useStore() {
     addOkr, updateOkr, deleteOkr,
     addCustomer, updateCustomer, deleteCustomer,
     addProject, updateProject, deleteProject,
-    addPoint, deletePoint,
+    addPoint, deletePoint, updatePoint,
     getProjectPoints, getProjectTotals,
     exportData, importData,
   };

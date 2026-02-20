@@ -1,8 +1,10 @@
 import { useState, useRef } from 'react';
-import { Trophy, Zap, Clock, Flame, Activity, TrendingUp, Star, Plus } from 'lucide-react';
+import { Trophy, Zap, Clock, Flame, Activity, TrendingUp, Star, Plus, Timer } from 'lucide-react';
 import { useAppStore } from '../context/StoreContext';
+import { useTimerContext } from '../context/TimerContext';
 import { getThisWeekRange, filterPointsByRange, formatRelative, formatDateTime, getStreakDays } from '../utils/dateHelpers';
 import AddPointsModal from '../components/AddPointsModal';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 function CustomerBadge({ customerId, customers, size = 'sm' }) {
   const c = customers.find(x => x.id === customerId);
@@ -40,7 +42,9 @@ function StatCard({ icon: Icon, label, value, sub, color = 'indigo' }) {
 
 export default function Dashboard({ onNavigate }) {
   const { projects, customers, okrs, points } = useAppStore();
+  const { isRunning, projectId: runningProjectId, startTimer, stopTimer } = useTimerContext();
   const [addModal, setAddModal] = useState(null);
+  const [timerConflict, setTimerConflict] = useState(null); // holds the project to start after conflict
   const [flashId, setFlashId] = useState(null);
   const flashRef = useRef({});
 
@@ -204,6 +208,27 @@ export default function Dashboard({ onNavigate }) {
                         </div>
                         <p className="text-[11px] text-gray-500">{project.totalHours.toFixed(1)}h</p>
                       </div>
+                      {/* Timer button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isRunning && runningProjectId !== project.id) {
+                            setTimerConflict(project);
+                          } else if (!isRunning) {
+                            startTimer(project.id);
+                          }
+                          // If already running for THIS project, widget is visible — no action needed
+                        }}
+                        className={`p-1.5 rounded-lg transition-colors flex-shrink-0 ${
+                          runningProjectId === project.id
+                            ? 'bg-emerald-600/30 text-emerald-400 cursor-default'
+                            : 'bg-gray-700/50 hover:bg-emerald-600/20 text-gray-400 hover:text-emerald-400'
+                        }`}
+                        title={runningProjectId === project.id ? 'Timer running' : 'Start timer'}
+                      >
+                        <Timer size={13} />
+                      </button>
+                      {/* Add points button */}
                       <button
                         onClick={(e) => { e.stopPropagation(); setAddModal(project); }}
                         className="p-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-400 transition-colors flex-shrink-0"
@@ -281,6 +306,16 @@ export default function Dashboard({ onNavigate }) {
           project={addModal}
           onClose={() => setAddModal(null)}
           onSuccess={handlePointSuccess}
+        />
+      )}
+
+      {timerConflict && (
+        <ConfirmDialog
+          title="Timer Already Running"
+          message={`A timer is already running for another project. Stop it first (you'll be prompted to save), then start a new timer for "${timerConflict.name}".`}
+          danger={false}
+          onConfirm={() => { stopTimer(); setTimerConflict(null); }}
+          onCancel={() => setTimerConflict(null)}
         />
       )}
     </div>

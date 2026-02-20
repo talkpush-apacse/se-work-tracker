@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { StoreProvider } from './context/StoreContext';
+import { TimerProvider } from './context/TimerContext';
 import Navigation from './components/Navigation';
+import TimerWidget from './components/TimerWidget';
 import Dashboard from './pages/Dashboard';
 import Projects from './pages/Projects';
 import Analytics from './pages/Analytics';
@@ -28,6 +30,8 @@ function AppContent() {
       {/* Main content */}
       <main className="md:ml-56 pt-16 md:pt-0">
         <div className="max-w-6xl mx-auto px-4 py-6">
+          {/* TimerWidget is global — appears on all tabs while a timer is running */}
+          <TimerWidget />
           {activeTab === 'dashboard' && <Dashboard onNavigate={handleNavigate} />}
           {activeTab === 'projects' && (
             <Projects
@@ -47,7 +51,9 @@ function AppContent() {
 export default function App() {
   return (
     <StoreProvider>
-      <AppContent />
+      <TimerProvider>
+        <AppContent />
+      </TimerProvider>
     </StoreProvider>
   );
 }

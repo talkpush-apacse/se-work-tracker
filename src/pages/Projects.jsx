@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Plus, ChevronRight, Pencil, Trash2, ArrowLeft, Clock, Zap, Calendar, CheckCircle2, PauseCircle, XCircle, LayoutGrid, List } from 'lucide-react';
+import { Plus, ChevronRight, Pencil, Trash2, ArrowLeft, Clock, Zap, Calendar, CheckCircle2, PauseCircle, XCircle, LayoutGrid, List, Timer, Square } from 'lucide-react';
 import { useAppStore } from '../context/StoreContext';
+import { useTimerContext } from '../context/TimerContext';
 import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import AddPointsModal from '../components/AddPointsModal';
@@ -81,12 +82,110 @@ function ProjectForm({ initial = {}, okrs, customers, onSubmit, onCancel }) {
   );
 }
 
+function EditEntryModal({ entry, onClose }) {
+  const { updatePoint } = useAppStore();
+  const [form, setForm] = useState({
+    points: String(entry.points),
+    hours: String(entry.hours),
+    activityType: entry.activityType,
+    comment: entry.comment || '',
+  });
+  const [errors, setErrors] = useState({});
+
+  const validate = () => {
+    const e = {};
+    if (!form.points || isNaN(form.points) || Number(form.points) <= 0) e.points = 'Enter a valid positive number';
+    if (!form.hours || isNaN(form.hours) || Number(form.hours) < 0) e.hours = 'Enter a valid number';
+    if (!form.activityType) e.activityType = 'Select an activity type';
+    return e;
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const errs = validate();
+    if (Object.keys(errs).length) { setErrors(errs); return; }
+    updatePoint(entry.id, {
+      points: Number(form.points),
+      hours: Number(form.hours),
+      activityType: form.activityType,
+      comment: form.comment.trim(),
+    });
+    onClose();
+  };
+
+  const f = (key) => ({
+    value: form[key],
+    onChange: (e) => setForm(p => ({ ...p, [key]: e.target.value })),
+  });
+
+  return (
+    <Modal title="Edit Entry" onClose={onClose}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-400 mb-1.5">Points *</label>
+            <input
+              type="number" step="1" min="1" autoFocus
+              {...f('points')}
+              className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+            />
+            {errors.points && <p className="mt-1 text-xs text-red-400">{errors.points}</p>}
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-400 mb-1.5">Hours Invested *</label>
+            <input
+              type="number" step="0.25" min="0"
+              {...f('hours')}
+              className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+            />
+            {errors.hours && <p className="mt-1 text-xs text-red-400">{errors.hours}</p>}
+          </div>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-400 mb-1.5">Activity Type *</label>
+          <select
+            {...f('activityType')}
+            className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+          >
+            <option value="">Select activity...</option>
+            {ACTIVITY_TYPES.map(a => <option key={a} value={a}>{a}</option>)}
+          </select>
+          {errors.activityType && <p className="mt-1 text-xs text-red-400">{errors.activityType}</p>}
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-400 mb-1.5">
+            Comment <span className="text-gray-600">(optional)</span>
+          </label>
+          <textarea
+            rows={2}
+            {...f('comment')}
+            className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40 resize-none"
+          />
+        </div>
+        <div className="flex gap-3 pt-1">
+          <button type="button" onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl bg-gray-700 hover:bg-gray-600 text-sm font-medium transition-colors">
+            Cancel
+          </button>
+          <button type="submit"
+            className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm font-bold text-white transition-colors">
+            Save Changes
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 function ProjectDetail({ project, onBack }) {
-  const { points, customers, okrs, addPoint, deletePoint, updateProject, deleteProject } = useAppStore();
+  const { points, customers, okrs, addPoint, deletePoint, updatePoint, updateProject, deleteProject } = useAppStore();
+  const { isRunning, projectId: runningProjectId, startTimer, stopTimer } = useTimerContext();
   const [addModal, setAddModal] = useState(false);
   const [editModal, setEditModal] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deleteEntryId, setDeleteEntryId] = useState(null);
+  const [editEntryModal, setEditEntryModal] = useState(null);
+  const [timerConflict, setTimerConflict] = useState(false);
   const [flashMsg, setFlashMsg] = useState(null);
 
   const customer = customers.find(c => c.id === project.customerId);
@@ -157,13 +256,39 @@ function ProjectDetail({ project, onBack }) {
         )}
       </div>
 
-      {/* Add points FAB */}
-      <button
-        onClick={() => setAddModal(true)}
-        className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-all shadow-lg shadow-indigo-600/30 hover:shadow-indigo-600/50"
-      >
-        <Plus size={18} /> Add Points
-      </button>
+      {/* Action buttons row */}
+      <div className="flex gap-3">
+        {/* Timer button */}
+        {isRunning && runningProjectId === project.id ? (
+          <button
+            onClick={stopTimer}
+            className="flex items-center justify-center gap-2 py-3 px-5 rounded-2xl bg-red-600/20 hover:bg-red-600/40 text-red-400 font-bold transition-all border border-red-700/40 flex-shrink-0"
+          >
+            <Square size={14} fill="currentColor" /> Stop Timer
+          </button>
+        ) : (
+          <button
+            onClick={() => {
+              if (isRunning) {
+                setTimerConflict(true);
+              } else {
+                startTimer(project.id);
+              }
+            }}
+            className="flex items-center justify-center gap-2 py-3 px-5 rounded-2xl bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 font-bold transition-all border border-emerald-700/40 flex-shrink-0"
+          >
+            <Timer size={15} /> Start Timer
+          </button>
+        )}
+
+        {/* Add points FAB */}
+        <button
+          onClick={() => setAddModal(true)}
+          className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-all shadow-lg shadow-indigo-600/30 hover:shadow-indigo-600/50"
+        >
+          <Plus size={18} /> Add Points
+        </button>
+      </div>
 
       {/* Points log */}
       <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
@@ -194,11 +319,19 @@ function ProjectDetail({ project, onBack }) {
                     <span className="text-xs text-gray-500 flex items-center gap-1"><Clock size={10} /> {entry.hours}h</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   <span className="text-sm font-bold text-indigo-400">+{entry.points}</span>
+                  <button
+                    onClick={() => setEditEntryModal(entry)}
+                    className="p-1 rounded text-gray-600 hover:text-indigo-400 opacity-0 group-hover:opacity-100 transition-all"
+                    title="Edit entry"
+                  >
+                    <Pencil size={13} />
+                  </button>
                   <button
                     onClick={() => setDeleteEntryId(entry.id)}
                     className="p-1 rounded text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                    title="Delete entry"
                   >
                     <Trash2 size={13} />
                   </button>
@@ -244,6 +377,23 @@ function ProjectDetail({ project, onBack }) {
           message="Remove this point entry?"
           onConfirm={() => { deletePoint(deleteEntryId); setDeleteEntryId(null); }}
           onCancel={() => setDeleteEntryId(null)}
+        />
+      )}
+
+      {editEntryModal && (
+        <EditEntryModal
+          entry={editEntryModal}
+          onClose={() => setEditEntryModal(null)}
+        />
+      )}
+
+      {timerConflict && (
+        <ConfirmDialog
+          title="Timer Already Running"
+          message="A timer is already running for another project. Stop it first (you'll be prompted to save that session), then you can start a timer here."
+          danger={false}
+          onConfirm={() => { stopTimer(); setTimerConflict(false); }}
+          onCancel={() => setTimerConflict(false)}
         />
       )}
     </div>
