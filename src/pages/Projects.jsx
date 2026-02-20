@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { Plus, ChevronRight, Pencil, Trash2, ArrowLeft, Clock, Zap, Calendar, CheckCircle2, PauseCircle, XCircle, LayoutGrid, List, Timer, Square } from 'lucide-react';
+import { Plus, ChevronRight, Pencil, Trash2, ArrowLeft, Clock, Zap, Calendar, CheckCircle2, PauseCircle, XCircle, LayoutGrid, List, Timer, Square, ListPlus } from 'lucide-react';
 import { useAppStore } from '../context/StoreContext';
 import { useTimerContext } from '../context/TimerContext';
 import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import AddPointsModal from '../components/AddPointsModal';
+import BulkAddProjectsModal from '../components/BulkAddProjectsModal';
+import BulkAddPointsModal from '../components/BulkAddPointsModal';
 import { CUSTOMER_COLORS, PROJECT_STATUSES, ACTIVITY_TYPES, ACTIVITY_COLORS } from '../constants';
 import { formatDate, formatDateTime, formatRelative } from '../utils/dateHelpers';
 
@@ -181,6 +183,7 @@ function ProjectDetail({ project, onBack }) {
   const { points, customers, okrs, addPoint, deletePoint, updatePoint, updateProject, deleteProject } = useAppStore();
   const { isRunning, projectId: runningProjectId, startTimer, stopTimer } = useTimerContext();
   const [addModal, setAddModal] = useState(false);
+  const [bulkPointsModal, setBulkPointsModal] = useState(false);
   const [editModal, setEditModal] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deleteEntryId, setDeleteEntryId] = useState(null);
@@ -288,6 +291,15 @@ function ProjectDetail({ project, onBack }) {
         >
           <Plus size={18} /> Add Points
         </button>
+
+        {/* Bulk add points */}
+        <button
+          onClick={() => setBulkPointsModal(true)}
+          className="flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 hover:text-white font-medium transition-all flex-shrink-0"
+          title="Bulk add point entries"
+        >
+          <ListPlus size={16} />
+        </button>
       </div>
 
       {/* Points log */}
@@ -350,6 +362,13 @@ function ProjectDetail({ project, onBack }) {
         />
       )}
 
+      {bulkPointsModal && (
+        <BulkAddPointsModal
+          project={project}
+          onClose={() => setBulkPointsModal(false)}
+        />
+      )}
+
       {editModal && (
         <Modal title="Edit Project" onClose={() => setEditModal(false)}>
           <ProjectForm
@@ -404,6 +423,7 @@ export default function Projects({ initialProjectId, onProjectSelect }) {
   const { projects, customers, okrs, addProject, updateProject, deleteProject } = useAppStore();
   const [selectedId, setSelectedId] = useState(initialProjectId || null);
   const [createModal, setCreateModal] = useState(false);
+  const [bulkProjectsModal, setBulkProjectsModal] = useState(false);
   const [groupBy, setGroupBy] = useState('customer'); // 'customer' | 'okr'
   const [statusFilter, setStatusFilter] = useState('All');
 
@@ -437,12 +457,20 @@ export default function Projects({ initialProjectId, onProjectSelect }) {
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-bold text-white">Projects</h1>
-        <button
-          onClick={() => setCreateModal(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm font-bold text-white transition-all shadow-lg shadow-indigo-600/30"
-        >
-          <Plus size={16} /> New Project
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setBulkProjectsModal(true)}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 border border-gray-700 text-sm font-medium text-gray-300 hover:text-white transition-all"
+          >
+            <ListPlus size={15} /> Bulk Add
+          </button>
+          <button
+            onClick={() => setCreateModal(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm font-bold text-white transition-all shadow-lg shadow-indigo-600/30"
+          >
+            <Plus size={16} /> New Project
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -528,6 +556,7 @@ export default function Projects({ initialProjectId, onProjectSelect }) {
           />
         </Modal>
       )}
+      {bulkProjectsModal && <BulkAddProjectsModal onClose={() => setBulkProjectsModal(false)} />}
     </div>
   );
 }

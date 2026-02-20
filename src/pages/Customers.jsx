@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, Users } from 'lucide-react';
+import { Plus, Pencil, Trash2, Users, ListPlus } from 'lucide-react';
 import { useAppStore } from '../context/StoreContext';
 import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
+import BulkAddCustomersModal from '../components/BulkAddCustomersModal';
 import { CUSTOMER_COLORS } from '../constants';
 import { formatDate } from '../utils/dateHelpers';
 
@@ -54,6 +55,7 @@ function CustomerForm({ initial = {}, onSubmit, onCancel }) {
 export default function Customers() {
   const { customers, projects, points, addCustomer, updateCustomer, deleteCustomer } = useAppStore();
   const [createModal, setCreateModal] = useState(false);
+  const [bulkModal, setBulkModal] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
@@ -64,12 +66,20 @@ export default function Customers() {
           <h1 className="text-2xl font-bold text-white">Customers</h1>
           <p className="text-sm text-gray-500 mt-0.5">Enterprise clients linked to your projects</p>
         </div>
-        <button
-          onClick={() => setCreateModal(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm font-bold text-white transition-all shadow-lg shadow-indigo-600/30"
-        >
-          <Plus size={16} /> Add Customer
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setBulkModal(true)}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 border border-gray-700 text-sm font-medium text-gray-300 hover:text-white transition-all"
+          >
+            <ListPlus size={15} /> Bulk Add
+          </button>
+          <button
+            onClick={() => setCreateModal(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm font-bold text-white transition-all shadow-lg shadow-indigo-600/30"
+          >
+            <Plus size={16} /> Add Customer
+          </button>
+        </div>
       </div>
 
       {customers.length === 0 ? (
@@ -151,6 +161,7 @@ export default function Customers() {
           onCancel={() => setDeleteTarget(null)}
         />
       )}
+      {bulkModal && <BulkAddCustomersModal onClose={() => setBulkModal(false)} />}
     </div>
   );
 }

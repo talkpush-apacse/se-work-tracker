@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, Target, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Pencil, Trash2, Target, ChevronDown, ChevronUp, ListPlus } from 'lucide-react';
 import { useAppStore } from '../context/StoreContext';
 import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
+import BulkAddOKRsModal from '../components/BulkAddOKRsModal';
 import { formatDate } from '../utils/dateHelpers';
 
 function OkrForm({ initial = {}, onSubmit, onCancel }) {
@@ -48,6 +49,7 @@ function OkrForm({ initial = {}, onSubmit, onCancel }) {
 export default function OKRs() {
   const { okrs, projects, points, addOkr, updateOkr, deleteOkr } = useAppStore();
   const [createModal, setCreateModal] = useState(false);
+  const [bulkModal, setBulkModal] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [expanded, setExpanded] = useState({});
@@ -61,12 +63,20 @@ export default function OKRs() {
           <h1 className="text-2xl font-bold text-white">OKRs</h1>
           <p className="text-sm text-gray-500 mt-0.5">Objectives that guide your project priorities</p>
         </div>
-        <button
-          onClick={() => setCreateModal(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm font-bold text-white transition-all shadow-lg shadow-indigo-600/30"
-        >
-          <Plus size={16} /> New OKR
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setBulkModal(true)}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 border border-gray-700 text-sm font-medium text-gray-300 hover:text-white transition-all"
+          >
+            <ListPlus size={15} /> Bulk Add
+          </button>
+          <button
+            onClick={() => setCreateModal(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm font-bold text-white transition-all shadow-lg shadow-indigo-600/30"
+          >
+            <Plus size={16} /> New OKR
+          </button>
+        </div>
       </div>
 
       {okrs.length === 0 ? (
@@ -149,6 +159,7 @@ export default function OKRs() {
           onCancel={() => setDeleteTarget(null)}
         />
       )}
+      {bulkModal && <BulkAddOKRsModal onClose={() => setBulkModal(false)} />}
     </div>
   );
 }
