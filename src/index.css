@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gray-950 text-gray-100 font-sans;
+    margin: 0;
+    min-width: 320px;
+    min-height: 100vh;
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #374151 transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 4px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: #374151;
+    border-radius: 2px;
+  }
+}
+
+.point-flash {
+  animation: pointFlash 0.9s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes pointFlash {
+  0% { opacity: 1; transform: translateY(0) scale(1); }
+  40% { opacity: 1; transform: translateY(-28px) scale(1.4); }
+  100% { opacity: 0; transform: translateY(-56px) scale(0.9); }
+}
