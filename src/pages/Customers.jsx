@@ -117,7 +117,7 @@ function QuickAddProjectForm({ customerId, okrs, onSubmit, onCancel }) {
 }
 
 // ─── Sortable customer row ────────────────────────────────────────────────────
-function SortableCustomerRow({ customer, linkedProjects, totalPoints, totalHours, okrs, onEdit, onDelete, onPin, onAddProject }) {
+function SortableCustomerRow({ customer, linkedProjects, totalPoints, totalHours, taskPts, okrs, onEdit, onDelete, onPin, onAddProject }) {
   const {
     attributes,
     listeners,
@@ -190,6 +190,12 @@ function SortableCustomerRow({ customer, linkedProjects, totalPoints, totalHours
             <p className="text-sm font-bold text-white">{totalHours.toFixed(1)}</p>
             <p className="text-[10px] text-gray-500">Hours</p>
           </div>
+          {taskPts > 0 && (
+            <div>
+              <p className="text-sm font-bold text-teal-400">⚡{taskPts}</p>
+              <p className="text-[10px] text-gray-500">Task Pts</p>
+            </div>
+          )}
         </div>
 
         {/* Action buttons */}
@@ -234,7 +240,7 @@ function SortableCustomerRow({ customer, linkedProjects, totalPoints, totalHours
 
 // ─── Main Customers page ──────────────────────────────────────────────────────
 export default function Customers() {
-  const { customers, projects, points, okrs, addCustomer, updateCustomer, deleteCustomer, reorderCustomers, addProject } = useAppStore();
+  const { customers, projects, points, tasks, okrs, addCustomer, updateCustomer, deleteCustomer, reorderCustomers, addProject } = useAppStore();
   const [createModal, setCreateModal] = useState(false);
   const [bulkModal, setBulkModal] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
@@ -302,6 +308,8 @@ export default function Customers() {
                 const totalHours = linkedProjects.reduce((s, proj) => {
                   return s + points.filter(pt => pt.projectId === proj.id).reduce((ss, e) => ss + e.hours, 0);
                 }, 0);
+                const taskPts = linkedProjects.reduce((s, proj) =>
+                  s + tasks.filter(t => t.projectId === proj.id).reduce((ss, t) => ss + (t.points || 0), 0), 0);
 
                 return (
                   <SortableCustomerRow
@@ -310,6 +318,7 @@ export default function Customers() {
                     linkedProjects={linkedProjects}
                     totalPoints={totalPoints}
                     totalHours={totalHours}
+                    taskPts={taskPts}
                     okrs={okrs}
                     onEdit={setEditTarget}
                     onDelete={setDeleteTarget}

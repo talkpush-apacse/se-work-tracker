@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { TASK_TYPE_POINTS } from '../constants';
 
 const KEYS = {
   okrs: 'gpt-okrs',
@@ -195,13 +196,29 @@ export function useStore() {
   // Task actions
   const addTask = useCallback((data) => {
     // data: { projectId, meetingEntryId (optional), description, taskType, assigneeOrTeam, status }
-    const task = { id: uid(), createdAt: new Date().toISOString(), status: 'open', ...data };
+    const task = { id: uid(), createdAt: new Date().toISOString(), status: 'open', points: 0, ...data };
+    // Auto-assign points if task is created already in 'done' status
+    if (task.status === 'done') task.points = TASK_TYPE_POINTS[task.taskType] || 0;
     setTasks(prev => [...prev, task]);
     return task;
   }, []);
 
   const updateTask = useCallback((id, data) => {
-    setTasks(prev => prev.map(t => t.id === id ? { ...t, ...data } : t));
+    setTasks(prev => prev.map(t => {
+      if (t.id !== id) return t;
+      const next = { ...t, ...data };
+      // Auto-calculate task points on status change
+      if ('status' in data) {
+        if (data.status === 'done') {
+          // Completed — award points based on task type
+          next.points = TASK_TYPE_POINTS[next.taskType] || 0;
+        } else if (t.status === 'done') {
+          // Moved OUT of done (including archive) — deduct points
+          next.points = 0;
+        }
+      }
+      return next;
+    }));
   }, []);
 
   const deleteTask = useCallback((id) => {

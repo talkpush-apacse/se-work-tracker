@@ -247,7 +247,7 @@ function KrProgress({ keyResults }) {
 
 // ─── Main OKRs page ───────────────────────────────────────────────────────────
 export default function OKRs() {
-  const { okrs, projects, points, addOkr, updateOkr, deleteOkr } = useAppStore();
+  const { okrs, projects, points, tasks, addOkr, updateOkr, deleteOkr } = useAppStore();
   const [createModal, setCreateModal] = useState(false);
   const [bulkModal, setBulkModal] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
@@ -336,6 +336,9 @@ export default function OKRs() {
                   const totalHours = linkedProjects.reduce((s, proj) => {
                     return s + points.filter(pt => pt.projectId === proj.id).reduce((ss, e) => ss + e.hours, 0);
                   }, 0);
+                  // Task completion points rolled up from all linked projects
+                  const taskPts = linkedProjects.reduce((s, proj) =>
+                    s + tasks.filter(t => t.projectId === proj.id).reduce((ss, t) => ss + (t.points || 0), 0), 0);
                   const isExpanded = expanded[okr.id];
                   const keyResults = okr.keyResults || [];
 
@@ -353,10 +356,13 @@ export default function OKRs() {
                             {/* KR progress bar */}
                             <KrProgress keyResults={keyResults} />
 
-                            <div className="flex items-center gap-4 mt-2">
+                            <div className="flex items-center gap-4 mt-2 flex-wrap">
                               <span className="text-xs text-gray-500">{linkedProjects.length} project{linkedProjects.length !== 1 ? 's' : ''}</span>
                               <span className="text-xs font-semibold text-indigo-400">{totalPoints} pts</span>
                               <span className="text-xs text-gray-500">{totalHours.toFixed(1)}h</span>
+                              {taskPts > 0 && (
+                                <span className="text-xs font-semibold text-teal-400">⚡{taskPts} task pts</span>
+                              )}
                               {keyResults.length > 0 && (
                                 <span className="text-xs text-gray-500">{keyResults.length} KR{keyResults.length !== 1 ? 's' : ''}</span>
                               )}

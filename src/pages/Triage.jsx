@@ -12,6 +12,7 @@ import {
   AI_OUTPUT_TYPES, AI_OUTPUT_TYPE_LABELS,
   TASK_RECIPIENTS,
   CUSTOMER_COLORS,
+  TASK_TYPE_POINTS,
 } from '../constants';
 
 // ─── Helper: resolve recipient label from value key ───────────────────────────
@@ -57,18 +58,183 @@ Write a concise bullet-point summary covering: key decisions made, actions taken
 Keep it scannable — this is for your own reference or a quick async update.`,
 };
 
+// ─── Shared inline project + customer creation form ───────────────────────────
+// Used by both TriageForm and QuickAddTaskForm to allow creating a new project
+// (and optionally a new customer) without leaving the current form.
+function InlineProjectCreate({ localCustomers, onCustomerCreated, onProjectCreated }) {
+  const { addCustomer, addProject } = useAppStore();
+  const [newProject, setNewProject] = useState({ name: '', customerId: '' });
+  const [showNewCustomer, setShowNewCustomer] = useState(false);
+  const [newCustomer, setNewCustomer] = useState({ name: '', color: CUSTOMER_COLORS[0].value });
+
+  const handleCreateCustomer = () => {
+    if (!newCustomer.name.trim()) return;
+    const created = addCustomer({ name: newCustomer.name.trim(), color: newCustomer.color });
+    onCustomerCreated(created);
+    setNewProject(p => ({ ...p, customerId: created.id }));
+    setNewCustomer({ name: '', color: CUSTOMER_COLORS[0].value });
+    setShowNewCustomer(false);
+  };
+
+  const handleCreateProject = () => {
+    if (!newProject.name.trim()) return;
+    const created = addProject({
+      name: newProject.name.trim(),
+      customerId: newProject.customerId || null,
+      okrId: null,
+      status: 'Active',
+    });
+    onProjectCreated(created);
+  };
+
+  return (
+    <div className="mt-2 p-2.5 bg-gray-800 border border-gray-700 rounded-xl space-y-2">
+      <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">New Project</p>
+      <input
+        value={newProject.name}
+        onChange={e => setNewProject(p => ({ ...p, name: e.target.value }))}
+        placeholder="Project name *"
+        className="w-full bg-gray-900 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+      />
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-[10px] text-gray-500">Customer <span className="text-gray-600">(optional)</span></span>
+          <button
+            type="button"
+            onClick={() => setShowNewCustomer(v => !v)}
+            className="text-[10px] font-semibold text-indigo-400 hover:text-indigo-300 transition-colors"
+          >
+            {showNewCustomer ? '✕ Cancel' : '+ New Customer'}
+          </button>
+        </div>
+        <select
+          value={newProject.customerId}
+          onChange={e => setNewProject(p => ({ ...p, customerId: e.target.value }))}
+          className="w-full bg-gray-900 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+        >
+          <option value="">— No customer —</option>
+          {localCustomers.map(c => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
+      </div>
+      {showNewCustomer && (
+        <div className="p-2 bg-gray-900 border border-gray-700 rounded-lg space-y-2">
+          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">New Customer</p>
+          <input
+            value={newCustomer.name}
+            onChange={e => setNewCustomer(p => ({ ...p, name: e.target.value }))}
+            placeholder="Customer name *"
+            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+          />
+          <div className="flex flex-wrap gap-1.5">
+            {CUSTOMER_COLORS.map(({ name, value }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setNewCustomer(p => ({ ...p, color: value }))}
+                title={name}
+                className={`w-5 h-5 rounded-full transition-all ${newCustomer.color === value ? 'ring-2 ring-white ring-offset-1 ring-offset-gray-900 scale-110' : 'hover:scale-105'}`}
+                style={{ backgroundColor: value }}
+              />
+            ))}
+          </div>
+          <button
+            type="button"
+            disabled={!newCustomer.name.trim()}
+            onClick={handleCreateCustomer}
+            className="w-full py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-white transition-colors"
+          >
+            Create Customer
+          </button>
+        </div>
+      )}
+      <button
+        type="button"
+        disabled={!newProject.name.trim()}
+        onClick={handleCreateProject}
+        className="w-full py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-white transition-colors"
+      >
+        Create Project
+      </button>
+    </div>
+  );
+}
+
 // ─── Inline triage form (shown below an untriaged entry) ──────────────────────
-function TriageForm({ entry, project, customer, onSubmit, onCancel }) {
+function TriageForm({ entry, project, customer, projects, customers, onSubmit, onCancel }) {
   const [form, setForm] = useState({
-    description: entry.rawNotes.split('\n')[0].slice(0, 120), // pre-fill from first line
-    taskType: 'mine',
-    assigneeOrTeam: '',  // stores the recipient value key
-    status: 'open',
+    projectId:     project?.id || '',
+    description:   entry.rawNotes.split('\n')[0].slice(0, 120), // pre-fill from first line
+    taskType:      'mine',
+    assigneeOrTeam: '',
+    status:        'open',
   });
+
+  // Local lists that grow if user creates new entries inline
+  const [localProjects,  setLocalProjects]  = useState(projects  || []);
+  const [localCustomers, setLocalCustomers] = useState(customers || []);
+  const [showInlineCreate, setShowInlineCreate] = useState(false);
+
+  // Build project options: non-Completed, with customer name suffix
+  const projectOptions = localProjects
+    .filter(p => p.status !== 'Completed')
+    .map(p => {
+      const c = localCustomers.find(c => c.id === p.customerId);
+      return { id: p.id, label: `${p.name}${c ? ` — ${c.name}` : ''}` };
+    })
+    .sort((a, b) => a.label.localeCompare(b.label));
+
+  const canSubmit = form.projectId && form.description.trim();
+
+  // "Logged on" date from entry.createdAt
+  const loggedOn = entry.createdAt
+    ? new Date(entry.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : null;
 
   return (
     <div className="mt-3 border-t border-gray-700/60 pt-3 space-y-3">
-      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Convert to Task</p>
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Convert to Task</p>
+        {loggedOn && (
+          <p className="text-[10px] text-gray-500">Logged on {loggedOn}</p>
+        )}
+      </div>
+
+      {/* Project selector with inline creation */}
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-xs text-gray-400">Project *</label>
+          <button
+            type="button"
+            onClick={() => setShowInlineCreate(v => !v)}
+            className="text-[10px] font-semibold text-indigo-400 hover:text-indigo-300 transition-colors"
+          >
+            {showInlineCreate ? '✕ Cancel' : '+ New Project'}
+          </button>
+        </div>
+        <select
+          value={form.projectId}
+          onChange={e => setForm(p => ({ ...p, projectId: e.target.value }))}
+          className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+        >
+          <option value="">— Select project —</option>
+          {projectOptions.map(p => (
+            <option key={p.id} value={p.id}>{p.label}</option>
+          ))}
+        </select>
+        {showInlineCreate && (
+          <InlineProjectCreate
+            localCustomers={localCustomers}
+            onCustomerCreated={c => setLocalCustomers(prev => [...prev, c])}
+            onProjectCreated={p => {
+              setLocalProjects(prev => [...prev, p]);
+              setForm(f => ({ ...f, projectId: p.id }));
+              setShowInlineCreate(false);
+            }}
+          />
+        )}
+      </div>
 
       <div>
         <label className="block text-xs text-gray-400 mb-1">Task Description *</label>
@@ -131,7 +297,7 @@ function TriageForm({ entry, project, customer, onSubmit, onCancel }) {
         </button>
         <button
           type="button"
-          disabled={!form.description.trim()}
+          disabled={!canSubmit}
           onClick={() => onSubmit({ ...form, description: form.description.trim() })}
           className="flex-1 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-white transition-colors"
         >
@@ -144,13 +310,13 @@ function TriageForm({ entry, project, customer, onSubmit, onCancel }) {
 
 // ─── Triage queue entry card ──────────────────────────────────────────────────
 function TriageEntryCard({ entry, project, customer, onTriaged }) {
-  const { addTask, markMeetingEntryTriaged } = useAppStore();
+  const { addTask, markMeetingEntryTriaged, projects, customers } = useAppStore();
   const [expanded, setExpanded] = useState(false);
   const [showForm, setShowForm] = useState(false);
 
   const handleSubmit = (formData) => {
     addTask({
-      projectId: project.id,
+      projectId: formData.projectId || project.id, // use form-selected project (may differ from entry's)
       meetingEntryId: entry.id,
       description: formData.description,
       taskType: formData.taskType,
@@ -218,6 +384,8 @@ function TriageEntryCard({ entry, project, customer, onTriaged }) {
           entry={entry}
           project={project}
           customer={customer}
+          projects={projects}
+          customers={customers}
           onSubmit={handleSubmit}
           onCancel={() => setShowForm(false)}
         />
@@ -232,6 +400,14 @@ function TaskCard({ task, project, customer, isSelected, onSelect, onStatusChang
   const typeColors = TASK_TYPE_COLORS[task.taskType] || TASK_TYPE_COLORS.mine;
   const statusColors = TASK_STATUS_COLORS[task.status] || TASK_STATUS_COLORS.open;
   const isArchived = task.status === 'archived';
+
+  // Aging — days since task creation (client-side, no DB needed)
+  const ageDays = Math.floor((Date.now() - new Date(task.createdAt)) / 86_400_000);
+  const ageStyle = ageDays <= 2
+    ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+    : ageDays <= 5
+      ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
+      : 'text-red-400 bg-red-500/10 border-red-500/20';
   const [isEditing, setIsEditing] = useState(false);
   const [draftDesc, setDraftDesc] = useState(task.description);
   const editRef = useRef(null);
@@ -320,9 +496,25 @@ function TaskCard({ task, project, customer, isSelected, onSelect, onStatusChang
         <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${typeColors.bg} ${typeColors.text} ${typeColors.border}`}>
           {TASK_TYPE_LABELS[task.taskType]}
         </span>
+        {/* Aging chip — hidden for archived tasks */}
+        {!isArchived && (
+          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${ageStyle}`}
+            title={`Created ${ageDays} day${ageDays === 1 ? '' : 's'} ago`}
+          >
+            {ageDays}d
+          </span>
+        )}
         {task.assigneeOrTeam && (
           <span className="flex items-center gap-0.5 text-[10px] text-gray-500">
             <User size={9} /> {recipientLabel(task.assigneeOrTeam)}
+          </span>
+        )}
+        {/* Task points badge — shown when task is done */}
+        {task.points > 0 && (
+          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full border bg-teal-500/10 text-teal-400 border-teal-500/20"
+            title={`${task.points} task point${task.points === 1 ? '' : 's'} earned`}
+          >
+            ⚡ {task.points}pt{task.points === 1 ? '' : 's'}
           </span>
         )}
       </div>
@@ -910,8 +1102,6 @@ function AIWorkspace({ task, project, customer }) {
 
 // ─── Quick add task form (no meeting entry, just description + project link) ───
 function QuickAddTaskForm({ projects, customers, onSubmit, onCancel }) {
-  const { addCustomer, addProject } = useAppStore();
-
   const [form, setForm] = useState({
     projectId: '',
     description: '',
@@ -920,54 +1110,20 @@ function QuickAddTaskForm({ projects, customers, onSubmit, onCancel }) {
     status: 'open',
   });
 
-  // Inline new-project state
-  const [showNewProject, setShowNewProject] = useState(false);
-  const [newProject, setNewProject] = useState({ name: '', customerId: '' });
-
-  // Inline new-customer state (nested inside new-project)
-  const [showNewCustomer, setShowNewCustomer] = useState(false);
-  const [newCustomer, setNewCustomer] = useState({ name: '', color: CUSTOMER_COLORS[0].value });
-
-  // Live lists (may grow if user creates new entries)
+  // Live lists grow when user creates new entries via InlineProjectCreate
   const [localCustomers, setLocalCustomers] = useState(customers);
-  const [localProjects, setLocalProjects] = useState(projects);
+  const [localProjects,  setLocalProjects]  = useState(projects);
+  const [showInlineCreate, setShowInlineCreate] = useState(false);
 
-  // Derive a flat list: project name + customer name for the selector
   const projectOptions = localProjects
     .filter(p => p.status !== 'Completed')
     .map(p => {
-      const customer = localCustomers.find(c => c.id === p.customerId);
-      return { id: p.id, label: `${p.name}${customer ? ` — ${customer.name}` : ''}` };
+      const c = localCustomers.find(c => c.id === p.customerId);
+      return { id: p.id, label: `${p.name}${c ? ` — ${c.name}` : ''}` };
     })
     .sort((a, b) => a.label.localeCompare(b.label));
 
   const canSubmit = form.projectId && form.description.trim();
-
-  // ── Create a new customer inline ──────────────────────────────────────────
-  const handleCreateCustomer = () => {
-    if (!newCustomer.name.trim()) return;
-    const created = addCustomer({ name: newCustomer.name.trim(), color: newCustomer.color });
-    setLocalCustomers(prev => [...prev, created]);
-    setNewProject(p => ({ ...p, customerId: created.id }));
-    setNewCustomer({ name: '', color: CUSTOMER_COLORS[0].value });
-    setShowNewCustomer(false);
-  };
-
-  // ── Create a new project inline ───────────────────────────────────────────
-  const handleCreateProject = () => {
-    if (!newProject.name.trim()) return;
-    const created = addProject({
-      name: newProject.name.trim(),
-      customerId: newProject.customerId || null,
-      okrId: null,
-      status: 'Active',
-    });
-    setLocalProjects(prev => [...prev, created]);
-    setForm(p => ({ ...p, projectId: created.id }));
-    setNewProject({ name: '', customerId: '' });
-    setShowNewProject(false);
-    setShowNewCustomer(false);
-  };
 
   return (
     <div className="bg-gray-800/60 border border-indigo-500/30 rounded-xl p-3 space-y-3">
@@ -979,10 +1135,10 @@ function QuickAddTaskForm({ projects, customers, onSubmit, onCancel }) {
           <label className="text-xs text-gray-400">Project *</label>
           <button
             type="button"
-            onClick={() => { setShowNewProject(v => !v); setShowNewCustomer(false); }}
+            onClick={() => setShowInlineCreate(v => !v)}
             className="text-[10px] font-semibold text-indigo-400 hover:text-indigo-300 transition-colors"
           >
-            {showNewProject ? '✕ Cancel' : '+ New Project'}
+            {showInlineCreate ? '✕ Cancel' : '+ New Project'}
           </button>
         </div>
         <select
@@ -995,83 +1151,16 @@ function QuickAddTaskForm({ projects, customers, onSubmit, onCancel }) {
             <option key={p.id} value={p.id}>{p.label}</option>
           ))}
         </select>
-
-        {/* ── Inline new project mini-form ── */}
-        {showNewProject && (
-          <div className="mt-2 p-2.5 bg-gray-800 border border-gray-700 rounded-xl space-y-2">
-            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">New Project</p>
-            <input
-              value={newProject.name}
-              onChange={e => setNewProject(p => ({ ...p, name: e.target.value }))}
-              placeholder="Project name *"
-              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
-            />
-            {/* Customer selector within new project */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] text-gray-500">Customer <span className="text-gray-600">(optional)</span></span>
-                <button
-                  type="button"
-                  onClick={() => setShowNewCustomer(v => !v)}
-                  className="text-[10px] font-semibold text-indigo-400 hover:text-indigo-300 transition-colors"
-                >
-                  {showNewCustomer ? '✕ Cancel' : '+ New Customer'}
-                </button>
-              </div>
-              <select
-                value={newProject.customerId}
-                onChange={e => setNewProject(p => ({ ...p, customerId: e.target.value }))}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
-              >
-                <option value="">— No customer —</option>
-                {localCustomers.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* ── Inline new customer sub-form ── */}
-            {showNewCustomer && (
-              <div className="p-2 bg-gray-900 border border-gray-700 rounded-lg space-y-2">
-                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">New Customer</p>
-                <input
-                  value={newCustomer.name}
-                  onChange={e => setNewCustomer(p => ({ ...p, name: e.target.value }))}
-                  placeholder="Customer name *"
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
-                />
-                <div className="flex flex-wrap gap-1.5">
-                  {CUSTOMER_COLORS.map(({ name, value }) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => setNewCustomer(p => ({ ...p, color: value }))}
-                      title={name}
-                      className={`w-5 h-5 rounded-full transition-all ${newCustomer.color === value ? 'ring-2 ring-white ring-offset-1 ring-offset-gray-900 scale-110' : 'hover:scale-105'}`}
-                      style={{ backgroundColor: value }}
-                    />
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  disabled={!newCustomer.name.trim()}
-                  onClick={handleCreateCustomer}
-                  className="w-full py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-white transition-colors"
-                >
-                  Create Customer
-                </button>
-              </div>
-            )}
-
-            <button
-              type="button"
-              disabled={!newProject.name.trim()}
-              onClick={handleCreateProject}
-              className="w-full py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-white transition-colors"
-            >
-              Create Project
-            </button>
-          </div>
+        {showInlineCreate && (
+          <InlineProjectCreate
+            localCustomers={localCustomers}
+            onCustomerCreated={c => setLocalCustomers(prev => [...prev, c])}
+            onProjectCreated={p => {
+              setLocalProjects(prev => [...prev, p]);
+              setForm(f => ({ ...f, projectId: p.id }));
+              setShowInlineCreate(false);
+            }}
+          />
         )}
       </div>
 
@@ -1159,6 +1248,8 @@ export default function Triage() {
   // Filter state
   const [filterCustomerId, setFilterCustomerId] = useState('');
   const [filterProjectId, setFilterProjectId] = useState('');
+  const [filterTaskType,   setFilterTaskType]   = useState('');
+  const [filterStatus,     setFilterStatus]     = useState('');
   const [showArchived, setShowArchived] = useState(false);
 
   // Derived customer list for filter dropdown (only customers that have tasks)
@@ -1201,6 +1292,8 @@ export default function Triage() {
       if (!proj || proj.customerId !== filterCustomerId) return false;
     }
     if (filterProjectId && t.projectId !== filterProjectId) return false;
+    if (filterTaskType && t.taskType !== filterTaskType) return false;
+    if (filterStatus   && t.status   !== filterStatus)   return false;
     return true;
   });
 
@@ -1212,6 +1305,7 @@ export default function Triage() {
       if (!proj || proj.customerId !== filterCustomerId) return false;
     }
     if (filterProjectId && t.projectId !== filterProjectId) return false;
+    if (filterTaskType && t.taskType !== filterTaskType) return false;
     return true;
   });
 
@@ -1225,7 +1319,7 @@ export default function Triage() {
 
   const totalActiveTasks = activeTasks.length;
   const openCount = (tasksByStatus['open'] || []).length + (tasksByStatus['in-progress'] || []).length;
-  const filtersActive = filterCustomerId || filterProjectId;
+  const filtersActive = filterCustomerId || filterProjectId || filterTaskType || filterStatus;
 
   // Resolve selected task's project/customer
   const selectedProject = selectedTask ? projects.find(p => p.id === selectedTask.projectId) : null;
@@ -1376,8 +1470,8 @@ export default function Triage() {
             </div>
           )}
 
-          {/* Filter bar */}
-          <div className="flex gap-2 mb-3">
+          {/* Filter bar — row 1: client + project */}
+          <div className="flex gap-2 mb-2">
             <select
               value={filterCustomerId}
               onChange={e => handleCustomerFilter(e.target.value)}
@@ -1399,11 +1493,40 @@ export default function Triage() {
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
+          </div>
+
+          {/* Filter bar — row 2: task type + status + clear */}
+          <div className="flex gap-2 mb-3">
+            <select
+              value={filterTaskType}
+              onChange={e => setFilterTaskType(e.target.value)}
+              className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+            >
+              <option value="">All types</option>
+              {TASK_TYPES.map(t => (
+                <option key={t} value={t}>{TASK_TYPE_LABELS[t]}</option>
+              ))}
+            </select>
+            <select
+              value={filterStatus}
+              onChange={e => setFilterStatus(e.target.value)}
+              className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+            >
+              <option value="">All statuses</option>
+              {TASK_STATUSES.map(s => (
+                <option key={s} value={s}>{TASK_STATUS_LABELS[s]}</option>
+              ))}
+            </select>
             {filtersActive && (
               <button
-                onClick={() => { setFilterCustomerId(''); setFilterProjectId(''); }}
+                onClick={() => {
+                  setFilterCustomerId('');
+                  setFilterProjectId('');
+                  setFilterTaskType('');
+                  setFilterStatus('');
+                }}
                 className="px-2.5 py-2 rounded-xl bg-gray-800 border border-gray-700 text-[10px] text-gray-400 hover:text-white hover:border-gray-600 transition-colors flex-shrink-0"
-                title="Clear filters"
+                title="Clear all filters"
               >
                 ✕
               </button>

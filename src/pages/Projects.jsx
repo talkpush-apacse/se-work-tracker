@@ -182,7 +182,7 @@ function EditEntryModal({ entry, onClose }) {
 }
 
 function ProjectDetail({ project, onBack }) {
-  const { points, customers, okrs, addPoint, deletePoint, updatePoint, updateProject, deleteProject, getProjectMeetingEntries, getProjectTasks, updateTask } = useAppStore();
+  const { points, tasks, customers, okrs, addPoint, deletePoint, updatePoint, updateProject, deleteProject, getProjectMeetingEntries, getProjectTasks, updateTask } = useAppStore();
   const { isRunning, projectId: runningProjectId, startTimer, stopTimer } = useTimerContext();
   const [activeTab, setActiveTab] = useState('points'); // 'points' | 'meetings' | 'tasks'
   const [addModal, setAddModal] = useState(false);
@@ -201,6 +201,8 @@ function ProjectDetail({ project, onBack }) {
   const entries = points.filter(p => p.projectId === project.id).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
   const totalPoints = entries.reduce((s, e) => s + e.points, 0);
   const totalHours = entries.reduce((s, e) => s + e.hours, 0);
+  // Task completion points: auto-awarded when tasks are marked done
+  const taskPts = tasks.filter(t => t.projectId === project.id).reduce((s, t) => s + (t.points || 0), 0);
 
   // Meeting entries sorted newest-date-first, then grouped by meetingDate
   const meetingEntries = getProjectMeetingEntries(project.id).sort(
@@ -260,7 +262,7 @@ function ProjectDetail({ project, onBack }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-3 mt-5">
+        <div className={`grid gap-3 mt-5 ${taskPts > 0 ? 'grid-cols-4' : 'grid-cols-3'}`}>
           <div className="bg-gray-800/60 rounded-xl p-3 text-center">
             <p className="text-2xl font-bold text-indigo-400">{totalPoints}</p>
             <p className="text-xs text-gray-400 mt-0.5">Total Points</p>
@@ -273,6 +275,12 @@ function ProjectDetail({ project, onBack }) {
             <p className="text-2xl font-bold text-white">{entries.length}</p>
             <p className="text-xs text-gray-400 mt-0.5">Entries</p>
           </div>
+          {taskPts > 0 && (
+            <div className="bg-teal-500/10 border border-teal-500/20 rounded-xl p-3 text-center">
+              <p className="text-2xl font-bold text-teal-400">⚡{taskPts}</p>
+              <p className="text-xs text-teal-500/80 mt-0.5">Task Pts</p>
+            </div>
+          )}
         </div>
 
         {/* Floating flash */}

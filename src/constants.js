@@ -23,19 +23,30 @@ export const CUSTOMER_COLORS = [
 
 export const PROJECT_STATUSES = ['Active', 'On Hold', 'Completed'];
 
-// Task types (matches spec: mine / coordinate / comms)
-export const TASK_TYPES = ['mine', 'coordinate', 'comms'];
+// Task types
+export const TASK_TYPES = ['mine', 'coordinate', 'comms', 'focus-time'];
 
 export const TASK_TYPE_LABELS = {
-  mine: 'Mine',
-  coordinate: 'Coordinate',
-  comms: 'Needs Comms',
+  mine:         'Mine',
+  coordinate:   'Coordinate',
+  comms:        'Needs Comms',
+  'focus-time': 'Focus Time',
 };
 
 export const TASK_TYPE_COLORS = {
-  mine: { bg: 'bg-blue-500/15', text: 'text-blue-400', border: 'border-blue-500/20' },
-  coordinate: { bg: 'bg-amber-500/15', text: 'text-amber-400', border: 'border-amber-500/20' },
-  comms: { bg: 'bg-purple-500/15', text: 'text-purple-400', border: 'border-purple-500/20' },
+  mine:         { bg: 'bg-blue-500/15',   text: 'text-blue-400',   border: 'border-blue-500/20' },
+  coordinate:   { bg: 'bg-amber-500/15',  text: 'text-amber-400',  border: 'border-amber-500/20' },
+  comms:        { bg: 'bg-purple-500/15', text: 'text-purple-400', border: 'border-purple-500/20' },
+  'focus-time': { bg: 'bg-teal-500/15',   text: 'text-teal-400',   border: 'border-teal-500/20' },
+};
+
+// Points awarded per task type when a task is marked 'done'
+// Moving OUT of 'done' resets points to 0
+export const TASK_TYPE_POINTS = {
+  'focus-time': 2,
+  mine:         1,
+  coordinate:   1,
+  comms:        1,
 };
 
 // Task statuses — 'archived' is a soft-delete; excluded from board by default
