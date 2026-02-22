@@ -19,6 +19,37 @@ function load(key, fallback = []) {
   }
 }
 
+// Migrate OKRs that predate the keyResults/quarter fields
+function migrateOkrs(okrs) {
+  return okrs.map(okr => {
+    const migrated = { ...okr };
+    // Add quarter default for existing OKRs
+    if (!migrated.quarter) migrated.quarter = 'Q1 2026';
+    // Convert old freeform description into structured keyResults
+    if (!migrated.keyResults) {
+      if (migrated.description && migrated.description.trim()) {
+        // Parse "KR1: ..." lines from description into structured KRs
+        const lines = migrated.description.split('\n').filter(l => /^KR\d*:/i.test(l.trim()));
+        if (lines.length > 0) {
+          migrated.keyResults = lines.map((line, i) => ({
+            id: `kr-${okr.id}-${i}`,
+            text: line.replace(/^KR\d*:\s*/i, '').trim(),
+            type: 'boolean',
+            value: null,
+          }));
+          migrated.description = ''; // clear since KRs are now structured
+        } else {
+          migrated.keyResults = [];
+          // Keep description as-is (it's freeform notes, not KRs)
+        }
+      } else {
+        migrated.keyResults = [];
+      }
+    }
+    return migrated;
+  });
+}
+
 function save(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
 }
@@ -28,7 +59,7 @@ function uid() {
 }
 
 export function useStore() {
-  const [okrs, setOkrs] = useState(() => load(KEYS.okrs));
+  const [okrs, setOkrs] = useState(() => migrateOkrs(load(KEYS.okrs)));
   const [customers, setCustomers] = useState(() => load(KEYS.customers));
   const [projects, setProjects] = useState(() => load(KEYS.projects));
   const [points, setPoints] = useState(() => load(KEYS.points));

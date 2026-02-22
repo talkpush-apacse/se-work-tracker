@@ -3,6 +3,24 @@ import { Target, ChevronRight } from 'lucide-react';
 import Modal from './Modal';
 import { useAppStore } from '../context/StoreContext';
 
+// Mirror the quarter generator from OKRs.jsx
+function generateQuarters() {
+  const quarters = [];
+  const now = new Date();
+  const startYear = now.getFullYear();
+  const startQ = Math.ceil((now.getMonth() + 1) / 3);
+  for (let offset = -3; offset <= 4; offset++) {
+    let q = startQ + offset;
+    let y = startYear;
+    while (q < 1) { q += 4; y--; }
+    while (q > 4) { q -= 4; y++; }
+    quarters.push(`Q${q} ${y}`);
+  }
+  return quarters;
+}
+const QUARTERS = generateQuarters();
+const CURRENT_QUARTER = QUARTERS[3];
+
 function parseOkrText(text) {
   const lines = text.split('\n');
   const objectives = [];
@@ -30,6 +48,7 @@ function parseOkrText(text) {
 export default function BulkAddOKRsModal({ onClose }) {
   const { okrs, addOkr } = useAppStore();
   const [text, setText] = useState('');
+  const [quarter, setQuarter] = useState(CURRENT_QUARTER);
   const [result, setResult] = useState(null);
 
   const existingTitles = useMemo(
@@ -59,11 +78,14 @@ export default function BulkAddOKRsModal({ onClose }) {
 
   const handleConfirm = () => {
     toAdd.forEach(obj => {
-      // Build description from key results if any
-      const description = obj.keyResults.length
-        ? obj.keyResults.map((kr, i) => `KR${i + 1}: ${kr}`).join('\n')
-        : '';
-      addOkr({ title: obj.title, description });
+      // Convert parsed KR strings into the structured keyResults format
+      const keyResults = obj.keyResults.map((krText, i) => ({
+        id: `kr-bulk-${Date.now().toString(36)}-${i}`,
+        text: krText,
+        type: 'boolean', // default; user can change type after via Edit
+        value: null,
+      }));
+      addOkr({ title: obj.title, description: '', quarter, keyResults });
     });
     setResult({ added: toAdd.length, skipped: skipped.length });
   };
@@ -91,6 +113,18 @@ export default function BulkAddOKRsModal({ onClose }) {
     <Modal title="Bulk Add OKRs" onClose={onClose} size="xl">
       <div className="space-y-4">
         <div>
+          <label className="block text-xs font-medium text-gray-400 mb-1.5">Quarter (applied to all objectives)</label>
+          <select
+            value={quarter}
+            onChange={e => setQuarter(e.target.value)}
+            className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+          >
+            {QUARTERS.map(q => (
+              <option key={q} value={q}>{q}{q === CURRENT_QUARTER ? ' (current)' : ''}</option>
+            ))}
+          </select>
+        </div>
+        <div>
           <label className="block text-xs font-medium text-gray-400 mb-1.5">
             Paste OKRs in structured format
           </label>
@@ -113,6 +147,7 @@ KR2: Deliver 5 new enterprise case studies`}
             <p>• Start each objective with <code className="text-indigo-400 bg-indigo-950/40 px-1 rounded">Objective: [title]</code></p>
             <p>• Add key results with <code className="text-indigo-400 bg-indigo-950/40 px-1 rounded">KR1: [description]</code>, <code className="text-indigo-400 bg-indigo-950/40 px-1 rounded">KR2:</code>, etc.</p>
             <p>• Blank lines between objectives are fine. Lines not matching the format are ignored.</p>
+            <p>• KRs default to Yes/No type — change to numeric (0–100) by editing the OKR after adding.</p>
           </div>
         </div>
 
