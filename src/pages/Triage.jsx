@@ -889,11 +889,126 @@ function AIWorkspace({ task, project, customer }) {
   );
 }
 
+// ─── Quick add task form (no meeting entry, just description + project link) ───
+function QuickAddTaskForm({ projects, customers, onSubmit, onCancel }) {
+  const [form, setForm] = useState({
+    projectId: '',
+    description: '',
+    taskType: 'mine',
+    assigneeOrTeam: '',
+    status: 'open',
+  });
+
+  // Derive a flat list: project name + customer name for the selector
+  const projectOptions = projects
+    .filter(p => p.status !== 'Completed')
+    .map(p => {
+      const customer = customers.find(c => c.id === p.customerId);
+      return { id: p.id, label: `${p.name}${customer ? ` — ${customer.name}` : ''}` };
+    })
+    .sort((a, b) => a.label.localeCompare(b.label));
+
+  const canSubmit = form.projectId && form.description.trim();
+
+  return (
+    <div className="bg-gray-800/60 border border-indigo-500/30 rounded-xl p-3 space-y-3">
+      <p className="text-xs font-semibold text-indigo-300 uppercase tracking-wide">New Task</p>
+
+      {/* Project selector */}
+      <div>
+        <label className="block text-xs text-gray-400 mb-1">Project *</label>
+        <select
+          value={form.projectId}
+          onChange={e => setForm(p => ({ ...p, projectId: e.target.value }))}
+          className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+        >
+          <option value="">— Select project —</option>
+          {projectOptions.map(p => (
+            <option key={p.id} value={p.id}>{p.label}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Description */}
+      <div>
+        <label className="block text-xs text-gray-400 mb-1">Task Description *</label>
+        <textarea
+          rows={2}
+          value={form.description}
+          onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+          placeholder="What needs to be done?"
+          className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40 resize-none"
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs text-gray-400 mb-1">Task Type</label>
+          <select
+            value={form.taskType}
+            onChange={e => setForm(p => ({ ...p, taskType: e.target.value }))}
+            className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+          >
+            {TASK_TYPES.map(t => (
+              <option key={t} value={t}>{TASK_TYPE_LABELS[t]}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs text-gray-400 mb-1">Status</label>
+          <select
+            value={form.status}
+            onChange={e => setForm(p => ({ ...p, status: e.target.value }))}
+            className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+          >
+            {TASK_STATUSES.map(s => (
+              <option key={s} value={s}>{TASK_STATUS_LABELS[s]}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-xs text-gray-400 mb-1">Recipient <span className="text-gray-600">(optional)</span></label>
+        <select
+          value={form.assigneeOrTeam}
+          onChange={e => setForm(p => ({ ...p, assigneeOrTeam: e.target.value }))}
+          className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+        >
+          <option value="">— Select recipient —</option>
+          {TASK_RECIPIENTS.map(r => (
+            <option key={r.value} value={r.value}>{r.label}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="flex gap-2 pt-1">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="flex-1 py-2 rounded-xl bg-gray-700 hover:bg-gray-600 text-xs font-medium transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          disabled={!canSubmit}
+          onClick={() => onSubmit({ ...form, description: form.description.trim() })}
+          className="flex-1 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-white transition-colors"
+        >
+          Create Task
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Triage page ──────────────────────────────────────────────────────────
 export default function Triage() {
-  const { meetingEntries, tasks, projects, customers, updateTask } = useAppStore();
+  const { meetingEntries, tasks, projects, customers, updateTask, addTask } = useAppStore();
   const [selectedTask, setSelectedTask] = useState(null);
   const [triageRefresh, setTriageRefresh] = useState(0);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
 
   // Filter state
   const [filterCustomerId, setFilterCustomerId] = useState('');
@@ -1081,7 +1196,39 @@ export default function Triage() {
                 filtered
               </span>
             )}
+            <button
+              onClick={() => setShowQuickAdd(v => !v)}
+              className={`ml-auto flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
+                showQuickAdd
+                  ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300'
+                  : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-indigo-300 hover:border-indigo-500/40'
+              }`}
+            >
+              <Plus size={12} />
+              Task
+            </button>
           </div>
+
+          {/* Quick add task form */}
+          {showQuickAdd && (
+            <div className="mb-3">
+              <QuickAddTaskForm
+                projects={projects}
+                customers={customers}
+                onSubmit={(formData) => {
+                  addTask({
+                    projectId: formData.projectId,
+                    description: formData.description,
+                    taskType: formData.taskType,
+                    assigneeOrTeam: formData.assigneeOrTeam || null,
+                    status: formData.status,
+                  });
+                  setShowQuickAdd(false);
+                }}
+                onCancel={() => setShowQuickAdd(false)}
+              />
+            </div>
+          )}
 
           {/* Filter bar */}
           <div className="flex gap-2 mb-3">
