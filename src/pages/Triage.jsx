@@ -1674,7 +1674,8 @@ export default function Triage() {
   const [filterProjectId, setFilterProjectId] = useState('');
   const [filterTaskType,   setFilterTaskType]   = useState('');
   const [filterStatus,     setFilterStatus]     = useState('');
-  const [showArchived, setShowArchived] = useState(false);
+  // 'active' tab: open/in-progress/blocked; 'closed' tab: done + archived
+  const [boardTab, setBoardTab] = useState('active');
 
   // dnd-kit sensors
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
@@ -1711,9 +1712,9 @@ export default function Triage() {
     return acc;
   }, {});
 
-  // All active (non-archived) tasks, filtered
+  // Active tasks: open, in-progress, blocked (excludes done and archived)
   const activeTasks = tasks.filter(t => {
-    if (t.status === 'archived') return false;
+    if (['done', 'archived'].includes(t.status)) return false;
     if (filterCustomerId) {
       const proj = projects.find(p => p.id === t.projectId);
       if (!proj || proj.customerId !== filterCustomerId) return false;
@@ -1724,9 +1725,9 @@ export default function Triage() {
     return true;
   });
 
-  // Archived tasks (filtered the same way)
-  const archivedTasks = tasks.filter(t => {
-    if (t.status !== 'archived') return false;
+  // Closed tasks: done + archived
+  const closedTasks = tasks.filter(t => {
+    if (!['done', 'archived'].includes(t.status)) return false;
     if (filterCustomerId) {
       const proj = projects.find(p => p.id === t.projectId);
       if (!proj || proj.customerId !== filterCustomerId) return false;
@@ -1821,9 +1822,14 @@ export default function Triage() {
         <div className="flex items-center gap-2 mb-3">
           <Tag size={15} className="text-indigo-400" />
           <h2 className="text-sm font-semibold text-white">Task Board</h2>
-          {activeTasks.length > 0 && (
+          {boardTab === 'active' && activeTasks.length > 0 && (
             <span className="bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
               {activeTasks.length} active
+            </span>
+          )}
+          {boardTab === 'closed' && closedTasks.length > 0 && (
+            <span className="bg-gray-500/20 text-gray-400 border border-gray-500/20 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+              {closedTasks.length} closed
             </span>
           )}
           {filtersActive && (
@@ -1902,16 +1908,19 @@ export default function Triage() {
               <option key={t} value={t}>{TASK_TYPE_LABELS[t]}</option>
             ))}
           </select>
-          <select
-            value={filterStatus}
-            onChange={e => setFilterStatus(e.target.value)}
-            className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
-          >
-            <option value="">All statuses</option>
-            {TASK_STATUSES.map(s => (
-              <option key={s} value={s}>{TASK_STATUS_LABELS[s]}</option>
-            ))}
-          </select>
+          {/* Status filter only shown on Active tab; Closed tab always shows done+archived */}
+          {boardTab === 'active' && (
+            <select
+              value={filterStatus}
+              onChange={e => setFilterStatus(e.target.value)}
+              className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+            >
+              <option value="">All statuses</option>
+              {TASK_STATUSES.filter(s => !['done', 'archived'].includes(s)).map(s => (
+                <option key={s} value={s}>{TASK_STATUS_LABELS[s]}</option>
+              ))}
+            </select>
+          )}
           {filtersActive && (
             <button
               onClick={() => {
@@ -1928,17 +1937,44 @@ export default function Triage() {
           )}
         </div>
 
-        {/* Flat draggable task list */}
-        {activeTasks.length === 0 && !showArchived ? (
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl px-5 py-10 text-center">
-            <Tag size={24} className="text-gray-700 mx-auto mb-2" />
-            <p className="text-gray-500 text-sm">{filtersActive ? 'No tasks match this filter.' : 'No tasks yet.'}</p>
-            <p className="text-gray-600 text-xs mt-1">
-              {filtersActive ? 'Try a different filter.' : 'Convert a meeting entry above to create your first task.'}
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-4">
+        {/* Active / Closed tab switcher */}
+        <div className="flex gap-1 bg-gray-800/50 rounded-xl p-1 mb-3 w-fit">
+          <button
+            onClick={() => { setBoardTab('active'); setFilterStatus(''); }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              boardTab === 'active' ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            Active ({activeTasks.length})
+          </button>
+          <button
+            onClick={() => { setBoardTab('closed'); setFilterStatus(''); }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              boardTab === 'closed' ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            Closed
+            {closedTasks.length > 0 && (
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                boardTab === 'closed' ? 'bg-gray-600 text-gray-300' : 'bg-gray-700 text-gray-400'
+              }`}>
+                {closedTasks.length}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* Active tab — draggable task list */}
+        {boardTab === 'active' && (
+          activeTasks.length === 0 ? (
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl px-5 py-10 text-center">
+              <Tag size={24} className="text-gray-700 mx-auto mb-2" />
+              <p className="text-gray-500 text-sm">{filtersActive ? 'No tasks match this filter.' : 'No active tasks.'}</p>
+              <p className="text-gray-600 text-xs mt-1">
+                {filtersActive ? 'Try a different filter.' : 'Convert a meeting entry above or add a task to get started.'}
+              </p>
+            </div>
+          ) : (
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={activeTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
                 <div className="space-y-2">
@@ -1958,40 +1994,36 @@ export default function Triage() {
                 </div>
               </SortableContext>
             </DndContext>
+          )
+        )}
 
-            {/* Archived section */}
-            {archivedTasks.length > 0 && (
-              <div>
-                <button
-                  onClick={() => setShowArchived(v => !v)}
-                  className="flex items-center gap-2 text-[10px] font-semibold text-gray-600 hover:text-gray-400 transition-colors mb-2"
-                >
-                  <Archive size={11} />
-                  {showArchived ? 'Hide' : 'Show'} Archived ({archivedTasks.length})
-                  <ChevronDown size={11} className={`transition-transform ${showArchived ? 'rotate-180' : ''}`} />
-                </button>
-                {showArchived && (
-                  <div className="space-y-2">
-                    {archivedTasks
-                      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-                      .map(task => {
-                        const project  = projects.find(p => p.id === task.projectId);
-                        const customer = customers.find(c => c.id === project?.customerId);
-                        return (
-                          <SortableTaskRow
-                            key={task.id}
-                            task={task}
-                            project={project}
-                            customer={customer}
-                            onOpenDetail={handleOpenDetail}
-                          />
-                        );
-                      })}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+        {/* Closed tab — done + archived tasks, non-draggable */}
+        {boardTab === 'closed' && (
+          closedTasks.length === 0 ? (
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl px-5 py-10 text-center">
+              <Archive size={24} className="text-gray-700 mx-auto mb-2" />
+              <p className="text-gray-500 text-sm">{filtersActive ? 'No closed tasks match this filter.' : 'No closed tickets yet.'}</p>
+              <p className="text-gray-600 text-xs mt-1">Tasks marked done or archived will appear here.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {closedTasks
+                .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+                .map(task => {
+                  const project  = projects.find(p => p.id === task.projectId);
+                  const customer = customers.find(c => c.id === project?.customerId);
+                  return (
+                    <SortableTaskRow
+                      key={task.id}
+                      task={task}
+                      project={project}
+                      customer={customer}
+                      onOpenDetail={handleOpenDetail}
+                    />
+                  );
+                })}
+            </div>
+          )
         )}
       </div>
     </div>

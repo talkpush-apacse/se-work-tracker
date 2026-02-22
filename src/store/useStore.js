@@ -8,6 +8,7 @@ const KEYS = {
   points: 'gpt-points',
   meetingEntries: 'gpt-meeting-entries',
   tasks: 'gpt-tasks',
+  milestones: 'gpt-milestones',
   aiOutputs: 'gpt-ai-outputs',
   aiSettings: 'gpt-ai-settings',
 };
@@ -87,6 +88,7 @@ export function useStore() {
   const [points, setPoints] = useState(() => load(KEYS.points));
   const [meetingEntries, setMeetingEntries] = useState(() => load(KEYS.meetingEntries));
   const [tasks, setTasks] = useState(() => load(KEYS.tasks));
+  const [milestones, setMilestones] = useState(() => load(KEYS.milestones));
   const [aiOutputs, setAiOutputs] = useState(() => load(KEYS.aiOutputs));
   const [aiSettings, setAiSettings] = useState(() => {
     const stored = load(KEYS.aiSettings, null);
@@ -106,6 +108,7 @@ export function useStore() {
   useEffect(() => { save(KEYS.points, points); }, [points]);
   useEffect(() => { save(KEYS.meetingEntries, meetingEntries); }, [meetingEntries]);
   useEffect(() => { save(KEYS.tasks, tasks); }, [tasks]);
+  useEffect(() => { save(KEYS.milestones, milestones); }, [milestones]);
   useEffect(() => { save(KEYS.aiOutputs, aiOutputs); }, [aiOutputs]);
   useEffect(() => { save(KEYS.aiSettings, aiSettings); }, [aiSettings]);
 
@@ -160,6 +163,7 @@ export function useStore() {
     setPoints(prev => prev.filter(pt => pt.projectId !== id));
     setMeetingEntries(prev => prev.filter(m => m.projectId !== id));
     setTasks(prev => prev.filter(t => t.projectId !== id));
+    setMilestones(prev => prev.filter(m => m.projectId !== id));
   }, []);
 
   // Point actions
@@ -234,6 +238,26 @@ export function useStore() {
     setTasks(prev => orderedIds.map(id => prev.find(t => t.id === id)).filter(Boolean));
   }, []);
 
+  // Milestone actions
+  const addMilestone = useCallback((data) => {
+    // data: { projectId, title, targetDate (YYYY-MM-DD), status ('upcoming'|'achieved'|'missed') }
+    const m = { id: uid(), createdAt: new Date().toISOString(), ...data };
+    setMilestones(prev => [...prev, m]);
+    return m;
+  }, []);
+
+  const updateMilestone = useCallback((id, data) => {
+    setMilestones(prev => prev.map(m => m.id === id ? { ...m, ...data } : m));
+  }, []);
+
+  const deleteMilestone = useCallback((id) => {
+    setMilestones(prev => prev.filter(m => m.id !== id));
+  }, []);
+
+  const getProjectMilestones = useCallback((projectId) => {
+    return milestones.filter(m => m.projectId === projectId);
+  }, [milestones]);
+
   // AI output actions
   const addAiOutput = useCallback((data) => {
     // data: { taskId, outputType, inputText, outputText }
@@ -307,7 +331,7 @@ export function useStore() {
   }, []);
 
   return {
-    okrs, customers, projects, points, meetingEntries, tasks, aiOutputs,
+    okrs, customers, projects, points, meetingEntries, tasks, milestones, aiOutputs,
     addOkr, updateOkr, deleteOkr,
     addCustomer, updateCustomer, deleteCustomer, reorderCustomers,
     addProject, updateProject, deleteProject,
@@ -315,6 +339,7 @@ export function useStore() {
     getProjectPoints, getProjectTotals,
     addMeetingEntry, markMeetingEntryTriaged, getProjectMeetingEntries,
     addTask, updateTask, deleteTask, reorderTasks, getProjectTasks,
+    addMilestone, updateMilestone, deleteMilestone, getProjectMilestones,
     addAiOutput, getTaskAiOutputs, updateAiOutput,
     aiSettings, updateAiSettings,
     exportData, importData,

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, ChevronRight, Pencil, Trash2, ArrowLeft, Clock, Zap, Calendar, CheckCircle2, PauseCircle, XCircle, LayoutGrid, List, Timer, Square, ListPlus, NotebookPen, Pin, PinOff } from 'lucide-react';
+import { Plus, ChevronRight, Pencil, Trash2, ArrowLeft, Clock, Zap, Calendar, CheckCircle2, PauseCircle, XCircle, LayoutGrid, List, Timer, Square, ListPlus, NotebookPen, Pin, PinOff, Flag, GitCommitHorizontal } from 'lucide-react';
 import { useAppStore } from '../context/StoreContext';
 import { useTimerContext } from '../context/TimerContext';
 import Modal from '../components/Modal';
@@ -182,9 +182,9 @@ function EditEntryModal({ entry, onClose }) {
 }
 
 function ProjectDetail({ project, onBack }) {
-  const { points, tasks, customers, okrs, addPoint, deletePoint, updatePoint, updateProject, deleteProject, getProjectMeetingEntries, getProjectTasks, updateTask } = useAppStore();
+  const { points, tasks, customers, okrs, addPoint, deletePoint, updatePoint, updateProject, deleteProject, getProjectMeetingEntries, getProjectTasks, updateTask, getProjectMilestones, addMilestone, updateMilestone, deleteMilestone } = useAppStore();
   const { isRunning, projectId: runningProjectId, startTimer, stopTimer } = useTimerContext();
-  const [activeTab, setActiveTab] = useState('points'); // 'points' | 'meetings' | 'tasks'
+  const [activeTab, setActiveTab] = useState('points'); // 'points' | 'meetings' | 'tasks' | 'timeline'
   const [addModal, setAddModal] = useState(false);
   const [addTaskModal, setAddTaskModal] = useState(false);
   const [bulkPointsModal, setBulkPointsModal] = useState(false);
@@ -195,6 +195,13 @@ function ProjectDetail({ project, onBack }) {
   const [timerConflict, setTimerConflict] = useState(false);
   const [flashMsg, setFlashMsg] = useState(null);
   const [newMeetingModal, setNewMeetingModal] = useState(false);
+
+  // Milestone state (for Timeline tab)
+  const [showMilestoneForm, setShowMilestoneForm] = useState(false);
+  const [milestoneForm, setMilestoneForm] = useState({ title: '', targetDate: '', status: 'upcoming' });
+  const [milestoneFormErrors, setMilestoneFormErrors] = useState({});
+  const [editMilestoneId, setEditMilestoneId] = useState(null);
+  const [deleteMilestoneId, setDeleteMilestoneId] = useState(null);
 
   const customer = customers.find(c => c.id === project.customerId);
   const okr = okrs.find(o => o.id === project.okrId);
@@ -214,6 +221,11 @@ function ProjectDetail({ project, onBack }) {
     return acc;
   }, {});
 
+  // Milestones for this project, sorted by targetDate ascending
+  const projectMilestones = getProjectMilestones(project.id).sort(
+    (a, b) => a.targetDate.localeCompare(b.targetDate)
+  );
+
   // Tasks for this project, grouped by status
   const projectTasks = getProjectTasks(project.id).sort(
     (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
@@ -228,6 +240,37 @@ function ProjectDetail({ project, onBack }) {
   const handlePointSuccess = (entry) => {
     setFlashMsg(`+${entry.points} pts!`);
     setTimeout(() => setFlashMsg(null), 1500);
+  };
+
+  // Milestone helpers
+  const openAddMilestoneForm = () => {
+    setEditMilestoneId(null);
+    setMilestoneForm({ title: '', targetDate: '', status: 'upcoming' });
+    setMilestoneFormErrors({});
+    setShowMilestoneForm(true);
+  };
+
+  const openEditMilestoneForm = (m) => {
+    setEditMilestoneId(m.id);
+    setMilestoneForm({ title: m.title, targetDate: m.targetDate, status: m.status });
+    setMilestoneFormErrors({});
+    setShowMilestoneForm(true);
+  };
+
+  const handleSaveMilestone = () => {
+    const errs = {};
+    if (!milestoneForm.title.trim()) errs.title = 'Required';
+    if (!milestoneForm.targetDate) errs.targetDate = 'Required';
+    if (Object.keys(errs).length) { setMilestoneFormErrors(errs); return; }
+    if (editMilestoneId) {
+      updateMilestone(editMilestoneId, { ...milestoneForm, title: milestoneForm.title.trim() });
+    } else {
+      addMilestone({ projectId: project.id, ...milestoneForm, title: milestoneForm.title.trim() });
+    }
+    setShowMilestoneForm(false);
+    setEditMilestoneId(null);
+    setMilestoneForm({ title: '', targetDate: '', status: 'upcoming' });
+    setMilestoneFormErrors({});
   };
 
   return (
@@ -318,6 +361,17 @@ function ProjectDetail({ project, onBack }) {
           {projectTasks.length > 0 && (
             <span className="ml-0.5 bg-indigo-600/40 text-indigo-300 text-[10px] px-1.5 py-0.5 rounded-full font-semibold">
               {projectTasks.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab('timeline')}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition-all ${activeTab === 'timeline' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}
+        >
+          <Flag size={12} /> Timeline
+          {projectMilestones.length > 0 && (
+            <span className="ml-0.5 bg-indigo-600/40 text-indigo-300 text-[10px] px-1.5 py-0.5 rounded-full font-semibold">
+              {projectMilestones.length}
             </span>
           )}
         </button>
@@ -562,6 +616,206 @@ function ProjectDetail({ project, onBack }) {
           )}
         </div>
       )}
+
+      {/* Timeline tab */}
+      {activeTab === 'timeline' && (() => {
+        const MILESTONE_STATUS_STYLES = {
+          upcoming: { badge: 'bg-amber-500/15 text-amber-400 border-amber-500/20', dot: 'bg-amber-400', label: 'Upcoming' },
+          achieved: { badge: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20', dot: 'bg-emerald-400', label: 'Achieved' },
+          missed:   { badge: 'bg-red-500/15 text-red-400 border-red-500/20',         dot: 'bg-red-400',     label: 'Missed'   },
+        };
+        return (
+          <div className="space-y-5">
+
+            {/* ── Milestones ── */}
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-800 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Flag size={14} className="text-indigo-400" />
+                  <h2 className="text-sm font-semibold text-white">Milestones</h2>
+                  {projectMilestones.length > 0 && (
+                    <span className="text-xs text-gray-500">({projectMilestones.length})</span>
+                  )}
+                </div>
+                <button
+                  onClick={openAddMilestoneForm}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all"
+                >
+                  <Plus size={13} /> Add Milestone
+                </button>
+              </div>
+
+              {/* Inline add / edit form */}
+              {showMilestoneForm && (
+                <div className="px-5 py-4 border-b border-gray-800 bg-gray-800/40 space-y-3">
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="col-span-1">
+                      <input
+                        type="text"
+                        value={milestoneForm.title}
+                        onChange={e => setMilestoneForm(p => ({ ...p, title: e.target.value }))}
+                        placeholder="Milestone title *"
+                        autoFocus
+                        className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+                      />
+                      {milestoneFormErrors.title && <p className="mt-1 text-[10px] text-red-400">{milestoneFormErrors.title}</p>}
+                    </div>
+                    <div>
+                      <input
+                        type="date"
+                        value={milestoneForm.targetDate}
+                        onChange={e => setMilestoneForm(p => ({ ...p, targetDate: e.target.value }))}
+                        className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+                      />
+                      {milestoneFormErrors.targetDate && <p className="mt-1 text-[10px] text-red-400">{milestoneFormErrors.targetDate}</p>}
+                    </div>
+                    <div>
+                      <select
+                        value={milestoneForm.status}
+                        onChange={e => setMilestoneForm(p => ({ ...p, status: e.target.value }))}
+                        className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+                      >
+                        <option value="upcoming">Upcoming</option>
+                        <option value="achieved">Achieved</option>
+                        <option value="missed">Missed</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleSaveMilestone}
+                      className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-colors"
+                    >
+                      {editMilestoneId ? 'Save Changes' : 'Add'}
+                    </button>
+                    <button
+                      onClick={() => { setShowMilestoneForm(false); setEditMilestoneId(null); setMilestoneFormErrors({}); }}
+                      className="px-4 py-1.5 rounded-xl bg-gray-700 hover:bg-gray-600 text-xs text-gray-300 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Milestone list */}
+              {projectMilestones.length === 0 && !showMilestoneForm ? (
+                <div className="px-5 py-10 text-center">
+                  <Flag size={24} className="text-gray-700 mx-auto mb-2" />
+                  <p className="text-gray-500 text-sm">No milestones yet.</p>
+                  <p className="text-gray-600 text-xs mt-1">Add one to track key dates for this project.</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-800/60">
+                  {projectMilestones.map(m => {
+                    const style = MILESTONE_STATUS_STYLES[m.status] || MILESTONE_STATUS_STYLES.upcoming;
+                    const formattedDate = m.targetDate
+                      ? new Date(m.targetDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                      : '—';
+                    return (
+                      <div key={m.id} className="px-5 py-3.5 flex items-center gap-4 group hover:bg-gray-800/30 transition-colors">
+                        {/* Status dot */}
+                        <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${style.dot}`} />
+                        {/* Title + date */}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-white font-medium leading-snug">{m.title}</p>
+                          <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
+                            <Calendar size={10} /> {formattedDate}
+                          </p>
+                        </div>
+                        {/* Status badge */}
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border flex-shrink-0 ${style.badge}`}>
+                          {style.label}
+                        </span>
+                        {/* Actions — visible on hover */}
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                          <button
+                            onClick={() => openEditMilestoneForm(m)}
+                            className="p-1 rounded text-gray-600 hover:text-indigo-400 transition-colors"
+                            title="Edit milestone"
+                          >
+                            <Pencil size={13} />
+                          </button>
+                          <button
+                            onClick={() => setDeleteMilestoneId(m.id)}
+                            className="p-1 rounded text-gray-600 hover:text-red-400 transition-colors"
+                            title="Delete milestone"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* ── Task Log ── */}
+            {(() => {
+              // Dot colors per task status (TASK_STATUS_COLORS has no .dot property)
+              const TASK_DOT = {
+                'open':        'bg-gray-500',
+                'in-progress': 'bg-indigo-400',
+                'done':        'bg-emerald-400',
+                'blocked':     'bg-red-400',
+                'archived':    'bg-gray-600',
+              };
+              return (
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-800 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <GitCommitHorizontal size={14} className="text-gray-400" />
+                  <h2 className="text-sm font-semibold text-white">Task Log</h2>
+                </div>
+                <span className="text-xs text-gray-500">{projectTasks.length} {projectTasks.length === 1 ? 'task' : 'tasks'}</span>
+              </div>
+              {projectTasks.length === 0 ? (
+                <div className="px-5 py-10 text-center">
+                  <GitCommitHorizontal size={24} className="text-gray-700 mx-auto mb-2" />
+                  <p className="text-gray-500 text-sm">No tasks logged yet.</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-800/60">
+                  {projectTasks.map(task => {
+                    const typeColors = TASK_TYPE_COLORS[task.taskType] || TASK_TYPE_COLORS.mine;
+                    const statusColors = TASK_STATUS_COLORS[task.status] || TASK_STATUS_COLORS.open;
+                    return (
+                      <div key={task.id} className="px-5 py-3 flex items-start gap-3 hover:bg-gray-800/30 transition-colors">
+                        <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${TASK_DOT[task.status] || 'bg-gray-500'}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-white leading-snug">{task.description}</p>
+                          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${typeColors.bg} ${typeColors.text} ${typeColors.border}`}>
+                              {TASK_TYPE_LABELS[task.taskType]}
+                            </span>
+                            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${statusColors.bg} ${statusColors.text} ${statusColors.border}`}>
+                              {TASK_STATUS_LABELS[task.status]}
+                            </span>
+                            <span className="text-[10px] text-gray-600">{formatDate(task.createdAt)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+              );
+            })()}
+
+            {/* Milestone delete confirmation */}
+            {deleteMilestoneId && (
+              <ConfirmDialog
+                title="Delete Milestone"
+                message="Remove this milestone? This cannot be undone."
+                onConfirm={() => { deleteMilestone(deleteMilestoneId); setDeleteMilestoneId(null); }}
+                onCancel={() => setDeleteMilestoneId(null)}
+              />
+            )}
+          </div>
+        );
+      })()}
 
       {addTaskModal && (
         <AddTaskModal
