@@ -3,7 +3,7 @@ import {
   ChevronDown, Plus, Mic, MicOff, Copy, Save, Check,
   Loader2, ClipboardList, Sparkles, ChevronRight,
   Calendar, User, Tag, AlertCircle, Archive, ArchiveX,
-  Settings, RotateCcw,
+  Settings, RotateCcw, Pencil,
 } from 'lucide-react';
 import { useAppStore } from '../context/StoreContext';
 import {
@@ -227,9 +227,23 @@ function TriageEntryCard({ entry, project, customer, onTriaged }) {
 
 // ─── Task card (in the board) ─────────────────────────────────────────────────
 function TaskCard({ task, project, customer, isSelected, onSelect, onStatusChange, onArchive }) {
+  const { updateTask } = useAppStore();
   const typeColors = TASK_TYPE_COLORS[task.taskType] || TASK_TYPE_COLORS.mine;
   const statusColors = TASK_STATUS_COLORS[task.status] || TASK_STATUS_COLORS.open;
   const isArchived = task.status === 'archived';
+  const [isEditing, setIsEditing] = useState(false);
+  const [draftDesc, setDraftDesc] = useState(task.description);
+  const editRef = useRef(null);
+
+  const commitEdit = () => {
+    const trimmed = draftDesc.trim();
+    if (trimmed && trimmed !== task.description) {
+      updateTask(task.id, { description: trimmed });
+    } else {
+      setDraftDesc(task.description); // revert if empty or unchanged
+    }
+    setIsEditing(false);
+  };
 
   return (
     <div
@@ -252,9 +266,34 @@ function TaskCard({ task, project, customer, isSelected, onSelect, onStatusChang
               {customer.name}
             </span>
           )}
-          <p className={`text-xs font-medium leading-snug line-clamp-2 ${isArchived ? 'text-gray-500 line-through' : 'text-white'}`}>
-            {task.description}
-          </p>
+          {isEditing ? (
+            <textarea
+              ref={editRef}
+              value={draftDesc}
+              onChange={e => setDraftDesc(e.target.value)}
+              onBlur={commitEdit}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commitEdit(); }
+                if (e.key === 'Escape') { setDraftDesc(task.description); setIsEditing(false); }
+              }}
+              autoFocus
+              rows={2}
+              onClick={e => e.stopPropagation()}
+              className="w-full bg-gray-700/60 border border-indigo-500/50 rounded-lg px-2 py-1 text-xs text-white resize-none focus:outline-none focus:border-indigo-400 leading-snug"
+            />
+          ) : (
+            <div
+              className="group/desc flex items-start gap-1"
+              onClick={e => { if (!isArchived) { e.stopPropagation(); setIsEditing(true); } }}
+            >
+              <p className={`flex-1 text-xs font-medium leading-snug line-clamp-2 ${isArchived ? 'text-gray-500 line-through' : 'text-white group-hover/desc:text-indigo-200 cursor-text'}`}>
+                {task.description}
+              </p>
+              {!isArchived && (
+                <Pencil size={10} className="flex-shrink-0 mt-0.5 text-gray-600 opacity-0 group-hover/desc:opacity-100 transition-opacity" />
+              )}
+            </div>
+          )}
           {project && <p className="text-[10px] text-gray-500 mt-0.5 truncate">{project.name}</p>}
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
@@ -429,7 +468,7 @@ function AIWorkspace({ task, project, customer }) {
             'anthropic-dangerous-direct-browser-access': 'true',
           },
           body: JSON.stringify({
-            model: 'claude-sonnet-4-5',
+            model: 'claude-sonnet-4-6',
             max_tokens: 1024,
             system: systemPrompt,
             messages: [{ role: 'user', content: userInput.trim() }],
