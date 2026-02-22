@@ -28,6 +28,7 @@ const DEFAULT_AI_SETTINGS = {
     summary: 'openai',
   },
   openaiModel: 'gpt-4o',
+  claudeModel: 'claude-sonnet-4-6',
 };
 
 function load(key, fallback = []) {
@@ -94,6 +95,7 @@ export function useStore() {
       prompts: { ...DEFAULT_AI_SETTINGS.prompts, ...stored.prompts },
       providers: { ...DEFAULT_AI_SETTINGS.providers, ...stored.providers },
       openaiModel: stored.openaiModel || DEFAULT_AI_SETTINGS.openaiModel,
+      claudeModel: stored.claudeModel || DEFAULT_AI_SETTINGS.claudeModel,
     };
   });
 
@@ -226,6 +228,7 @@ export function useStore() {
       prompts: { ...prev.prompts, ...(patch.prompts || {}) },
       providers: { ...prev.providers, ...(patch.providers || {}) },
       openaiModel: patch.openaiModel !== undefined ? patch.openaiModel : prev.openaiModel,
+      claudeModel: patch.claudeModel !== undefined ? patch.claudeModel : prev.claudeModel,
     }));
   }, []);
 

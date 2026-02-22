@@ -447,9 +447,12 @@ function AIWorkspace({ task, project, customer }) {
     const recipient = recipientOverride ? recipientLabel(recipientOverride) : null;
 
     // Use custom prompt if set; otherwise fall back to built-in default
-    const systemPrompt = customPrompt.trim()
+    const basePrompt = customPrompt.trim()
       ? customPrompt.trim()
       : SYSTEM_PROMPTS[outputType](task.description, clientName, recipient);
+
+    // Always produce plain text — no markdown bold, italics, or symbols
+    const systemPrompt = `${basePrompt}\n\nIMPORTANT: Write in plain text only. Do not use markdown formatting. Do not use asterisks (*) for bold or emphasis. Do not use underscores for italics. Do not use bullet points with special characters. Use plain sentences and paragraph breaks only.`;
 
     try {
       if (currentProvider === 'claude') {
@@ -468,7 +471,7 @@ function AIWorkspace({ task, project, customer }) {
             'anthropic-dangerous-direct-browser-access': 'true',
           },
           body: JSON.stringify({
-            model: 'claude-sonnet-4-6',
+            model: aiSettings.claudeModel || 'claude-sonnet-4-6',
             max_tokens: 1024,
             system: systemPrompt,
             messages: [{ role: 'user', content: userInput.trim() }],
@@ -684,6 +687,32 @@ function AIWorkspace({ task, project, customer }) {
                       className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-all ${
                         (aiSettings.openaiModel || 'gpt-4o') === model.value
                           ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                          : 'bg-gray-800 border-gray-700 text-gray-500 hover:text-gray-300 hover:border-gray-600'
+                      }`}
+                    >
+                      {model.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Claude model selector — only shown when provider is Claude */}
+            {currentProvider === 'claude' && (
+              <div>
+                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Claude Model</p>
+                <div className="flex gap-1.5">
+                  {[
+                    { value: 'claude-sonnet-4-5', label: 'Sonnet 4.5' },
+                    { value: 'claude-sonnet-4-6', label: 'Sonnet 4.6' },
+                    { value: 'claude-opus-4-6', label: 'Opus 4.6' },
+                  ].map(model => (
+                    <button
+                      key={model.value}
+                      onClick={() => updateAiSettings({ claudeModel: model.value })}
+                      className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-all ${
+                        (aiSettings.claudeModel || 'claude-sonnet-4-6') === model.value
+                          ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
                           : 'bg-gray-800 border-gray-700 text-gray-500 hover:text-gray-300 hover:border-gray-600'
                       }`}
                     >
