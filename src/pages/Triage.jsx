@@ -323,6 +323,10 @@ function AIWorkspace({ task, project, customer }) {
   const [savedMsg, setSavedMsg] = useState(false);
   const [error, setError] = useState(null);
   const [showCustomize, setShowCustomize] = useState(false);
+  // Local recipient override — pre-seeded from task, editable per-session without touching the task record
+  const [recipientOverride, setRecipientOverride] = useState(task.assigneeOrTeam || '');
+  // Editable mirror of the AI output text — user can tweak before copying/saving
+  const [editedText, setEditedText] = useState('');
   const recognitionRef = useRef(null);
 
   const history = getTaskAiOutputs(task.id);
@@ -336,6 +340,8 @@ function AIWorkspace({ task, project, customer }) {
     setCurrentOutput(null);
     setUserInput('');
     setError(null);
+    setEditedText('');
+    setRecipientOverride(task.assigneeOrTeam || '');
   }, [task.id]);
 
   // ── Web Speech API voice input ──────────────────────────────────────────
@@ -399,7 +405,7 @@ function AIWorkspace({ task, project, customer }) {
     setCurrentOutput(null);
 
     const clientName = customer?.name || 'the client';
-    const recipient = task.assigneeOrTeam ? recipientLabel(task.assigneeOrTeam) : null;
+    const recipient = recipientOverride ? recipientLabel(recipientOverride) : null;
 
     // Use custom prompt if set; otherwise fall back to built-in default
     const systemPrompt = customPrompt.trim()
@@ -438,6 +444,7 @@ function AIWorkspace({ task, project, customer }) {
         const data = await res.json();
         const text = data.content?.[0]?.text || '';
         setCurrentOutput({ outputType, inputText: userInput.trim(), outputText: text, provider: 'claude' });
+        setEditedText(text);
       } else {
         // ── OpenAI GPT-4o ────────────────────────────────────────────────
         const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
@@ -469,6 +476,7 @@ function AIWorkspace({ task, project, customer }) {
         const data = await res.json();
         const text = data.choices?.[0]?.message?.content || '';
         setCurrentOutput({ outputType, inputText: userInput.trim(), outputText: text, provider: 'openai' });
+        setEditedText(text);
       }
     } catch (err) {
       setError(err.message);
@@ -479,21 +487,23 @@ function AIWorkspace({ task, project, customer }) {
 
   const handleCopy = () => {
     if (!currentOutput) return;
-    navigator.clipboard.writeText(currentOutput.outputText);
+    navigator.clipboard.writeText(editedText);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   const handleSave = () => {
     if (!currentOutput) return;
-    addAiOutput({ taskId: task.id, ...currentOutput });
+    // Save with the edited text (in case user tweaked it before saving)
+    addAiOutput({ taskId: task.id, ...currentOutput, outputText: editedText });
     setSavedMsg(true);
     setTimeout(() => setSavedMsg(false), 2000);
   };
 
   const typeColors = TASK_TYPE_COLORS[task.taskType] || TASK_TYPE_COLORS.mine;
   const statusColors = TASK_STATUS_COLORS[task.status] || TASK_STATUS_COLORS.open;
-  const recipientText = task.assigneeOrTeam ? recipientLabel(task.assigneeOrTeam) : null;
+  // Use local override for the resolved label (used both in hint text and passed to AI prompts)
+  const recipientText = recipientOverride ? recipientLabel(recipientOverride) : null;
 
   return (
     <div className="space-y-4">
@@ -542,11 +552,26 @@ function AIWorkspace({ task, project, customer }) {
             </button>
           ))}
         </div>
-        {/* Recipient hint for relevant output types */}
-        {recipientText && ['email', 'slack', 'summary'].includes(outputType) && (
-          <p className="mt-2 text-[10px] text-indigo-400/70 flex items-center gap-1">
-            <User size={9} /> Output will be tailored for: <span className="font-semibold">{recipientText}</span>
-          </p>
+        {/* Recipient selector — visible for output types that use it */}
+        {['email', 'slack', 'summary'].includes(outputType) && (
+          <div className="mt-2.5 flex items-center gap-2">
+            <User size={11} className="text-gray-500 flex-shrink-0" />
+            <select
+              value={recipientOverride}
+              onChange={e => setRecipientOverride(e.target.value)}
+              className="flex-1 bg-gray-800/60 border border-gray-700/60 rounded-lg px-2.5 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+            >
+              <option value="">— No recipient —</option>
+              {TASK_RECIPIENTS.map(r => (
+                <option key={r.value} value={r.value}>{r.label}</option>
+              ))}
+            </select>
+            {recipientText && (
+              <span className="text-[10px] text-indigo-400/70 whitespace-nowrap">
+                tailored for <span className="font-semibold">{recipientText}</span>
+              </span>
+            )}
+          </div>
         )}
       </div>
 
@@ -716,7 +741,18 @@ function AIWorkspace({ task, project, customer }) {
               </button>
             </div>
           </div>
-          <p className="text-sm text-gray-200 whitespace-pre-wrap leading-relaxed">{currentOutput.outputText}</p>
+          <textarea
+            value={editedText}
+            onChange={e => setEditedText(e.target.value)}
+            rows={Math.max(6, editedText.split('\n').length + 1)}
+            className="w-full bg-transparent text-sm text-gray-200 leading-relaxed resize-none focus:outline-none placeholder-gray-600"
+            placeholder="Output will appear here…"
+          />
+          {editedText !== currentOutput.outputText && (
+            <p className="text-[10px] text-indigo-400/60 flex items-center gap-1">
+              ✎ Edited — copy or save to use your version
+            </p>
+          )}
         </div>
       )}
 
