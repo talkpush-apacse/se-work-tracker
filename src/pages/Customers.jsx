@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, Users, ListPlus } from 'lucide-react';
+import { Plus, Pencil, Trash2, Users, ListPlus, Pin, PinOff } from 'lucide-react';
 import { useAppStore } from '../context/StoreContext';
 import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -59,6 +59,14 @@ export default function Customers() {
   const [editTarget, setEditTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
+  // Sort pinned customers to the front; preserve relative order within each group
+  const sortedCustomers = [...customers].sort((a, b) => {
+    if (!!a.pinned === !!b.pinned) return 0;
+    return !!b.pinned - !!a.pinned;
+  });
+
+  const handlePin = (id, value) => updateCustomer(id, { pinned: value });
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
@@ -90,7 +98,7 @@ export default function Customers() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {customers.map(customer => {
+          {sortedCustomers.map(customer => {
             const linkedProjects = projects.filter(p => p.customerId === customer.id);
             const totalPoints = linkedProjects.reduce((s, proj) => {
               return s + points.filter(pt => pt.projectId === proj.id).reduce((ss, e) => ss + e.points, 0);
@@ -102,7 +110,11 @@ export default function Customers() {
             return (
               <div
                 key={customer.id}
-                className="bg-gray-900 border border-gray-800 rounded-2xl p-5"
+                className={`rounded-2xl p-5 transition-all ${
+                  customer.pinned
+                    ? 'bg-amber-950/20 border border-amber-700/40'
+                    : 'bg-gray-900 border border-gray-800'
+                }`}
                 style={{ borderTopColor: customer.color, borderTopWidth: 3 }}
               >
                 <div className="flex items-start justify-between mb-4">
@@ -118,7 +130,18 @@ export default function Customers() {
                       <p className="text-xs text-gray-500">Since {formatDate(customer.createdAt)}</p>
                     </div>
                   </div>
-                  <div className="flex gap-1">
+                  <div className="flex gap-1 items-center">
+                    <button
+                      onClick={() => handlePin(customer.id, !customer.pinned)}
+                      title={customer.pinned ? 'Unpin customer' : 'Pin to top'}
+                      className={`p-1.5 rounded-lg transition-colors ${
+                        customer.pinned
+                          ? 'text-amber-400 hover:text-amber-300 hover:bg-amber-900/40'
+                          : 'text-gray-500 hover:text-amber-400 hover:bg-gray-800'
+                      }`}
+                    >
+                      {customer.pinned ? <PinOff size={13} /> : <Pin size={13} />}
+                    </button>
                     <button onClick={() => setEditTarget(customer)} className="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-gray-800 transition-colors"><Pencil size={13} /></button>
                     <button onClick={() => setDeleteTarget(customer)} className="p-1.5 rounded-lg text-gray-500 hover:text-red-400 hover:bg-gray-800 transition-colors"><Trash2 size={13} /></button>
                   </div>

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, ChevronRight, Pencil, Trash2, ArrowLeft, Clock, Zap, Calendar, CheckCircle2, PauseCircle, XCircle, LayoutGrid, List, Timer, Square, ListPlus, NotebookPen } from 'lucide-react';
+import { Plus, ChevronRight, Pencil, Trash2, ArrowLeft, Clock, Zap, Calendar, CheckCircle2, PauseCircle, XCircle, LayoutGrid, List, Timer, Square, ListPlus, NotebookPen, Pin, PinOff } from 'lucide-react';
 import { useAppStore } from '../context/StoreContext';
 import { useTimerContext } from '../context/TimerContext';
 import Modal from '../components/Modal';
@@ -630,6 +630,51 @@ function ProjectDetail({ project, onBack }) {
   );
 }
 
+// ─── Project card (used in both Priority section and group sections) ──────────
+function ProjectCard({ project, customers, okrs, onSelect, onPin }) {
+  const customer = customers.find(c => c.id === project.customerId);
+  const okr = okrs.find(o => o.id === project.okrId);
+  const StatusIcon = STATUS_ICONS[project.status] || CheckCircle2;
+  const isPinned = !!project.pinned;
+
+  return (
+    <div
+      onClick={() => onSelect(project.id)}
+      className={`relative text-left rounded-2xl p-4 transition-all hover:shadow-lg cursor-pointer group ${
+        isPinned
+          ? 'bg-amber-950/20 border border-amber-700/40 hover:border-amber-600/60'
+          : 'bg-gray-900 border border-gray-800 hover:border-gray-700'
+      }`}
+      style={{ borderLeftColor: customer?.color || '#6366f1', borderLeftWidth: 3 }}
+    >
+      {/* Pin button — always visible, top-right */}
+      <button
+        onClick={e => { e.stopPropagation(); onPin(project.id, !isPinned); }}
+        title={isPinned ? 'Unpin project' : 'Pin to top'}
+        className={`absolute top-3 right-3 p-1 rounded-lg transition-colors z-10 ${
+          isPinned
+            ? 'text-amber-400 hover:text-amber-300 hover:bg-amber-900/40'
+            : 'text-gray-600 hover:text-amber-400 hover:bg-gray-800'
+        }`}
+      >
+        {isPinned ? <PinOff size={13} /> : <Pin size={13} />}
+      </button>
+
+      <div className="flex items-start justify-between gap-2 mb-3 pr-6">
+        <p className="font-semibold text-white text-sm leading-tight">{project.name}</p>
+        <ChevronRight size={15} className="text-gray-600 group-hover:text-gray-400 flex-shrink-0 mt-0.5 transition-colors" />
+      </div>
+      {okr && <p className="text-[11px] text-gray-500 mb-3 line-clamp-1">{okr.title}</p>}
+      <div className="flex items-center justify-between">
+        <span className={`flex items-center gap-1 text-[11px] font-medium ${STATUS_COLORS[project.status]}`}>
+          <StatusIcon size={11} /> {project.status}
+        </span>
+        <span className="text-xs text-gray-500">Created {formatDate(project.createdAt)}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function Projects({ initialProjectId, onProjectSelect }) {
   const { projects, customers, okrs, addProject, updateProject, deleteProject } = useAppStore();
   const [selectedId, setSelectedId] = useState(initialProjectId || null);
@@ -646,23 +691,30 @@ export default function Projects({ initialProjectId, onProjectSelect }) {
 
   const filtered = statusFilter === 'All' ? projects : projects.filter(p => p.status === statusFilter);
 
-  // Group projects
+  // Pinned projects — shown in the Priority section above all groups
+  const pinnedProjects = filtered.filter(p => !!p.pinned);
+  // Unpinned only go into the group sections
+  const unpinned = filtered.filter(p => !p.pinned);
+
+  // Group projects (unpinned only — pinned ones live in the Priority section)
   const groups = {};
   if (groupBy === 'customer') {
     customers.forEach(c => { groups[c.id] = { label: c.name, color: c.color, items: [] }; });
     groups['_none'] = { label: 'No Customer', color: '#6b7280', items: [] };
-    filtered.forEach(p => {
+    unpinned.forEach(p => {
       const key = customers.find(c => c.id === p.customerId) ? p.customerId : '_none';
       if (groups[key]) groups[key].items.push(p);
     });
   } else {
     okrs.forEach(o => { groups[o.id] = { label: o.title, color: '#6366f1', items: [] }; });
     groups['_none'] = { label: 'No OKR', color: '#6b7280', items: [] };
-    filtered.forEach(p => {
+    unpinned.forEach(p => {
       const key = okrs.find(o => o.id === p.okrId) ? p.okrId : '_none';
       if (groups[key]) groups[key].items.push(p);
     });
   }
+
+  const handlePin = (id, value) => updateProject(id, { pinned: value });
 
   return (
     <div className="space-y-5">
@@ -710,8 +762,31 @@ export default function Projects({ initialProjectId, onProjectSelect }) {
         </div>
       </div>
 
+      {/* Priority Projects — pinned items float above all groups */}
+      {pinnedProjects.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <Pin size={13} className="text-amber-400" />
+            <span className="text-sm font-semibold text-amber-300">Priority</span>
+            <span className="text-xs text-gray-600">({pinnedProjects.length})</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {pinnedProjects.map(project => (
+              <ProjectCard
+                key={project.id}
+                project={project}
+                customers={customers}
+                okrs={okrs}
+                onSelect={setSelectedId}
+                onPin={handlePin}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Groups */}
-      {Object.entries(groups).filter(([, g]) => g.items.length > 0).length === 0 ? (
+      {Object.entries(groups).filter(([, g]) => g.items.length > 0).length === 0 && pinnedProjects.length === 0 ? (
         <div className="bg-gray-900 border border-gray-800 rounded-2xl py-16 text-center">
           <p className="text-gray-500 text-sm">No projects found.</p>
           <button onClick={() => setCreateModal(true)} className="mt-3 text-sm text-indigo-400 hover:text-indigo-300">Create your first project →</button>
@@ -727,31 +802,16 @@ export default function Projects({ initialProjectId, onProjectSelect }) {
                 <span className="text-xs text-gray-600">({group.items.length})</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {group.items.map(project => {
-                  const customer = customers.find(c => c.id === project.customerId);
-                  const okr = okrs.find(o => o.id === project.okrId);
-                  const StatusIcon = STATUS_ICONS[project.status] || CheckCircle2;
-                  return (
-                    <button
-                      key={project.id}
-                      onClick={() => setSelectedId(project.id)}
-                      className="text-left bg-gray-900 border border-gray-800 hover:border-gray-700 rounded-2xl p-4 transition-all hover:shadow-lg group"
-                      style={{ borderLeftColor: customer?.color || '#6366f1', borderLeftWidth: 3 }}
-                    >
-                      <div className="flex items-start justify-between gap-2 mb-3">
-                        <p className="font-semibold text-white text-sm leading-tight">{project.name}</p>
-                        <ChevronRight size={15} className="text-gray-600 group-hover:text-gray-400 flex-shrink-0 mt-0.5 transition-colors" />
-                      </div>
-                      {okr && <p className="text-[11px] text-gray-500 mb-3 line-clamp-1">{okr.title}</p>}
-                      <div className="flex items-center justify-between">
-                        <span className={`flex items-center gap-1 text-[11px] font-medium ${STATUS_COLORS[project.status]}`}>
-                          <StatusIcon size={11} /> {project.status}
-                        </span>
-                        <span className="text-xs text-gray-500">Created {formatDate(project.createdAt)}</span>
-                      </div>
-                    </button>
-                  );
-                })}
+                {group.items.map(project => (
+                  <ProjectCard
+                    key={project.id}
+                    project={project}
+                    customers={customers}
+                    okrs={okrs}
+                    onSelect={setSelectedId}
+                    onPin={handlePin}
+                  />
+                ))}
               </div>
             </div>
           ))
