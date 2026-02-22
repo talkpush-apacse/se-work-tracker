@@ -23,8 +23,10 @@ export const CUSTOMER_COLORS = [
 
 export const PROJECT_STATUSES = ['Active', 'On Hold', 'Completed'];
 
-// Task types
-export const TASK_TYPES = ['mine', 'coordinate', 'comms', 'focus-time'];
+// Task types — only 'comms' and 'focus-time' appear in dropdowns.
+// 'mine' and 'coordinate' entries are kept in the maps below for backward compat
+// with existing localStorage tasks but are excluded from the active array.
+export const TASK_TYPES = ['comms', 'focus-time'];
 
 export const TASK_TYPE_LABELS = {
   mine:         'Mine',
@@ -80,14 +82,12 @@ export const TASK_RECIPIENTS = [
 ];
 
 // AI output types
-export const AI_OUTPUT_TYPES = ['email', 'slack', 'troubleshooting', 'configuration', 'summary'];
+export const AI_OUTPUT_TYPES = ['message-draft', 'checklist', 'meeting-summary'];
 
 export const AI_OUTPUT_TYPE_LABELS = {
-  email: 'Email Draft',
-  slack: 'Slack Message',
-  troubleshooting: 'Troubleshooting Plan',
-  configuration: 'Configuration Plan',
-  summary: 'General Summary',
+  'message-draft':   'Message Draft',
+  'checklist':       'Checklist',
+  'meeting-summary': 'Meeting Summary',
 };
 
 export const ACTIVITY_COLORS = {

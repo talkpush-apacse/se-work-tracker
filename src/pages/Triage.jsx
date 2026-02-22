@@ -20,42 +20,52 @@ function recipientLabel(value) {
   return TASK_RECIPIENTS.find(r => r.value === value)?.label || value || null;
 }
 
+// ─── Email nature options (shown as sub-dropdown when output type = message-draft) ─
+const EMAIL_NATURES = [
+  { value: 'generic-ack',      label: 'Generic Acknowledgment' },
+  { value: 'set-expectations', label: 'Set Expectations'       },
+  { value: 'share-update',     label: 'Share Update'           },
+  { value: 'consult-internal', label: 'Consult Internal Team'  },
+  { value: 'consult-client',   label: 'Consult Client'         },
+];
+
 // ─── System prompts per output type ───────────────────────────────────────────
 // recipient is the human-readable label (e.g. "Client", "Internal — CRM Developers")
 const SYSTEM_PROMPTS = {
-  email: (task, client, recipient) =>
-    `You are a professional Solutions Engineer at a SaaS company called Talkpush.
+  'message-draft': (task, client, recipient, emailNature) => {
+    const natureInstructions = {
+      'generic-ack':
+        'Write a professional email acknowledging the client\'s message or request. Confirm you are looking into it. Keep it brief and warm.',
+      'set-expectations':
+        'Write a professional email setting clear expectations about timelines, next steps, or what the client should expect. Be specific but avoid over-committing.',
+      'share-update':
+        'Write a professional email sharing a progress update. Summarize what has been done, what is next, and any blockers.',
+      'consult-internal':
+        'Write a professional internal message asking a colleague for input, help, or review. Be specific about what you need and why.',
+      'consult-client':
+        'Write a professional email to the client asking for information, feedback, or a decision needed to proceed. Be specific about what you need.',
+    };
+    return `You are a professional Solutions Engineer at a SaaS company called Talkpush.
 Write a clear, concise professional email related to the following task for client "${client}".
 ${recipient ? `This email is addressed to: ${recipient}.` : ''}
-Task: ${task}
+Nature of message: ${natureInstructions[emailNature] || natureInstructions['generic-ack']}
+Task context: ${task}
 Format: Start with "Subject: ..." on the first line, then a blank line, then the email body.
-Keep the tone professional but warm. Be direct and action-oriented. No filler phrases.`,
+Keep the tone professional but warm. Be direct and action-oriented. No filler phrases.`;
+  },
 
-  slack: (task, client, recipient) =>
-    `You are a Solutions Engineer at Talkpush writing an internal Slack message about a task for client "${client}".
-${recipient ? `This message is directed at: ${recipient}.` : ''}
-Task: ${task}
-Write a brief, direct Slack message. No markdown headers. No excessive formatting.
-Use bullet points only if listing multiple items. Keep it under 5 lines where possible.`,
+  'checklist': (task, client) =>
+    `You are a Solutions Engineer at Talkpush creating an action checklist for client "${client}".
+Task context: ${task}
+Write a numbered checklist of clear, specific action items. Each item must start with an action verb.
+No introductory paragraphs. No filler. Just the numbered list.`,
 
-  troubleshooting: (task, client) =>
-    `You are a technical Solutions Engineer at Talkpush troubleshooting an issue for client "${client}".
-Task/Issue: ${task}
-Write a structured troubleshooting plan. Start with the most likely root cause, then numbered steps to diagnose and resolve.
-Include what to check at each step and expected outcome.`,
-
-  configuration: (task, client) =>
-    `You are a Solutions Engineer at Talkpush writing a configuration guide for client "${client}".
-Task: ${task}
-Write a structured, numbered configuration plan. Include dependencies, prerequisites, and notes on potential gotchas.
-Be specific and actionable.`,
-
-  summary: (task, client, recipient) =>
-    `You are a Solutions Engineer at Talkpush summarizing work done for client "${client}".
-${recipient ? `This summary is intended for: ${recipient}.` : ''}
-Task: ${task}
-Write a concise bullet-point summary covering: key decisions made, actions taken or needed, and any open questions.
-Keep it scannable — this is for your own reference or a quick async update.`,
+  'meeting-summary': (task, client, recipient) =>
+    `You are a Solutions Engineer at Talkpush writing a meeting summary for client "${client}".
+${recipient ? `Attendees/stakeholders: ${recipient}.` : ''}
+Meeting context: ${task}
+Write in four sections — Context, Key Decisions, Action Items (with owners if known), and Next Steps.
+Be concise and scannable. Bullet points within sections are fine.`,
 };
 
 // ─── Shared inline project + customer creation form ───────────────────────────
@@ -166,7 +176,7 @@ function TriageForm({ entry, project, customer, projects, customers, onSubmit, o
   const [form, setForm] = useState({
     projectId:     project?.id || '',
     description:   entry.rawNotes.split('\n')[0].slice(0, 120), // pre-fill from first line
-    taskType:      'mine',
+    taskType:      'comms',
     assigneeOrTeam: '',
     status:        'open',
   });
@@ -412,6 +422,17 @@ function TaskCard({ task, project, customer, isSelected, onSelect, onStatusChang
   const [draftDesc, setDraftDesc] = useState(task.description);
   const editRef = useRef(null);
 
+  // Notes — freeform field for links, artifacts, context
+  const [notesDraft, setNotesDraft] = useState(task.notes || '');
+  const notesTimerRef = useRef(null);
+  const handleNotesChange = (val) => {
+    setNotesDraft(val);
+    clearTimeout(notesTimerRef.current);
+    notesTimerRef.current = setTimeout(() => {
+      updateTask(task.id, { notes: val });
+    }, 500);
+  };
+
   const commitEdit = () => {
     const trimmed = draftDesc.trim();
     if (trimmed && trimmed !== task.description) {
@@ -536,8 +557,26 @@ function TaskCard({ task, project, customer, isSelected, onSelect, onStatusChang
         </div>
       )}
 
+      {/* Notes textarea — for links, artifacts, context */}
+      {!isArchived && (
+        <div className="mt-2" onClick={e => e.stopPropagation()}>
+          <textarea
+            value={notesDraft}
+            onChange={e => handleNotesChange(e.target.value)}
+            placeholder="Notes, links, artifacts…"
+            rows={2}
+            className="w-full bg-gray-800/60 border border-gray-700/50 rounded-lg px-2 py-1.5 text-[10px] text-gray-300 placeholder:text-gray-600 resize-none focus:outline-none focus:border-gray-600"
+          />
+        </div>
+      )}
+
       {isArchived && (
-        <p className="mt-1.5 text-[10px] text-gray-600 italic">Archived</p>
+        <div>
+          {task.notes && (
+            <p className="mt-1 text-[10px] text-gray-500 line-clamp-2">{task.notes}</p>
+          )}
+          <p className="mt-1 text-[10px] text-gray-600 italic">Archived</p>
+        </div>
       )}
     </div>
   );
@@ -546,7 +585,8 @@ function TaskCard({ task, project, customer, isSelected, onSelect, onStatusChang
 // ─── AI Workspace (right panel) ───────────────────────────────────────────────
 function AIWorkspace({ task, project, customer }) {
   const { addAiOutput, getTaskAiOutputs, aiSettings, updateAiSettings } = useAppStore();
-  const [outputType, setOutputType] = useState('email');
+  const [outputType, setOutputType] = useState('message-draft');
+  const [emailNature, setEmailNature] = useState('generic-ack');
   const [userInput, setUserInput] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -654,7 +694,7 @@ function AIWorkspace({ task, project, customer }) {
     // Use custom prompt if set; otherwise fall back to built-in default
     const basePrompt = customPrompt.trim()
       ? customPrompt.trim()
-      : SYSTEM_PROMPTS[outputType](task.description, clientName, recipient);
+      : SYSTEM_PROMPTS[outputType](task.description, clientName, recipient, emailNature);
 
     // Always produce plain text — no markdown bold, italics, or symbols
     const systemPrompt = `${basePrompt}\n\nIMPORTANT: Write in plain text only. Do not use markdown formatting. Do not use asterisks (*) for bold or emphasis. Do not use underscores for italics. Do not use bullet points with special characters. Use plain sentences and paragraph breaks only.`;
@@ -800,7 +840,7 @@ function AIWorkspace({ task, project, customer }) {
           ))}
         </div>
         {/* Recipient selector — visible for output types that use it */}
-        {['email', 'slack', 'summary'].includes(outputType) && (
+        {['message-draft', 'meeting-summary'].includes(outputType) && (
           <div className="mt-2.5 flex items-center gap-2">
             <User size={11} className="text-gray-500 flex-shrink-0" />
             <select
@@ -822,6 +862,22 @@ function AIWorkspace({ task, project, customer }) {
         )}
       </div>
 
+      {/* Email nature sub-selector — only for Message Draft */}
+      {outputType === 'message-draft' && (
+        <div>
+          <p className="text-xs font-medium text-gray-400 mb-2">Message Nature</p>
+          <select
+            value={emailNature}
+            onChange={e => setEmailNature(e.target.value)}
+            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+          >
+            {EMAIL_NATURES.map(n => (
+              <option key={n.value} value={n.value}>{n.label}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {/* ── Customize Panel ───────────────────────────────────────────────────── */}
       <div className="border border-gray-700/60 rounded-xl overflow-hidden">
         {/* Collapse toggle */}
@@ -838,7 +894,7 @@ function AIWorkspace({ task, project, customer }) {
                 ? 'bg-amber-500/15 text-amber-400 border-amber-500/20'
                 : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20'
             }`}>
-              {currentProvider === 'claude' ? 'Claude' : 'GPT-4o'}
+              {currentProvider === 'claude' ? 'Claude' : 'ChatGPT'}
             </span>
             {customPrompt.trim() && (
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" title="Custom prompt active" />
@@ -1009,7 +1065,7 @@ function AIWorkspace({ task, project, customer }) {
       >
         {isGenerating
           ? <><Loader2 size={16} className="animate-spin" /> Generating…</>
-          : <><Sparkles size={16} /> Generate with {currentProvider === 'claude' ? 'Claude' : 'GPT-4o'}</>
+          : <><Sparkles size={16} /> Generate with {currentProvider === 'claude' ? 'Claude' : 'ChatGPT'}</>
         }
       </button>
 
@@ -1105,7 +1161,7 @@ function QuickAddTaskForm({ projects, customers, onSubmit, onCancel }) {
   const [form, setForm] = useState({
     projectId: '',
     description: '',
-    taskType: 'mine',
+    taskType: 'comms',
     assigneeOrTeam: '',
     status: 'open',
   });
