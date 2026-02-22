@@ -582,6 +582,91 @@ function TaskCard({ task, project, customer, isSelected, onSelect, onStatusChang
   );
 }
 
+// ─── History item (editable previous AI output) ───────────────────────────────
+function HistoryItem({ h }) {
+  const { updateAiOutput } = useAppStore();
+  const [draft,  setDraft]  = useState(h.outputText);
+  const [copied, setCopied] = useState(false);
+  const [saved,  setSaved]  = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(draft);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleSave = () => {
+    updateAiOutput(h.id, draft);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  return (
+    <details className="bg-gray-900 border border-gray-800 rounded-xl">
+      <summary className="flex items-center justify-between px-4 py-3 cursor-pointer list-none">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-gray-400">
+            {AI_OUTPUT_TYPE_LABELS[h.outputType]}
+          </span>
+          {h.provider && (
+            <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${
+              h.provider === 'claude'
+                ? 'bg-amber-500/15 text-amber-400 border-amber-500/20'
+                : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20'
+            }`}>
+              {h.provider === 'claude' ? 'Claude' : 'ChatGPT'}
+            </span>
+          )}
+          <span className="text-[10px] text-gray-600">
+            {new Date(h.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            {' '}
+            {new Date(h.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+          </span>
+        </div>
+        <ChevronDown size={13} className="text-gray-600 flex-shrink-0" />
+      </summary>
+
+      <div className="px-4 pb-4 space-y-2">
+        {/* Editable textarea — same UX as current output */}
+        <textarea
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          rows={Math.max(5, draft.split('\n').length + 1)}
+          className="w-full bg-transparent text-xs text-gray-300 leading-relaxed resize-none focus:outline-none"
+        />
+
+        {/* Edited indicator */}
+        {draft !== h.outputText && (
+          <p className="text-[10px] text-indigo-400/60 flex items-center gap-1">
+            ✎ Edited — save to persist
+          </p>
+        )}
+
+        {/* Action buttons */}
+        <div className="flex gap-1.5 border-t border-gray-800 pt-2">
+          <button
+            onClick={handleCopy}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs text-gray-400 hover:text-white transition-all border border-gray-700"
+          >
+            {copied
+              ? <><Check size={11} className="text-emerald-400" /> Copied!</>
+              : <><Copy size={11} /> Copy</>}
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={draft === h.outputText}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs text-gray-400 hover:text-white transition-all border border-gray-700 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {saved
+              ? <><Check size={11} className="text-emerald-400" /> Saved!</>
+              : <><Save size={11} /> Save</>}
+          </button>
+        </div>
+      </div>
+    </details>
+  );
+}
+
 // ─── AI Workspace (right panel) ───────────────────────────────────────────────
 function AIWorkspace({ task, project, customer }) {
   const { addAiOutput, getTaskAiOutputs, aiSettings, updateAiSettings } = useAppStore();
@@ -1123,31 +1208,7 @@ function AIWorkspace({ task, project, customer }) {
           <p className="text-xs font-medium text-gray-500 mb-2">Previous Outputs ({history.length})</p>
           <div className="space-y-2">
             {history.map(h => (
-              <details key={h.id} className="bg-gray-900 border border-gray-800 rounded-xl">
-                <summary className="flex items-center justify-between px-4 py-3 cursor-pointer list-none">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-gray-400">{AI_OUTPUT_TYPE_LABELS[h.outputType]}</span>
-                    {h.provider && (
-                      <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${
-                        h.provider === 'claude'
-                          ? 'bg-amber-500/15 text-amber-400 border-amber-500/20'
-                          : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20'
-                      }`}>
-                        {h.provider === 'claude' ? 'Claude' : 'GPT-4o'}
-                      </span>
-                    )}
-                    <span className="text-[10px] text-gray-600">
-                      {new Date(h.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      {' '}
-                      {new Date(h.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-                    </span>
-                  </div>
-                  <ChevronDown size={13} className="text-gray-600 flex-shrink-0" />
-                </summary>
-                <div className="px-4 pb-4">
-                  <p className="text-xs text-gray-300 whitespace-pre-wrap leading-relaxed">{h.outputText}</p>
-                </div>
-              </details>
+              <HistoryItem key={h.id} h={h} />
             ))}
           </div>
         </div>

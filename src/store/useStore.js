@@ -244,6 +244,12 @@ export function useStore() {
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   }, [aiOutputs]);
 
+  const updateAiOutput = useCallback((id, newText) => {
+    setAiOutputs(prev =>
+      prev.map(o => o.id === id ? { ...o, outputText: newText } : o)
+    );
+  }, []);
+
   // AI settings actions
   const updateAiSettings = useCallback((patch) => {
     setAiSettings(prev => ({
@@ -305,7 +311,7 @@ export function useStore() {
     getProjectPoints, getProjectTotals,
     addMeetingEntry, markMeetingEntryTriaged, getProjectMeetingEntries,
     addTask, updateTask, deleteTask, getProjectTasks,
-    addAiOutput, getTaskAiOutputs,
+    addAiOutput, getTaskAiOutputs, updateAiOutput,
     aiSettings, updateAiSettings,
     exportData, importData,
   };
