@@ -27,6 +27,7 @@ const DEFAULT_AI_SETTINGS = {
     configuration: 'openai',
     summary: 'openai',
   },
+  openaiModel: 'gpt-4o',
 };
 
 function load(key, fallback = []) {
@@ -92,6 +93,7 @@ export function useStore() {
     return {
       prompts: { ...DEFAULT_AI_SETTINGS.prompts, ...stored.prompts },
       providers: { ...DEFAULT_AI_SETTINGS.providers, ...stored.providers },
+      openaiModel: stored.openaiModel || DEFAULT_AI_SETTINGS.openaiModel,
     };
   });
 
@@ -223,6 +225,7 @@ export function useStore() {
     setAiSettings(prev => ({
       prompts: { ...prev.prompts, ...(patch.prompts || {}) },
       providers: { ...prev.providers, ...(patch.providers || {}) },
+      openaiModel: patch.openaiModel !== undefined ? patch.openaiModel : prev.openaiModel,
     }));
   }, []);
 

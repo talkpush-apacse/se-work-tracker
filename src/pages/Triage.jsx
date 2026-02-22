@@ -498,7 +498,7 @@ function AIWorkspace({ task, project, customer }) {
             Authorization: `Bearer ${apiKey}`,
           },
           body: JSON.stringify({
-            model: 'gpt-4o',
+            model: aiSettings.openaiModel || 'gpt-4o',
             messages: [
               { role: 'system', content: systemPrompt },
               { role: 'user', content: userInput.trim() },
@@ -647,7 +647,7 @@ function AIWorkspace({ task, project, customer }) {
               <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">AI Provider</p>
               <div className="flex gap-1.5">
                 {[
-                  { value: 'openai', label: 'GPT-4o', desc: 'OpenAI' },
+                  { value: 'openai', label: 'OpenAI', desc: 'GPT models' },
                   { value: 'claude', label: 'Claude', desc: 'Anthropic' },
                 ].map(opt => (
                   <button
@@ -667,6 +667,32 @@ function AIWorkspace({ task, project, customer }) {
                 ))}
               </div>
             </div>
+
+            {/* OpenAI model selector — only shown when provider is OpenAI */}
+            {currentProvider === 'openai' && (
+              <div>
+                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">OpenAI Model</p>
+                <div className="flex gap-1.5">
+                  {[
+                    { value: 'gpt-4o', label: 'GPT-4o' },
+                    { value: 'gpt-4.1', label: 'GPT-4.1' },
+                    { value: 'gpt-4o-mini', label: 'GPT-5 Mini' },
+                  ].map(model => (
+                    <button
+                      key={model.value}
+                      onClick={() => updateAiSettings({ openaiModel: model.value })}
+                      className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-all ${
+                        (aiSettings.openaiModel || 'gpt-4o') === model.value
+                          ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                          : 'bg-gray-800 border-gray-700 text-gray-500 hover:text-gray-300 hover:border-gray-600'
+                      }`}
+                    >
+                      {model.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Custom system prompt */}
             <div>
