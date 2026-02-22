@@ -3,6 +3,7 @@ import {
   ChevronDown, Plus, Mic, MicOff, Copy, Save, Check,
   Loader2, ClipboardList, Sparkles, ChevronRight,
   Calendar, User, Tag, AlertCircle, Archive, ArchiveX,
+  Settings, RotateCcw,
 } from 'lucide-react';
 import { useAppStore } from '../context/StoreContext';
 import {
@@ -312,7 +313,7 @@ function TaskCard({ task, project, customer, isSelected, onSelect, onStatusChang
 
 // ─── AI Workspace (right panel) ───────────────────────────────────────────────
 function AIWorkspace({ task, project, customer }) {
-  const { addAiOutput, getTaskAiOutputs } = useAppStore();
+  const { addAiOutput, getTaskAiOutputs, aiSettings, updateAiSettings } = useAppStore();
   const [outputType, setOutputType] = useState('email');
   const [userInput, setUserInput] = useState('');
   const [isListening, setIsListening] = useState(false);
@@ -321,9 +322,14 @@ function AIWorkspace({ task, project, customer }) {
   const [copied, setCopied] = useState(false);
   const [savedMsg, setSavedMsg] = useState(false);
   const [error, setError] = useState(null);
+  const [showCustomize, setShowCustomize] = useState(false);
   const recognitionRef = useRef(null);
 
   const history = getTaskAiOutputs(task.id);
+
+  // Shorthand for the current output type's settings
+  const currentProvider = aiSettings.providers[outputType] || 'openai';
+  const customPrompt = aiSettings.prompts[outputType] || '';
 
   // Reset workspace when task changes
   useEffect(() => {
@@ -381,16 +387,10 @@ function AIWorkspace({ task, project, customer }) {
     setIsListening(true);
   };
 
-  // ── OpenAI generate ─────────────────────────────────────────────────────
+  // ── Generate — routes to OpenAI or Claude based on per-type provider setting ─
   const handleGenerate = async () => {
     if (!userInput.trim()) {
       setError('Add some context or notes before generating.');
-      return;
-    }
-
-    const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-    if (!apiKey) {
-      setError('VITE_OPENAI_API_KEY is not set. Add it to your .env file and restart the dev server.');
       return;
     }
 
@@ -399,35 +399,77 @@ function AIWorkspace({ task, project, customer }) {
     setCurrentOutput(null);
 
     const clientName = customer?.name || 'the client';
-    // Pass resolved recipient label into the prompt for email, slack, summary
     const recipient = task.assigneeOrTeam ? recipientLabel(task.assigneeOrTeam) : null;
-    const systemPrompt = SYSTEM_PROMPTS[outputType](task.description, clientName, recipient);
+
+    // Use custom prompt if set; otherwise fall back to built-in default
+    const systemPrompt = customPrompt.trim()
+      ? customPrompt.trim()
+      : SYSTEM_PROMPTS[outputType](task.description, clientName, recipient);
 
     try {
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userInput.trim() },
-          ],
-          temperature: 0.7,
-        }),
-      });
+      if (currentProvider === 'claude') {
+        // ── Anthropic Claude ─────────────────────────────────────────────
+        const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
+        if (!apiKey) {
+          throw new Error('VITE_ANTHROPIC_API_KEY is not set. Add it to your .env file and restart the dev server.');
+        }
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData?.error?.message || `OpenAI error ${res.status}`);
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true',
+          },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-5',
+            max_tokens: 1024,
+            system: systemPrompt,
+            messages: [{ role: 'user', content: userInput.trim() }],
+          }),
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData?.error?.message || `Anthropic error ${res.status}`);
+        }
+
+        const data = await res.json();
+        const text = data.content?.[0]?.text || '';
+        setCurrentOutput({ outputType, inputText: userInput.trim(), outputText: text, provider: 'claude' });
+      } else {
+        // ── OpenAI GPT-4o ────────────────────────────────────────────────
+        const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+        if (!apiKey) {
+          throw new Error('VITE_OPENAI_API_KEY is not set. Add it to your .env file and restart the dev server.');
+        }
+
+        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userInput.trim() },
+            ],
+            temperature: 0.7,
+          }),
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData?.error?.message || `OpenAI error ${res.status}`);
+        }
+
+        const data = await res.json();
+        const text = data.choices?.[0]?.message?.content || '';
+        setCurrentOutput({ outputType, inputText: userInput.trim(), outputText: text, provider: 'openai' });
       }
-
-      const data = await res.json();
-      const text = data.choices?.[0]?.message?.content || '';
-      setCurrentOutput({ outputType, inputText: userInput.trim(), outputText: text });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -508,6 +550,93 @@ function AIWorkspace({ task, project, customer }) {
         )}
       </div>
 
+      {/* ── Customize Panel ───────────────────────────────────────────────────── */}
+      <div className="border border-gray-700/60 rounded-xl overflow-hidden">
+        {/* Collapse toggle */}
+        <button
+          onClick={() => setShowCustomize(v => !v)}
+          className="w-full flex items-center justify-between px-3 py-2.5 bg-gray-800/50 hover:bg-gray-800 transition-colors text-left"
+        >
+          <div className="flex items-center gap-2">
+            <Settings size={12} className="text-gray-500" />
+            <span className="text-xs font-medium text-gray-400">Customize</span>
+            {/* Indicators: provider badge + custom prompt dot */}
+            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${
+              currentProvider === 'claude'
+                ? 'bg-amber-500/15 text-amber-400 border-amber-500/20'
+                : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20'
+            }`}>
+              {currentProvider === 'claude' ? 'Claude' : 'GPT-4o'}
+            </span>
+            {customPrompt.trim() && (
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" title="Custom prompt active" />
+            )}
+          </div>
+          <ChevronDown size={13} className={`text-gray-600 transition-transform ${showCustomize ? 'rotate-180' : ''}`} />
+        </button>
+
+        {showCustomize && (
+          <div className="p-3 space-y-3 bg-gray-900/40 border-t border-gray-700/60">
+
+            {/* Provider toggle */}
+            <div>
+              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">AI Provider</p>
+              <div className="flex gap-1.5">
+                {[
+                  { value: 'openai', label: 'GPT-4o', desc: 'OpenAI' },
+                  { value: 'claude', label: 'Claude', desc: 'Anthropic' },
+                ].map(opt => (
+                  <button
+                    key={opt.value}
+                    onClick={() => updateAiSettings({ providers: { [outputType]: opt.value } })}
+                    className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-all ${
+                      currentProvider === opt.value
+                        ? opt.value === 'claude'
+                          ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                          : 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                        : 'bg-gray-800 border-gray-700 text-gray-500 hover:text-gray-300 hover:border-gray-600'
+                    }`}
+                  >
+                    {opt.label}
+                    <span className="block text-[9px] font-normal opacity-60">{opt.desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Custom system prompt */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
+                  System Prompt
+                </p>
+                {customPrompt.trim() && (
+                  <button
+                    onClick={() => updateAiSettings({ prompts: { [outputType]: '' } })}
+                    className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-gray-300 transition-colors"
+                    title="Reset to default"
+                  >
+                    <RotateCcw size={9} /> Reset to default
+                  </button>
+                )}
+              </div>
+              <textarea
+                rows={5}
+                value={customPrompt}
+                onChange={e => updateAiSettings({ prompts: { [outputType]: e.target.value } })}
+                placeholder={`Leave blank to use the built-in default prompt for "${AI_OUTPUT_TYPE_LABELS[outputType]}".`}
+                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-xs text-gray-200 placeholder-gray-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40 resize-none font-mono leading-relaxed"
+              />
+              <p className="mt-1 text-[10px] text-gray-600">
+                {customPrompt.trim()
+                  ? 'Using your custom prompt. Task description and recipient are included automatically by the built-in prompts — in custom prompts you control everything.'
+                  : 'Using built-in default. Customize to change tone, format, or add standing instructions.'}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Voice + text input */}
       <div>
         <div className="flex items-center justify-between mb-2">
@@ -550,7 +679,7 @@ function AIWorkspace({ task, project, customer }) {
       >
         {isGenerating
           ? <><Loader2 size={16} className="animate-spin" /> Generating…</>
-          : <><Sparkles size={16} /> Generate {AI_OUTPUT_TYPE_LABELS[outputType]}</>
+          : <><Sparkles size={16} /> Generate with {currentProvider === 'claude' ? 'Claude' : 'GPT-4o'}</>
         }
       </button>
 
@@ -558,9 +687,20 @@ function AIWorkspace({ task, project, customer }) {
       {currentOutput && (
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
-              {AI_OUTPUT_TYPE_LABELS[currentOutput.outputType]}
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                {AI_OUTPUT_TYPE_LABELS[currentOutput.outputType]}
+              </p>
+              {currentOutput.provider && (
+                <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${
+                  currentOutput.provider === 'claude'
+                    ? 'bg-amber-500/15 text-amber-400 border-amber-500/20'
+                    : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20'
+                }`}>
+                  {currentOutput.provider === 'claude' ? 'Claude' : 'GPT-4o'}
+                </span>
+              )}
+            </div>
             <div className="flex gap-1.5">
               <button
                 onClick={handleCopy}
@@ -590,6 +730,15 @@ function AIWorkspace({ task, project, customer }) {
                 <summary className="flex items-center justify-between px-4 py-3 cursor-pointer list-none">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-medium text-gray-400">{AI_OUTPUT_TYPE_LABELS[h.outputType]}</span>
+                    {h.provider && (
+                      <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${
+                        h.provider === 'claude'
+                          ? 'bg-amber-500/15 text-amber-400 border-amber-500/20'
+                          : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20'
+                      }`}>
+                        {h.provider === 'claude' ? 'Claude' : 'GPT-4o'}
+                      </span>
+                    )}
                     <span className="text-[10px] text-gray-600">
                       {new Date(h.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                       {' '}

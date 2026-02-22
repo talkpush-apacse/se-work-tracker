@@ -8,6 +8,25 @@ const KEYS = {
   meetingEntries: 'gpt-meeting-entries',
   tasks: 'gpt-tasks',
   aiOutputs: 'gpt-ai-outputs',
+  aiSettings: 'gpt-ai-settings',
+};
+
+// Default AI settings shape — empty string means "use built-in default prompt"
+const DEFAULT_AI_SETTINGS = {
+  prompts: {
+    email: '',
+    slack: '',
+    troubleshooting: '',
+    configuration: '',
+    summary: '',
+  },
+  providers: {
+    email: 'openai',
+    slack: 'openai',
+    troubleshooting: 'openai',
+    configuration: 'openai',
+    summary: 'openai',
+  },
 };
 
 function load(key, fallback = []) {
@@ -66,6 +85,15 @@ export function useStore() {
   const [meetingEntries, setMeetingEntries] = useState(() => load(KEYS.meetingEntries));
   const [tasks, setTasks] = useState(() => load(KEYS.tasks));
   const [aiOutputs, setAiOutputs] = useState(() => load(KEYS.aiOutputs));
+  const [aiSettings, setAiSettings] = useState(() => {
+    const stored = load(KEYS.aiSettings, null);
+    if (!stored) return DEFAULT_AI_SETTINGS;
+    // Merge stored with defaults so new output types get default values
+    return {
+      prompts: { ...DEFAULT_AI_SETTINGS.prompts, ...stored.prompts },
+      providers: { ...DEFAULT_AI_SETTINGS.providers, ...stored.providers },
+    };
+  });
 
   useEffect(() => { save(KEYS.okrs, okrs); }, [okrs]);
   useEffect(() => { save(KEYS.customers, customers); }, [customers]);
@@ -74,6 +102,7 @@ export function useStore() {
   useEffect(() => { save(KEYS.meetingEntries, meetingEntries); }, [meetingEntries]);
   useEffect(() => { save(KEYS.tasks, tasks); }, [tasks]);
   useEffect(() => { save(KEYS.aiOutputs, aiOutputs); }, [aiOutputs]);
+  useEffect(() => { save(KEYS.aiSettings, aiSettings); }, [aiSettings]);
 
   // OKR actions
   const addOkr = useCallback((data) => {
@@ -189,6 +218,14 @@ export function useStore() {
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   }, [aiOutputs]);
 
+  // AI settings actions
+  const updateAiSettings = useCallback((patch) => {
+    setAiSettings(prev => ({
+      prompts: { ...prev.prompts, ...(patch.prompts || {}) },
+      providers: { ...prev.providers, ...(patch.providers || {}) },
+    }));
+  }, []);
+
   // Computed helpers
   const getProjectPoints = useCallback((projectId) => {
     return points.filter(p => p.projectId === projectId);
@@ -241,6 +278,7 @@ export function useStore() {
     addMeetingEntry, markMeetingEntryTriaged, getProjectMeetingEntries,
     addTask, updateTask, deleteTask, getProjectTasks,
     addAiOutput, getTaskAiOutputs,
+    aiSettings, updateAiSettings,
     exportData, importData,
   };
 }
