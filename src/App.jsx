@@ -8,6 +8,7 @@ import Projects from './pages/Projects';
 import Analytics from './pages/Analytics';
 import OKRs from './pages/OKRs';
 import Customers from './pages/Customers';
+import Triage from './pages/Triage';
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -39,6 +40,7 @@ function AppContent() {
               onProjectSelect={(id) => setProjectTarget(id)}
             />
           )}
+          {activeTab === 'triage' && <Triage />}
           {activeTab === 'analytics' && <Analytics />}
           {activeTab === 'okrs' && <OKRs />}
           {activeTab === 'customers' && <Customers />}

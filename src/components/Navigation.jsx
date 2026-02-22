@@ -1,10 +1,11 @@
-import { LayoutDashboard, FolderKanban, BarChart3, Target, Users, Menu, X, Download, Upload } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, BarChart3, Target, Users, Menu, X, Download, Upload, ListTodo } from 'lucide-react';
 import { useState, useRef } from 'react';
 import { useAppStore } from '../context/StoreContext';
 
 const tabs = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'projects', label: 'Projects', icon: FolderKanban },
+  { id: 'triage', label: 'Triage', icon: ListTodo },
   { id: 'analytics', label: 'Analytics', icon: BarChart3 },
   { id: 'okrs', label: 'OKRs', icon: Target },
   { id: 'customers', label: 'Customers', icon: Users },

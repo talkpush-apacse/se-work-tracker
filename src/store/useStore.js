@@ -5,6 +5,9 @@ const KEYS = {
   customers: 'gpt-customers',
   projects: 'gpt-projects',
   points: 'gpt-points',
+  meetingEntries: 'gpt-meeting-entries',
+  tasks: 'gpt-tasks',
+  aiOutputs: 'gpt-ai-outputs',
 };
 
 function load(key, fallback = []) {
@@ -29,11 +32,17 @@ export function useStore() {
   const [customers, setCustomers] = useState(() => load(KEYS.customers));
   const [projects, setProjects] = useState(() => load(KEYS.projects));
   const [points, setPoints] = useState(() => load(KEYS.points));
+  const [meetingEntries, setMeetingEntries] = useState(() => load(KEYS.meetingEntries));
+  const [tasks, setTasks] = useState(() => load(KEYS.tasks));
+  const [aiOutputs, setAiOutputs] = useState(() => load(KEYS.aiOutputs));
 
   useEffect(() => { save(KEYS.okrs, okrs); }, [okrs]);
   useEffect(() => { save(KEYS.customers, customers); }, [customers]);
   useEffect(() => { save(KEYS.projects, projects); }, [projects]);
   useEffect(() => { save(KEYS.points, points); }, [points]);
+  useEffect(() => { save(KEYS.meetingEntries, meetingEntries); }, [meetingEntries]);
+  useEffect(() => { save(KEYS.tasks, tasks); }, [tasks]);
+  useEffect(() => { save(KEYS.aiOutputs, aiOutputs); }, [aiOutputs]);
 
   // OKR actions
   const addOkr = useCallback((data) => {
@@ -79,6 +88,8 @@ export function useStore() {
   const deleteProject = useCallback((id) => {
     setProjects(prev => prev.filter(p => p.id !== id));
     setPoints(prev => prev.filter(pt => pt.projectId !== id));
+    setMeetingEntries(prev => prev.filter(m => m.projectId !== id));
+    setTasks(prev => prev.filter(t => t.projectId !== id));
   }, []);
 
   // Point actions
@@ -95,6 +106,57 @@ export function useStore() {
   const updatePoint = useCallback((id, data) => {
     setPoints(prev => prev.map(p => p.id === id ? { ...p, ...data } : p));
   }, []);
+
+  // Meeting entry actions
+  const addMeetingEntry = useCallback((data) => {
+    // data: { projectId, meetingDate (YYYY-MM-DD string), rawNotes }
+    const entry = { id: uid(), createdAt: new Date().toISOString(), isTriaged: false, ...data };
+    setMeetingEntries(prev => [...prev, entry]);
+    return entry;
+  }, []);
+
+  const markMeetingEntryTriaged = useCallback((id) => {
+    setMeetingEntries(prev => prev.map(m => m.id === id ? { ...m, isTriaged: true } : m));
+  }, []);
+
+  const getProjectMeetingEntries = useCallback((projectId) => {
+    return meetingEntries.filter(m => m.projectId === projectId);
+  }, [meetingEntries]);
+
+  // Task actions
+  const addTask = useCallback((data) => {
+    // data: { projectId, meetingEntryId (optional), description, taskType, assigneeOrTeam, status }
+    const task = { id: uid(), createdAt: new Date().toISOString(), status: 'open', ...data };
+    setTasks(prev => [...prev, task]);
+    return task;
+  }, []);
+
+  const updateTask = useCallback((id, data) => {
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, ...data } : t));
+  }, []);
+
+  const deleteTask = useCallback((id) => {
+    setTasks(prev => prev.filter(t => t.id !== id));
+    setAiOutputs(prev => prev.filter(o => o.taskId !== id));
+  }, []);
+
+  const getProjectTasks = useCallback((projectId) => {
+    return tasks.filter(t => t.projectId === projectId);
+  }, [tasks]);
+
+  // AI output actions
+  const addAiOutput = useCallback((data) => {
+    // data: { taskId, outputType, inputText, outputText }
+    const output = { id: uid(), createdAt: new Date().toISOString(), ...data };
+    setAiOutputs(prev => [...prev, output]);
+    return output;
+  }, []);
+
+  const getTaskAiOutputs = useCallback((taskId) => {
+    return aiOutputs
+      .filter(o => o.taskId === taskId)
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }, [aiOutputs]);
 
   // Computed helpers
   const getProjectPoints = useCallback((projectId) => {
@@ -139,12 +201,15 @@ export function useStore() {
   }, []);
 
   return {
-    okrs, customers, projects, points,
+    okrs, customers, projects, points, meetingEntries, tasks, aiOutputs,
     addOkr, updateOkr, deleteOkr,
     addCustomer, updateCustomer, deleteCustomer,
     addProject, updateProject, deleteProject,
     addPoint, deletePoint, updatePoint,
     getProjectPoints, getProjectTotals,
+    addMeetingEntry, markMeetingEntryTriaged, getProjectMeetingEntries,
+    addTask, updateTask, deleteTask, getProjectTasks,
+    addAiOutput, getTaskAiOutputs,
     exportData, importData,
   };
 }

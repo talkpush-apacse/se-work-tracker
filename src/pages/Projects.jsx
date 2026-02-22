@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, ChevronRight, Pencil, Trash2, ArrowLeft, Clock, Zap, Calendar, CheckCircle2, PauseCircle, XCircle, LayoutGrid, List, Timer, Square, ListPlus } from 'lucide-react';
+import { Plus, ChevronRight, Pencil, Trash2, ArrowLeft, Clock, Zap, Calendar, CheckCircle2, PauseCircle, XCircle, LayoutGrid, List, Timer, Square, ListPlus, NotebookPen } from 'lucide-react';
 import { useAppStore } from '../context/StoreContext';
 import { useTimerContext } from '../context/TimerContext';
 import Modal from '../components/Modal';
@@ -7,6 +7,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import AddPointsModal from '../components/AddPointsModal';
 import BulkAddProjectsModal from '../components/BulkAddProjectsModal';
 import BulkAddPointsModal from '../components/BulkAddPointsModal';
+import NewMeetingEntryModal from '../components/NewMeetingEntryModal';
 import { CUSTOMER_COLORS, PROJECT_STATUSES, ACTIVITY_TYPES, ACTIVITY_COLORS } from '../constants';
 import { formatDate, formatDateTime, formatRelative } from '../utils/dateHelpers';
 
@@ -180,8 +181,9 @@ function EditEntryModal({ entry, onClose }) {
 }
 
 function ProjectDetail({ project, onBack }) {
-  const { points, customers, okrs, addPoint, deletePoint, updatePoint, updateProject, deleteProject } = useAppStore();
+  const { points, customers, okrs, addPoint, deletePoint, updatePoint, updateProject, deleteProject, getProjectMeetingEntries } = useAppStore();
   const { isRunning, projectId: runningProjectId, startTimer, stopTimer } = useTimerContext();
+  const [activeTab, setActiveTab] = useState('points'); // 'points' | 'meetings'
   const [addModal, setAddModal] = useState(false);
   const [bulkPointsModal, setBulkPointsModal] = useState(false);
   const [editModal, setEditModal] = useState(false);
@@ -190,12 +192,23 @@ function ProjectDetail({ project, onBack }) {
   const [editEntryModal, setEditEntryModal] = useState(null);
   const [timerConflict, setTimerConflict] = useState(false);
   const [flashMsg, setFlashMsg] = useState(null);
+  const [newMeetingModal, setNewMeetingModal] = useState(false);
 
   const customer = customers.find(c => c.id === project.customerId);
   const okr = okrs.find(o => o.id === project.okrId);
   const entries = points.filter(p => p.projectId === project.id).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
   const totalPoints = entries.reduce((s, e) => s + e.points, 0);
   const totalHours = entries.reduce((s, e) => s + e.hours, 0);
+
+  // Meeting entries sorted newest-date-first, then grouped by meetingDate
+  const meetingEntries = getProjectMeetingEntries(project.id).sort(
+    (a, b) => b.meetingDate.localeCompare(a.meetingDate)
+  );
+  const meetingsByDate = meetingEntries.reduce((acc, entry) => {
+    if (!acc[entry.meetingDate]) acc[entry.meetingDate] = [];
+    acc[entry.meetingDate].push(entry);
+    return acc;
+  }, {});
 
   const StatusIcon = STATUS_ICONS[project.status] || CheckCircle2;
 
@@ -259,100 +272,195 @@ function ProjectDetail({ project, onBack }) {
         )}
       </div>
 
-      {/* Action buttons row */}
-      <div className="flex gap-3">
-        {/* Timer button */}
-        {isRunning && runningProjectId === project.id ? (
-          <button
-            onClick={stopTimer}
-            className="flex items-center justify-center gap-2 py-3 px-5 rounded-2xl bg-red-600/20 hover:bg-red-600/40 text-red-400 font-bold transition-all border border-red-700/40 flex-shrink-0"
-          >
-            <Square size={14} fill="currentColor" /> Stop Timer
-          </button>
-        ) : (
-          <button
-            onClick={() => {
-              if (isRunning) {
-                setTimerConflict(true);
-              } else {
-                startTimer(project.id);
-              }
-            }}
-            className="flex items-center justify-center gap-2 py-3 px-5 rounded-2xl bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 font-bold transition-all border border-emerald-700/40 flex-shrink-0"
-          >
-            <Timer size={15} /> Start Timer
-          </button>
-        )}
-
-        {/* Add points FAB */}
+      {/* Tab bar */}
+      <div className="flex bg-gray-800 rounded-xl p-1 gap-1 w-fit">
         <button
-          onClick={() => setAddModal(true)}
-          className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-all shadow-lg shadow-indigo-600/30 hover:shadow-indigo-600/50"
+          onClick={() => setActiveTab('points')}
+          className={`px-4 py-2 rounded-lg text-xs font-medium transition-all ${activeTab === 'points' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}
         >
-          <Plus size={18} /> Add Points
+          Points Log
         </button>
-
-        {/* Bulk add points */}
         <button
-          onClick={() => setBulkPointsModal(true)}
-          className="flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 hover:text-white font-medium transition-all flex-shrink-0"
-          title="Bulk add point entries"
+          onClick={() => setActiveTab('meetings')}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition-all ${activeTab === 'meetings' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}
         >
-          <ListPlus size={16} />
+          <NotebookPen size={12} /> Meeting Log
+          {meetingEntries.length > 0 && (
+            <span className="ml-0.5 bg-indigo-600/40 text-indigo-300 text-[10px] px-1.5 py-0.5 rounded-full font-semibold">
+              {meetingEntries.length}
+            </span>
+          )}
         </button>
       </div>
 
-      {/* Points log */}
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-800 flex items-center justify-between">
-          <h2 className="font-semibold text-white">Points History</h2>
-          <span className="text-xs text-gray-500">{entries.length} entries</span>
-        </div>
-        {entries.length === 0 ? (
-          <div className="px-5 py-10 text-center">
-            <p className="text-gray-500 text-sm">No points logged yet.</p>
-            <p className="text-gray-600 text-xs mt-1">Click "Add Points" to get started.</p>
+      {/* Points tab */}
+      {activeTab === 'points' && (
+        <>
+          {/* Action buttons row */}
+          <div className="flex gap-3">
+            {isRunning && runningProjectId === project.id ? (
+              <button
+                onClick={stopTimer}
+                className="flex items-center justify-center gap-2 py-3 px-5 rounded-2xl bg-red-600/20 hover:bg-red-600/40 text-red-400 font-bold transition-all border border-red-700/40 flex-shrink-0"
+              >
+                <Square size={14} fill="currentColor" /> Stop Timer
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  if (isRunning) {
+                    setTimerConflict(true);
+                  } else {
+                    startTimer(project.id);
+                  }
+                }}
+                className="flex items-center justify-center gap-2 py-3 px-5 rounded-2xl bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 font-bold transition-all border border-emerald-700/40 flex-shrink-0"
+              >
+                <Timer size={15} /> Start Timer
+              </button>
+            )}
+            <button
+              onClick={() => setAddModal(true)}
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-all shadow-lg shadow-indigo-600/30 hover:shadow-indigo-600/50"
+            >
+              <Plus size={18} /> Add Points
+            </button>
+            <button
+              onClick={() => setBulkPointsModal(true)}
+              className="flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 hover:text-white font-medium transition-all flex-shrink-0"
+              title="Bulk add point entries"
+            >
+              <ListPlus size={16} />
+            </button>
           </div>
-        ) : (
-          <div className="divide-y divide-gray-800/60">
-            {entries.map(entry => (
-              <div key={entry.id} className="px-5 py-3.5 flex items-start gap-3 group hover:bg-gray-800/30 transition-colors">
-                <div
-                  className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
-                  style={{ backgroundColor: ACTIVITY_COLORS[entry.activityType] || '#6366f1' }}
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-semibold text-white">{entry.activityType}</span>
-                    <span className="text-[10px] text-gray-500">{formatDateTime(entry.timestamp)}</span>
+
+          {/* Points log */}
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-800 flex items-center justify-between">
+              <h2 className="font-semibold text-white">Points History</h2>
+              <span className="text-xs text-gray-500">{entries.length} entries</span>
+            </div>
+            {entries.length === 0 ? (
+              <div className="px-5 py-10 text-center">
+                <p className="text-gray-500 text-sm">No points logged yet.</p>
+                <p className="text-gray-600 text-xs mt-1">Click "Add Points" to get started.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-800/60">
+                {entries.map(entry => (
+                  <div key={entry.id} className="px-5 py-3.5 flex items-start gap-3 group hover:bg-gray-800/30 transition-colors">
+                    <div
+                      className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
+                      style={{ backgroundColor: ACTIVITY_COLORS[entry.activityType] || '#6366f1' }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-semibold text-white">{entry.activityType}</span>
+                        <span className="text-[10px] text-gray-500">{formatDateTime(entry.timestamp)}</span>
+                      </div>
+                      {entry.comment && <p className="text-xs text-gray-400 mt-0.5">{entry.comment}</p>}
+                      <div className="flex items-center gap-3 mt-1">
+                        <span className="text-xs text-gray-500 flex items-center gap-1"><Clock size={10} /> {entry.hours}h</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-bold text-indigo-400">+{entry.points}</span>
+                      <button
+                        onClick={() => setEditEntryModal(entry)}
+                        className="p-1 rounded text-gray-600 hover:text-indigo-400 opacity-0 group-hover:opacity-100 transition-all"
+                        title="Edit entry"
+                      >
+                        <Pencil size={13} />
+                      </button>
+                      <button
+                        onClick={() => setDeleteEntryId(entry.id)}
+                        className="p-1 rounded text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                        title="Delete entry"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
                   </div>
-                  {entry.comment && <p className="text-xs text-gray-400 mt-0.5">{entry.comment}</p>}
-                  <div className="flex items-center gap-3 mt-1">
-                    <span className="text-xs text-gray-500 flex items-center gap-1"><Clock size={10} /> {entry.hours}h</span>
-                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Meeting Log tab */}
+      {activeTab === 'meetings' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-gray-500">{meetingEntries.length} {meetingEntries.length === 1 ? 'entry' : 'entries'}</p>
+            <button
+              onClick={() => setNewMeetingModal(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold transition-all shadow-lg shadow-indigo-600/30"
+            >
+              <Plus size={15} /> New Meeting Entry
+            </button>
+          </div>
+
+          {meetingEntries.length === 0 ? (
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl px-5 py-14 text-center">
+              <NotebookPen size={28} className="text-gray-700 mx-auto mb-3" />
+              <p className="text-gray-500 text-sm">No meeting notes yet.</p>
+              <p className="text-gray-600 text-xs mt-1">Click "New Meeting Entry" to log your first meeting.</p>
+            </div>
+          ) : (
+            Object.entries(meetingsByDate).map(([date, dayEntries]) => (
+              <div key={date}>
+                {/* Date group header */}
+                <div className="flex items-center gap-2 mb-2">
+                  <Calendar size={13} className="text-gray-500" />
+                  <span className="text-xs font-semibold text-gray-400">
+                    {new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
+                  </span>
+                  <span className="text-xs text-gray-600">({dayEntries.length})</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-sm font-bold text-indigo-400">+{entry.points}</span>
-                  <button
-                    onClick={() => setEditEntryModal(entry)}
-                    className="p-1 rounded text-gray-600 hover:text-indigo-400 opacity-0 group-hover:opacity-100 transition-all"
-                    title="Edit entry"
-                  >
-                    <Pencil size={13} />
-                  </button>
-                  <button
-                    onClick={() => setDeleteEntryId(entry.id)}
-                    className="p-1 rounded text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
-                    title="Delete entry"
-                  >
-                    <Trash2 size={13} />
-                  </button>
+
+                <div className="space-y-2">
+                  {dayEntries.map(entry => (
+                    <div key={entry.id} className="bg-gray-900 border border-gray-800 rounded-2xl p-4">
+                      <div className="flex items-start justify-between gap-3 mb-2">
+                        <span className="text-[10px] text-gray-500">
+                          Logged {new Date(entry.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                        </span>
+                        {entry.isTriaged ? (
+                          <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 flex-shrink-0">
+                            <CheckCircle2 size={10} /> Triaged
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20 flex-shrink-0">
+                            Untriaged
+                          </span>
+                        )}
+                      </div>
+                      {/* Notes preview — truncated at 3 lines, full text visible on expand */}
+                      <p className="text-sm text-gray-300 whitespace-pre-wrap line-clamp-3 leading-relaxed">
+                        {entry.rawNotes}
+                      </p>
+                      {entry.rawNotes.split('\n').length > 3 && (
+                        <details className="mt-1">
+                          <summary className="text-xs text-indigo-400 hover:text-indigo-300 cursor-pointer list-none">Show full notes</summary>
+                          <p className="mt-2 text-sm text-gray-300 whitespace-pre-wrap leading-relaxed">{entry.rawNotes}</p>
+                        </details>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {newMeetingModal && (
+        <NewMeetingEntryModal
+          project={project}
+          onClose={() => setNewMeetingModal(false)}
+        />
+      )}
 
       {addModal && (
         <AddPointsModal

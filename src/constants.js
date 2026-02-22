@@ -23,6 +23,49 @@ export const CUSTOMER_COLORS = [
 
 export const PROJECT_STATUSES = ['Active', 'On Hold', 'Completed'];
 
+// Task types (matches spec: mine / coordinate / comms)
+export const TASK_TYPES = ['mine', 'coordinate', 'comms'];
+
+export const TASK_TYPE_LABELS = {
+  mine: 'Mine',
+  coordinate: 'Coordinate',
+  comms: 'Needs Comms',
+};
+
+export const TASK_TYPE_COLORS = {
+  mine: { bg: 'bg-blue-500/15', text: 'text-blue-400', border: 'border-blue-500/20' },
+  coordinate: { bg: 'bg-amber-500/15', text: 'text-amber-400', border: 'border-amber-500/20' },
+  comms: { bg: 'bg-purple-500/15', text: 'text-purple-400', border: 'border-purple-500/20' },
+};
+
+// Task statuses
+export const TASK_STATUSES = ['open', 'in-progress', 'done', 'blocked'];
+
+export const TASK_STATUS_LABELS = {
+  'open': 'Open',
+  'in-progress': 'In Progress',
+  'done': 'Done',
+  'blocked': 'Blocked',
+};
+
+export const TASK_STATUS_COLORS = {
+  'open': { bg: 'bg-gray-500/15', text: 'text-gray-400', border: 'border-gray-500/20' },
+  'in-progress': { bg: 'bg-indigo-500/15', text: 'text-indigo-400', border: 'border-indigo-500/20' },
+  'done': { bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-500/20' },
+  'blocked': { bg: 'bg-red-500/15', text: 'text-red-400', border: 'border-red-500/20' },
+};
+
+// AI output types
+export const AI_OUTPUT_TYPES = ['email', 'slack', 'troubleshooting', 'configuration', 'summary'];
+
+export const AI_OUTPUT_TYPE_LABELS = {
+  email: 'Email Draft',
+  slack: 'Slack Message',
+  troubleshooting: 'Troubleshooting Plan',
+  configuration: 'Configuration Plan',
+  summary: 'General Summary',
+};
+
 export const ACTIVITY_COLORS = {
   'Sending Email': '#6366f1',
   'Joining Meeting': '#8b5cf6',
