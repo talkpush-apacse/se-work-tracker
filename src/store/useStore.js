@@ -230,6 +230,10 @@ export function useStore() {
     return tasks.filter(t => t.projectId === projectId);
   }, [tasks]);
 
+  const reorderTasks = useCallback((orderedIds) => {
+    setTasks(prev => orderedIds.map(id => prev.find(t => t.id === id)).filter(Boolean));
+  }, []);
+
   // AI output actions
   const addAiOutput = useCallback((data) => {
     // data: { taskId, outputType, inputText, outputText }
@@ -310,7 +314,7 @@ export function useStore() {
     addPoint, deletePoint, updatePoint,
     getProjectPoints, getProjectTotals,
     addMeetingEntry, markMeetingEntryTriaged, getProjectMeetingEntries,
-    addTask, updateTask, deleteTask, getProjectTasks,
+    addTask, updateTask, deleteTask, reorderTasks, getProjectTasks,
     addAiOutput, getTaskAiOutputs, updateAiOutput,
     aiSettings, updateAiSettings,
     exportData, importData,

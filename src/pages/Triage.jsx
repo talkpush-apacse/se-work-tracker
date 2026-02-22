@@ -3,8 +3,11 @@ import {
   ChevronDown, Plus, Mic, MicOff, Copy, Save, Check,
   Loader2, ClipboardList, Sparkles, ChevronRight,
   Calendar, User, Tag, AlertCircle, Archive, ArchiveX,
-  Settings, RotateCcw, Pencil,
+  Settings, RotateCcw, Pencil, GripVertical, ExternalLink, ArrowLeft,
 } from 'lucide-react';
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { useAppStore } from '../context/StoreContext';
 import {
   TASK_TYPES, TASK_TYPE_LABELS, TASK_TYPE_COLORS,
@@ -1355,10 +1358,314 @@ function QuickAddTaskForm({ projects, customers, onSubmit, onCancel }) {
   );
 }
 
+// ─── Sortable task row (compact queue card with drag handle) ──────────────────
+function SortableTaskRow({ task, project, customer, onOpenDetail }) {
+  const { updateTask } = useAppStore();
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
+
+  const typeColors   = TASK_TYPE_COLORS[task.taskType]   || TASK_TYPE_COLORS.comms;
+  const statusColors = TASK_STATUS_COLORS[task.status]   || TASK_STATUS_COLORS.open;
+  const ageDays      = Math.floor((Date.now() - new Date(task.createdAt)) / 86_400_000);
+  const ageStyle     = ageDays <= 2
+    ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+    : ageDays <= 5
+      ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
+      : 'text-red-400 bg-red-500/10 border-red-500/20';
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-2 bg-gray-800/50 border border-gray-700/60 rounded-xl px-3 py-2.5 hover:border-gray-600 transition-all"
+    >
+      {/* Drag handle */}
+      <button
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing text-gray-600 hover:text-gray-400 flex-shrink-0 touch-none p-0.5"
+        onClick={e => e.stopPropagation()}
+        aria-label="Drag to reorder"
+      >
+        <GripVertical size={15} />
+      </button>
+
+      {/* Main content (clickable → opens detail) */}
+      <div
+        className="flex-1 min-w-0 cursor-pointer"
+        onClick={() => onOpenDetail(task)}
+      >
+        <div className="flex items-baseline gap-1.5 min-w-0">
+          {customer && (
+            <span
+              className="text-[10px] font-semibold flex-shrink-0 px-1.5 py-0.5 rounded-full"
+              style={{ backgroundColor: (customer.color || '#6366f1') + '22', color: customer.color || '#6366f1' }}
+            >
+              {customer.name}
+            </span>
+          )}
+          <span className="text-sm text-gray-200 truncate">{task.description}</span>
+        </div>
+        {project && (
+          <p className="text-[10px] text-gray-500 mt-0.5 truncate">{project.name}</p>
+        )}
+        <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${typeColors.bg} ${typeColors.text} ${typeColors.border}`}>
+            {TASK_TYPE_LABELS[task.taskType]}
+          </span>
+          <span
+            className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${ageStyle}`}
+            title={`Created ${ageDays} day${ageDays === 1 ? '' : 's'} ago`}
+          >
+            {ageDays}d
+          </span>
+          {task.points > 0 && (
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full border bg-teal-500/10 text-teal-400 border-teal-500/20">
+              ⚡ {task.points}pt{task.points === 1 ? '' : 's'}
+            </span>
+          )}
+          {task.ticketUrl && (
+            <span className="text-[10px] text-indigo-400/70 flex items-center gap-0.5">
+              <ExternalLink size={9} /> ticket
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Quick status select */}
+      <div onClick={e => e.stopPropagation()} className="flex-shrink-0">
+        <select
+          value={task.status}
+          onChange={e => updateTask(task.id, { status: e.target.value })}
+          className={`text-[10px] font-semibold rounded-lg px-2 py-1 border cursor-pointer focus:outline-none ${statusColors.bg} ${statusColors.text} ${statusColors.border} bg-transparent`}
+        >
+          {TASK_STATUSES.map(s => (
+            <option key={s} value={s} className="bg-gray-800 text-white">{TASK_STATUS_LABELS[s]}</option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+}
+
+// ─── Task detail view (full-width page: metadata + notes + AI Workspace) ───────
+function TaskDetailView({ task, project, customer, onBack }) {
+  const { updateTask, deleteTask, projects, customers, addTask } = useAppStore();
+
+  // Local draft state — all saved on blur or debounced
+  const [descDraft,  setDescDraft]  = useState(task.description);
+  const [ticketUrl,  setTicketUrl]  = useState(task.ticketUrl  || '');
+  const [notesDraft, setNotesDraft] = useState(task.notes      || '');
+  const notesTimerRef = useRef(null);
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+
+  // Sync draft when task prop changes (e.g. status updated from outside)
+  useEffect(() => { setDescDraft(task.description); }, [task.description]);
+  useEffect(() => { setTicketUrl(task.ticketUrl || ''); }, [task.ticketUrl]);
+  useEffect(() => { setNotesDraft(task.notes || ''); }, [task.notes]);
+
+  const saveDesc = () => {
+    const trimmed = descDraft.trim();
+    if (trimmed && trimmed !== task.description) updateTask(task.id, { description: trimmed });
+    else setDescDraft(task.description);
+  };
+
+  const saveTicket = () => {
+    if (ticketUrl !== (task.ticketUrl || '')) updateTask(task.id, { ticketUrl });
+  };
+
+  const handleNotesChange = (val) => {
+    setNotesDraft(val);
+    clearTimeout(notesTimerRef.current);
+    notesTimerRef.current = setTimeout(() => updateTask(task.id, { notes: val }), 500);
+  };
+
+  const ageDays = Math.floor((Date.now() - new Date(task.createdAt)) / 86_400_000);
+
+  const selectClass = 'w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40';
+
+  return (
+    <div>
+      {/* Header bar */}
+      <div className="flex items-center gap-3 mb-6">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-white transition-colors"
+        >
+          <ArrowLeft size={16} /> Back to Queue
+        </button>
+        {customer && (
+          <span
+            className="text-xs font-semibold px-2 py-0.5 rounded-full"
+            style={{ backgroundColor: (customer.color || '#6366f1') + '22', color: customer.color || '#6366f1' }}
+          >
+            {customer.name}
+          </span>
+        )}
+        {project && (
+          <span className="text-xs text-gray-500">{project.name}</span>
+        )}
+      </div>
+
+      {/* Two-column layout */}
+      <div className="flex gap-6 items-start">
+
+        {/* ── Left panel (40%) — task metadata + notes ── */}
+        <div className="w-2/5 flex-shrink-0 space-y-4">
+
+          {/* Description */}
+          <div>
+            <label className="text-xs font-medium text-gray-400 mb-1 block">Task</label>
+            <textarea
+              value={descDraft}
+              onChange={e => setDescDraft(e.target.value)}
+              onBlur={saveDesc}
+              rows={2}
+              className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-gray-200 resize-none focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+            />
+          </div>
+
+          {/* Status + Type */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-gray-400 mb-1 block">Status</label>
+              <select
+                value={task.status}
+                onChange={e => updateTask(task.id, { status: e.target.value })}
+                className={selectClass}
+              >
+                {TASK_STATUSES.map(s => (
+                  <option key={s} value={s} className="bg-gray-800">{TASK_STATUS_LABELS[s]}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-400 mb-1 block">Type</label>
+              <select
+                value={task.taskType}
+                onChange={e => updateTask(task.id, { taskType: e.target.value })}
+                className={selectClass}
+              >
+                {TASK_TYPES.map(t => (
+                  <option key={t} value={t} className="bg-gray-800">{TASK_TYPE_LABELS[t]}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Assignee / Recipient */}
+          <div>
+            <label className="text-xs font-medium text-gray-400 mb-1 block">Recipient / Assignee</label>
+            <select
+              value={task.assigneeOrTeam || ''}
+              onChange={e => updateTask(task.id, { assigneeOrTeam: e.target.value })}
+              className={selectClass}
+            >
+              <option value="" className="bg-gray-800">— None —</option>
+              {TASK_RECIPIENTS.map(r => (
+                <option key={r.value} value={r.value} className="bg-gray-800">{r.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Ticket URL */}
+          <div>
+            <label className="text-xs font-medium text-gray-400 mb-1 flex items-center gap-1">
+              <ExternalLink size={11} /> Ticket / Link
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="url"
+                value={ticketUrl}
+                onChange={e => setTicketUrl(e.target.value)}
+                onBlur={saveTicket}
+                placeholder="https://jira.company.com/ticket/123"
+                className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-gray-200 placeholder:text-gray-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+              />
+              {ticketUrl && (
+                <a
+                  href={ticketUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center px-3 py-2 bg-gray-800 border border-gray-700 rounded-xl text-indigo-400 hover:text-indigo-300 hover:border-gray-600 transition-colors"
+                >
+                  <ExternalLink size={13} />
+                </a>
+              )}
+            </div>
+          </div>
+
+          {/* Notes & Artifacts */}
+          <div className="flex flex-col">
+            <label className="text-xs font-medium text-gray-400 mb-1 block">Notes & Artifacts</label>
+            <textarea
+              value={notesDraft}
+              onChange={e => handleNotesChange(e.target.value)}
+              placeholder="Paste links, screenshots, context, artifacts, email threads…"
+              rows={12}
+              className="w-full bg-gray-800/60 border border-gray-700/50 rounded-xl px-3 py-2.5 text-sm text-gray-300 placeholder:text-gray-600 resize-y focus:outline-none focus:border-gray-600"
+            />
+          </div>
+
+          {/* Footer: meta info + archive */}
+          <div className="flex items-center justify-between pt-2 border-t border-gray-800">
+            <div className="flex items-center gap-2 text-[10px] text-gray-600">
+              <Calendar size={10} />
+              <span>
+                {new Date(task.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+              </span>
+              <span className={`font-semibold px-1.5 py-0.5 rounded-full border ${
+                ageDays <= 2 ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                : ageDays <= 5 ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
+                : 'text-red-400 bg-red-500/10 border-red-500/20'
+              }`}>{ageDays}d old</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {!showConfirmDelete ? (
+                <button
+                  onClick={() => updateTask(task.id, { status: 'archived' })}
+                  className="flex items-center gap-1 text-[10px] text-gray-600 hover:text-gray-400 transition-colors"
+                >
+                  <Archive size={11} /> Archive
+                </button>
+              ) : null}
+              {!showConfirmDelete ? (
+                <button
+                  onClick={() => setShowConfirmDelete(true)}
+                  className="text-[10px] text-red-600 hover:text-red-400 transition-colors"
+                >
+                  Delete
+                </button>
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-red-400">Sure?</span>
+                  <button
+                    onClick={() => { deleteTask(task.id); onBack(); }}
+                    className="text-[10px] font-semibold text-red-400 hover:text-red-300"
+                  >Yes</button>
+                  <button
+                    onClick={() => setShowConfirmDelete(false)}
+                    className="text-[10px] text-gray-500 hover:text-gray-300"
+                  >No</button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Right panel (60%) — AI Workspace ── */}
+        <div className="flex-1 min-w-0">
+          <AIWorkspace task={task} project={project} customer={customer} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Triage page ──────────────────────────────────────────────────────────
 export default function Triage() {
-  const { meetingEntries, tasks, projects, customers, updateTask, addTask } = useAppStore();
-  const [selectedTask, setSelectedTask] = useState(null);
+  const { meetingEntries, tasks, projects, customers, updateTask, addTask, reorderTasks } = useAppStore();
+  const [taskDetailId, setTaskDetailId] = useState(null);
   const [triageRefresh, setTriageRefresh] = useState(0);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
 
@@ -1368,6 +1675,9 @@ export default function Triage() {
   const [filterTaskType,   setFilterTaskType]   = useState('');
   const [filterStatus,     setFilterStatus]     = useState('');
   const [showArchived, setShowArchived] = useState(false);
+
+  // dnd-kit sensors
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   // Derived customer list for filter dropdown (only customers that have tasks)
   const customersWithTasks = customers.filter(c =>
@@ -1426,303 +1736,261 @@ export default function Triage() {
     return true;
   });
 
-  // Group active tasks by status
-  const tasksByStatus = TASK_STATUSES.reduce((acc, s) => {
-    acc[s] = activeTasks
-      .filter(t => t.status === s)
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    return acc;
-  }, {});
-
-  const totalActiveTasks = activeTasks.length;
-  const openCount = (tasksByStatus['open'] || []).length + (tasksByStatus['in-progress'] || []).length;
   const filtersActive = filterCustomerId || filterProjectId || filterTaskType || filterStatus;
 
-  // Resolve selected task's project/customer
-  const selectedProject = selectedTask ? projects.find(p => p.id === selectedTask.projectId) : null;
-  const selectedCustomer = selectedProject ? customers.find(c => c.id === selectedProject.customerId) : null;
+  // Task detail open/close
+  const handleOpenDetail = (task) => setTaskDetailId(task.id);
+  const handleCloseDetail = () => setTaskDetailId(null);
 
-  // Keep selectedTask in sync if it gets updated
-  useEffect(() => {
-    if (selectedTask) {
-      const updated = tasks.find(t => t.id === selectedTask.id);
-      if (updated) setSelectedTask(updated);
-      else setSelectedTask(null); // task was deleted
-    }
-  }, [tasks]);
-
-  // Handle archive/unarchive toggle
-  const handleArchive = (task) => {
-    if (task.status === 'archived') {
-      // Restore to 'open'
-      updateTask(task.id, { status: 'open' });
-    } else {
-      // Archive — deselect if it was selected
-      if (selectedTask?.id === task.id) setSelectedTask(null);
-      updateTask(task.id, { status: 'archived' });
-    }
+  // Drag-and-drop reorder handler
+  const handleDragEnd = (event) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = activeTasks.findIndex(t => t.id === active.id);
+    const newIndex  = activeTasks.findIndex(t => t.id === over.id);
+    const reordered = arrayMove(activeTasks, oldIndex, newIndex);
+    reorderTasks(reordered.map(t => t.id));
   };
 
-  // Render a task card (used for both active and archived sections)
-  const renderTaskCard = (task) => {
-    const proj = projects.find(p => p.id === task.projectId);
-    const cust = proj ? customers.find(c => c.id === proj.customerId) : null;
-    return (
-      <TaskCard
-        key={task.id}
-        task={task}
-        project={proj}
-        customer={cust}
-        isSelected={selectedTask?.id === task.id}
-        onSelect={setSelectedTask}
-        onStatusChange={(id, val) => updateTask(id, { status: val })}
-        onArchive={handleArchive}
-      />
-    );
-  };
+  // ── Task Detail sub-view ───────────────────────────────────────────────────
+  if (taskDetailId) {
+    const task = tasks.find(t => t.id === taskDetailId);
+    if (!task) { setTaskDetailId(null); return null; }
+    const project  = projects.find(p => p.id === task.projectId);
+    const customer = customers.find(c => c.id === project?.customerId);
+    return <TaskDetailView task={task} project={project} customer={customer} onBack={handleCloseDetail} />;
+  }
 
+  // ── Queue view ─────────────────────────────────────────────────────────────
   return (
-    <div className="flex gap-5 min-h-[calc(100vh-8rem)]">
+    <div className="space-y-5">
 
-      {/* ── LEFT PANEL ────────────────────────────────────────────────────── */}
-      <div className="w-full lg:w-[420px] xl:w-[460px] flex-shrink-0 space-y-5 overflow-y-auto">
-
-        {/* Triage Queue */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <ClipboardList size={15} className="text-amber-400" />
-              <h2 className="text-sm font-semibold text-white">Triage Queue</h2>
-              {untriagedEntries.length > 0 && (
-                <span className="bg-amber-500/20 text-amber-400 border border-amber-500/20 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                  {untriagedEntries.length}
-                </span>
-              )}
-            </div>
-          </div>
-
-          {untriagedEntries.length === 0 ? (
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl px-5 py-10 text-center">
-              <ClipboardList size={24} className="text-gray-700 mx-auto mb-2" />
-              <p className="text-gray-500 text-sm">Queue is clear!</p>
-              <p className="text-gray-600 text-xs mt-1">All meeting entries have been triaged.</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {Object.values(untriagedByCustomer).map(({ customer, entries: customerEntries }) => (
-                <div key={customer?.id || '_none'}>
-                  <div className="flex items-center gap-1.5 mb-2">
-                    {customer && (
-                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: customer.color || '#6366f1' }} />
-                    )}
-                    <span className="text-xs font-semibold text-gray-400">
-                      {customer?.name || 'No Customer'}
-                    </span>
-                    <span className="text-xs text-gray-600">({customerEntries.length})</span>
-                  </div>
-                  <div className="space-y-2">
-                    {customerEntries.map(({ entry, project, customer: c }) => (
-                      <TriageEntryCard
-                        key={entry.id}
-                        entry={entry}
-                        project={project}
-                        customer={c}
-                        onTriaged={() => setTriageRefresh(n => n + 1)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Task Board */}
-        <div>
-          {/* Board header */}
-          <div className="flex items-center gap-2 mb-3">
-            <Tag size={15} className="text-indigo-400" />
-            <h2 className="text-sm font-semibold text-white">Task Board</h2>
-            {totalActiveTasks > 0 && (
-              <span className="bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                {openCount} open
+      {/* Triage Queue (untriaged meeting entries) */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <ClipboardList size={15} className="text-amber-400" />
+            <h2 className="text-sm font-semibold text-white">Triage Queue</h2>
+            {untriagedEntries.length > 0 && (
+              <span className="bg-amber-500/20 text-amber-400 border border-amber-500/20 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                {untriagedEntries.length}
               </span>
             )}
-            {filtersActive && (
-              <span className="bg-teal-500/15 text-teal-400 border border-teal-500/20 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                filtered
-              </span>
-            )}
-            <button
-              onClick={() => setShowQuickAdd(v => !v)}
-              className={`ml-auto flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
-                showQuickAdd
-                  ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300'
-                  : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-indigo-300 hover:border-indigo-500/40'
-              }`}
-            >
-              <Plus size={12} />
-              Task
-            </button>
           </div>
-
-          {/* Quick add task form */}
-          {showQuickAdd && (
-            <div className="mb-3">
-              <QuickAddTaskForm
-                projects={projects}
-                customers={customers}
-                onSubmit={(formData) => {
-                  addTask({
-                    projectId: formData.projectId,
-                    description: formData.description,
-                    taskType: formData.taskType,
-                    assigneeOrTeam: formData.assigneeOrTeam || null,
-                    status: formData.status,
-                  });
-                  setShowQuickAdd(false);
-                }}
-                onCancel={() => setShowQuickAdd(false)}
-              />
-            </div>
-          )}
-
-          {/* Filter bar — row 1: client + project */}
-          <div className="flex gap-2 mb-2">
-            <select
-              value={filterCustomerId}
-              onChange={e => handleCustomerFilter(e.target.value)}
-              className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
-            >
-              <option value="">All clients</option>
-              {customersWithTasks.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-            <select
-              value={filterProjectId}
-              onChange={e => setFilterProjectId(e.target.value)}
-              className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
-              disabled={projectsForFilter.length === 0}
-            >
-              <option value="">All projects</option>
-              {projectsForFilter.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Filter bar — row 2: task type + status + clear */}
-          <div className="flex gap-2 mb-3">
-            <select
-              value={filterTaskType}
-              onChange={e => setFilterTaskType(e.target.value)}
-              className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
-            >
-              <option value="">All types</option>
-              {TASK_TYPES.map(t => (
-                <option key={t} value={t}>{TASK_TYPE_LABELS[t]}</option>
-              ))}
-            </select>
-            <select
-              value={filterStatus}
-              onChange={e => setFilterStatus(e.target.value)}
-              className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
-            >
-              <option value="">All statuses</option>
-              {TASK_STATUSES.map(s => (
-                <option key={s} value={s}>{TASK_STATUS_LABELS[s]}</option>
-              ))}
-            </select>
-            {filtersActive && (
-              <button
-                onClick={() => {
-                  setFilterCustomerId('');
-                  setFilterProjectId('');
-                  setFilterTaskType('');
-                  setFilterStatus('');
-                }}
-                className="px-2.5 py-2 rounded-xl bg-gray-800 border border-gray-700 text-[10px] text-gray-400 hover:text-white hover:border-gray-600 transition-colors flex-shrink-0"
-                title="Clear all filters"
-              >
-                ✕
-              </button>
-            )}
-          </div>
-
-          {/* Board content */}
-          {totalActiveTasks === 0 && !showArchived ? (
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl px-5 py-10 text-center">
-              <Tag size={24} className="text-gray-700 mx-auto mb-2" />
-              <p className="text-gray-500 text-sm">{filtersActive ? 'No tasks match this filter.' : 'No tasks yet.'}</p>
-              <p className="text-gray-600 text-xs mt-1">
-                {filtersActive ? 'Try a different filter.' : 'Convert a meeting entry above to create your first task.'}
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {TASK_STATUSES.map(status => {
-                const group = tasksByStatus[status] || [];
-                if (group.length === 0) return null;
-                const statusColors = TASK_STATUS_COLORS[status];
-                return (
-                  <div key={status}>
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className={`text-[10px] font-bold uppercase tracking-wider ${statusColors.text}`}>
-                        {TASK_STATUS_LABELS[status]}
-                      </span>
-                      <span className="text-xs text-gray-600">({group.length})</span>
-                    </div>
-                    <div className="space-y-2">
-                      {group.map(renderTaskCard)}
-                    </div>
-                  </div>
-                );
-              })}
-
-              {/* Archived section */}
-              {archivedTasks.length > 0 && (
-                <div>
-                  <button
-                    onClick={() => setShowArchived(v => !v)}
-                    className="flex items-center gap-2 text-[10px] font-semibold text-gray-600 hover:text-gray-400 transition-colors mb-2"
-                  >
-                    <Archive size={11} />
-                    {showArchived ? 'Hide' : 'Show'} Archived ({archivedTasks.length})
-                    <ChevronDown size={11} className={`transition-transform ${showArchived ? 'rotate-180' : ''}`} />
-                  </button>
-                  {showArchived && (
-                    <div className="space-y-2">
-                      {archivedTasks
-                        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-                        .map(renderTaskCard)}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
         </div>
-      </div>
 
-      {/* ── RIGHT PANEL ───────────────────────────────────────────────────── */}
-      <div className="flex-1 min-w-0">
-        {selectedTask ? (
-          <div className="sticky top-0">
-            <AIWorkspace
-              key={selectedTask.id}
-              task={selectedTask}
-              project={selectedProject}
-              customer={selectedCustomer}
-            />
+        {untriagedEntries.length === 0 ? (
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl px-5 py-10 text-center">
+            <ClipboardList size={24} className="text-gray-700 mx-auto mb-2" />
+            <p className="text-gray-500 text-sm">Queue is clear!</p>
+            <p className="text-gray-600 text-xs mt-1">All meeting entries have been triaged.</p>
           </div>
         ) : (
-          <div className="h-full flex items-center justify-center">
-            <div className="text-center">
-              <Sparkles size={32} className="text-gray-700 mx-auto mb-3" />
-              <p className="text-gray-500 text-sm font-medium">Select a task to open AI Workspace</p>
-              <p className="text-gray-600 text-xs mt-1">Click any task card on the left to get started.</p>
-            </div>
+          <div className="space-y-3">
+            {Object.values(untriagedByCustomer).map(({ customer, entries: customerEntries }) => (
+              <div key={customer?.id || '_none'}>
+                <div className="flex items-center gap-1.5 mb-2">
+                  {customer && (
+                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: customer.color || '#6366f1' }} />
+                  )}
+                  <span className="text-xs font-semibold text-gray-400">
+                    {customer?.name || 'No Customer'}
+                  </span>
+                  <span className="text-xs text-gray-600">({customerEntries.length})</span>
+                </div>
+                <div className="space-y-2">
+                  {customerEntries.map(({ entry, project, customer: c }) => (
+                    <TriageEntryCard
+                      key={entry.id}
+                      entry={entry}
+                      project={project}
+                      customer={c}
+                      onTriaged={() => setTriageRefresh(n => n + 1)}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Task Board */}
+      <div>
+        {/* Board header */}
+        <div className="flex items-center gap-2 mb-3">
+          <Tag size={15} className="text-indigo-400" />
+          <h2 className="text-sm font-semibold text-white">Task Board</h2>
+          {activeTasks.length > 0 && (
+            <span className="bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+              {activeTasks.length} active
+            </span>
+          )}
+          {filtersActive && (
+            <span className="bg-teal-500/15 text-teal-400 border border-teal-500/20 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+              filtered
+            </span>
+          )}
+          <button
+            onClick={() => setShowQuickAdd(v => !v)}
+            className={`ml-auto flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
+              showQuickAdd
+                ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300'
+                : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-indigo-300 hover:border-indigo-500/40'
+            }`}
+          >
+            <Plus size={12} />
+            Task
+          </button>
+        </div>
+
+        {/* Quick add task form */}
+        {showQuickAdd && (
+          <div className="mb-3">
+            <QuickAddTaskForm
+              projects={projects}
+              customers={customers}
+              onSubmit={(formData) => {
+                addTask({
+                  projectId: formData.projectId,
+                  description: formData.description,
+                  taskType: formData.taskType,
+                  assigneeOrTeam: formData.assigneeOrTeam || null,
+                  status: formData.status,
+                });
+                setShowQuickAdd(false);
+              }}
+              onCancel={() => setShowQuickAdd(false)}
+            />
+          </div>
+        )}
+
+        {/* Filter bar — row 1: client + project */}
+        <div className="flex gap-2 mb-2">
+          <select
+            value={filterCustomerId}
+            onChange={e => handleCustomerFilter(e.target.value)}
+            className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+          >
+            <option value="">All clients</option>
+            {customersWithTasks.map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+          <select
+            value={filterProjectId}
+            onChange={e => setFilterProjectId(e.target.value)}
+            className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+            disabled={projectsForFilter.length === 0}
+          >
+            <option value="">All projects</option>
+            {projectsForFilter.map(p => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Filter bar — row 2: task type + status + clear */}
+        <div className="flex gap-2 mb-3">
+          <select
+            value={filterTaskType}
+            onChange={e => setFilterTaskType(e.target.value)}
+            className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+          >
+            <option value="">All types</option>
+            {TASK_TYPES.map(t => (
+              <option key={t} value={t}>{TASK_TYPE_LABELS[t]}</option>
+            ))}
+          </select>
+          <select
+            value={filterStatus}
+            onChange={e => setFilterStatus(e.target.value)}
+            className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+          >
+            <option value="">All statuses</option>
+            {TASK_STATUSES.map(s => (
+              <option key={s} value={s}>{TASK_STATUS_LABELS[s]}</option>
+            ))}
+          </select>
+          {filtersActive && (
+            <button
+              onClick={() => {
+                setFilterCustomerId('');
+                setFilterProjectId('');
+                setFilterTaskType('');
+                setFilterStatus('');
+              }}
+              className="px-2.5 py-2 rounded-xl bg-gray-800 border border-gray-700 text-[10px] text-gray-400 hover:text-white hover:border-gray-600 transition-colors flex-shrink-0"
+              title="Clear all filters"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
+        {/* Flat draggable task list */}
+        {activeTasks.length === 0 && !showArchived ? (
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl px-5 py-10 text-center">
+            <Tag size={24} className="text-gray-700 mx-auto mb-2" />
+            <p className="text-gray-500 text-sm">{filtersActive ? 'No tasks match this filter.' : 'No tasks yet.'}</p>
+            <p className="text-gray-600 text-xs mt-1">
+              {filtersActive ? 'Try a different filter.' : 'Convert a meeting entry above to create your first task.'}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={activeTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+                <div className="space-y-2">
+                  {activeTasks.map(task => {
+                    const project  = projects.find(p => p.id === task.projectId);
+                    const customer = customers.find(c => c.id === project?.customerId);
+                    return (
+                      <SortableTaskRow
+                        key={task.id}
+                        task={task}
+                        project={project}
+                        customer={customer}
+                        onOpenDetail={handleOpenDetail}
+                      />
+                    );
+                  })}
+                </div>
+              </SortableContext>
+            </DndContext>
+
+            {/* Archived section */}
+            {archivedTasks.length > 0 && (
+              <div>
+                <button
+                  onClick={() => setShowArchived(v => !v)}
+                  className="flex items-center gap-2 text-[10px] font-semibold text-gray-600 hover:text-gray-400 transition-colors mb-2"
+                >
+                  <Archive size={11} />
+                  {showArchived ? 'Hide' : 'Show'} Archived ({archivedTasks.length})
+                  <ChevronDown size={11} className={`transition-transform ${showArchived ? 'rotate-180' : ''}`} />
+                </button>
+                {showArchived && (
+                  <div className="space-y-2">
+                    {archivedTasks
+                      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+                      .map(task => {
+                        const project  = projects.find(p => p.id === task.projectId);
+                        const customer = customers.find(c => c.id === project?.customerId);
+                        return (
+                          <SortableTaskRow
+                            key={task.id}
+                            task={task}
+                            project={project}
+                            customer={customer}
+                            onOpenDetail={handleOpenDetail}
+                          />
+                        );
+                      })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
