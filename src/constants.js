@@ -38,7 +38,7 @@ export const TASK_TYPE_COLORS = {
   comms: { bg: 'bg-purple-500/15', text: 'text-purple-400', border: 'border-purple-500/20' },
 };
 
-// Task statuses
+// Task statuses — 'archived' is a soft-delete; excluded from board by default
 export const TASK_STATUSES = ['open', 'in-progress', 'done', 'blocked'];
 
 export const TASK_STATUS_LABELS = {
@@ -46,6 +46,7 @@ export const TASK_STATUS_LABELS = {
   'in-progress': 'In Progress',
   'done': 'Done',
   'blocked': 'Blocked',
+  'archived': 'Archived',
 };
 
 export const TASK_STATUS_COLORS = {
@@ -53,6 +54,7 @@ export const TASK_STATUS_COLORS = {
   'in-progress': { bg: 'bg-indigo-500/15', text: 'text-indigo-400', border: 'border-indigo-500/20' },
   'done': { bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-500/20' },
   'blocked': { bg: 'bg-red-500/15', text: 'text-red-400', border: 'border-red-500/20' },
+  'archived': { bg: 'bg-gray-800/60', text: 'text-gray-600', border: 'border-gray-700/40' },
 };
 
 // Task recipients — who this task/message is directed at

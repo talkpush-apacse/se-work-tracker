@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import {
   ChevronDown, Plus, Mic, MicOff, Copy, Save, Check,
   Loader2, ClipboardList, Sparkles, ChevronRight,
-  Calendar, User, Tag, AlertCircle,
+  Calendar, User, Tag, AlertCircle, Archive, ArchiveX,
 } from 'lucide-react';
 import { useAppStore } from '../context/StoreContext';
 import {
@@ -12,17 +12,25 @@ import {
   TASK_RECIPIENTS,
 } from '../constants';
 
+// ─── Helper: resolve recipient label from value key ───────────────────────────
+function recipientLabel(value) {
+  return TASK_RECIPIENTS.find(r => r.value === value)?.label || value || null;
+}
+
 // ─── System prompts per output type ───────────────────────────────────────────
+// recipient is the human-readable label (e.g. "Client", "Internal — CRM Developers")
 const SYSTEM_PROMPTS = {
-  email: (task, client) =>
+  email: (task, client, recipient) =>
     `You are a professional Solutions Engineer at a SaaS company called Talkpush.
 Write a clear, concise professional email related to the following task for client "${client}".
+${recipient ? `This email is addressed to: ${recipient}.` : ''}
 Task: ${task}
 Format: Start with "Subject: ..." on the first line, then a blank line, then the email body.
 Keep the tone professional but warm. Be direct and action-oriented. No filler phrases.`,
 
-  slack: (task, client) =>
+  slack: (task, client, recipient) =>
     `You are a Solutions Engineer at Talkpush writing an internal Slack message about a task for client "${client}".
+${recipient ? `This message is directed at: ${recipient}.` : ''}
 Task: ${task}
 Write a brief, direct Slack message. No markdown headers. No excessive formatting.
 Use bullet points only if listing multiple items. Keep it under 5 lines where possible.`,
@@ -39,8 +47,9 @@ Task: ${task}
 Write a structured, numbered configuration plan. Include dependencies, prerequisites, and notes on potential gotchas.
 Be specific and actionable.`,
 
-  summary: (task, client) =>
+  summary: (task, client, recipient) =>
     `You are a Solutions Engineer at Talkpush summarizing work done for client "${client}".
+${recipient ? `This summary is intended for: ${recipient}.` : ''}
 Task: ${task}
 Write a concise bullet-point summary covering: key decisions made, actions taken or needed, and any open questions.
 Keep it scannable — this is for your own reference or a quick async update.`,
@@ -216,17 +225,20 @@ function TriageEntryCard({ entry, project, customer, onTriaged }) {
 }
 
 // ─── Task card (in the board) ─────────────────────────────────────────────────
-function TaskCard({ task, project, customer, isSelected, onSelect, onStatusChange }) {
+function TaskCard({ task, project, customer, isSelected, onSelect, onStatusChange, onArchive }) {
   const typeColors = TASK_TYPE_COLORS[task.taskType] || TASK_TYPE_COLORS.mine;
   const statusColors = TASK_STATUS_COLORS[task.status] || TASK_STATUS_COLORS.open;
+  const isArchived = task.status === 'archived';
 
   return (
     <div
-      onClick={() => onSelect(task)}
-      className={`p-3 rounded-xl border cursor-pointer transition-all ${
-        isSelected
-          ? 'bg-indigo-600/15 border-indigo-500/40 shadow-lg shadow-indigo-500/10'
-          : 'bg-gray-800/50 border-gray-700/60 hover:border-gray-600'
+      onClick={() => !isArchived && onSelect(task)}
+      className={`p-3 rounded-xl border transition-all ${
+        isArchived
+          ? 'bg-gray-900/40 border-gray-800/60 opacity-60'
+          : isSelected
+            ? 'bg-indigo-600/15 border-indigo-500/40 shadow-lg shadow-indigo-500/10 cursor-pointer'
+            : 'bg-gray-800/50 border-gray-700/60 hover:border-gray-600 cursor-pointer'
       }`}
     >
       <div className="flex items-start gap-2 mb-2">
@@ -239,10 +251,28 @@ function TaskCard({ task, project, customer, isSelected, onSelect, onStatusChang
               {customer.name}
             </span>
           )}
-          <p className="text-xs font-medium text-white leading-snug line-clamp-2">{task.description}</p>
+          <p className={`text-xs font-medium leading-snug line-clamp-2 ${isArchived ? 'text-gray-500 line-through' : 'text-white'}`}>
+            {task.description}
+          </p>
           {project && <p className="text-[10px] text-gray-500 mt-0.5 truncate">{project.name}</p>}
         </div>
-        <ChevronRight size={13} className={`flex-shrink-0 mt-0.5 transition-colors ${isSelected ? 'text-indigo-400' : 'text-gray-600'}`} />
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {/* Archive / Unarchive button */}
+          <button
+            onClick={e => { e.stopPropagation(); onArchive(task); }}
+            title={isArchived ? 'Restore task' : 'Archive task'}
+            className={`p-1 rounded transition-colors ${
+              isArchived
+                ? 'text-gray-500 hover:text-emerald-400'
+                : 'text-gray-600 hover:text-gray-400'
+            }`}
+          >
+            {isArchived ? <ArchiveX size={12} /> : <Archive size={12} />}
+          </button>
+          {!isArchived && (
+            <ChevronRight size={13} className={`transition-colors ${isSelected ? 'text-indigo-400' : 'text-gray-600'}`} />
+          )}
+        </div>
       </div>
 
       <div className="flex items-center gap-1.5 flex-wrap">
@@ -251,25 +281,31 @@ function TaskCard({ task, project, customer, isSelected, onSelect, onStatusChang
         </span>
         {task.assigneeOrTeam && (
           <span className="flex items-center gap-0.5 text-[10px] text-gray-500">
-            <User size={9} /> {TASK_RECIPIENTS.find(r => r.value === task.assigneeOrTeam)?.label || task.assigneeOrTeam}
+            <User size={9} /> {recipientLabel(task.assigneeOrTeam)}
           </span>
         )}
       </div>
 
-      {/* Inline status dropdown — stop propagation so clicking it doesn't select the card */}
-      <div className="mt-2" onClick={e => e.stopPropagation()}>
-        <select
-          value={task.status}
-          onChange={e => onStatusChange(task.id, e.target.value)}
-          className={`w-full text-[10px] font-semibold rounded-lg px-2 py-1 border cursor-pointer focus:outline-none ${statusColors.bg} ${statusColors.text} ${statusColors.border} bg-transparent`}
-        >
-          {TASK_STATUSES.map(s => (
-            <option key={s} value={s} className="bg-gray-800 text-white">
-              {TASK_STATUS_LABELS[s]}
-            </option>
-          ))}
-        </select>
-      </div>
+      {/* Inline status dropdown — only for non-archived tasks */}
+      {!isArchived && (
+        <div className="mt-2" onClick={e => e.stopPropagation()}>
+          <select
+            value={task.status}
+            onChange={e => onStatusChange(task.id, e.target.value)}
+            className={`w-full text-[10px] font-semibold rounded-lg px-2 py-1 border cursor-pointer focus:outline-none ${statusColors.bg} ${statusColors.text} ${statusColors.border} bg-transparent`}
+          >
+            {TASK_STATUSES.map(s => (
+              <option key={s} value={s} className="bg-gray-800 text-white">
+                {TASK_STATUS_LABELS[s]}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {isArchived && (
+        <p className="mt-1.5 text-[10px] text-gray-600 italic">Archived</p>
+      )}
     </div>
   );
 }
@@ -363,7 +399,9 @@ function AIWorkspace({ task, project, customer }) {
     setCurrentOutput(null);
 
     const clientName = customer?.name || 'the client';
-    const systemPrompt = SYSTEM_PROMPTS[outputType](task.description, clientName);
+    // Pass resolved recipient label into the prompt for email, slack, summary
+    const recipient = task.assigneeOrTeam ? recipientLabel(task.assigneeOrTeam) : null;
+    const systemPrompt = SYSTEM_PROMPTS[outputType](task.description, clientName, recipient);
 
     try {
       const res = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -413,6 +451,7 @@ function AIWorkspace({ task, project, customer }) {
 
   const typeColors = TASK_TYPE_COLORS[task.taskType] || TASK_TYPE_COLORS.mine;
   const statusColors = TASK_STATUS_COLORS[task.status] || TASK_STATUS_COLORS.open;
+  const recipientText = task.assigneeOrTeam ? recipientLabel(task.assigneeOrTeam) : null;
 
   return (
     <div className="space-y-4">
@@ -436,9 +475,9 @@ function AIWorkspace({ task, project, customer }) {
         </div>
         <p className="text-sm font-semibold text-white leading-snug">{task.description}</p>
         {project && <p className="text-xs text-gray-500 mt-1">{project.name}</p>}
-        {task.assigneeOrTeam && (
+        {recipientText && (
           <p className="flex items-center gap-1 text-xs text-gray-500 mt-1">
-            <User size={11} /> {TASK_RECIPIENTS.find(r => r.value === task.assigneeOrTeam)?.label || task.assigneeOrTeam}
+            <User size={11} /> {recipientText}
           </p>
         )}
       </div>
@@ -461,6 +500,12 @@ function AIWorkspace({ task, project, customer }) {
             </button>
           ))}
         </div>
+        {/* Recipient hint for relevant output types */}
+        {recipientText && ['email', 'slack', 'summary'].includes(outputType) && (
+          <p className="mt-2 text-[10px] text-indigo-400/70 flex items-center gap-1">
+            <User size={9} /> Output will be tailored for: <span className="font-semibold">{recipientText}</span>
+          </p>
+        )}
       </div>
 
       {/* Voice + text input */}
@@ -569,7 +614,28 @@ function AIWorkspace({ task, project, customer }) {
 export default function Triage() {
   const { meetingEntries, tasks, projects, customers, updateTask } = useAppStore();
   const [selectedTask, setSelectedTask] = useState(null);
-  const [triageRefresh, setTriageRefresh] = useState(0); // bump to re-filter after triage
+  const [triageRefresh, setTriageRefresh] = useState(0);
+
+  // Filter state
+  const [filterCustomerId, setFilterCustomerId] = useState('');
+  const [filterProjectId, setFilterProjectId] = useState('');
+  const [showArchived, setShowArchived] = useState(false);
+
+  // Derived customer list for filter dropdown (only customers that have tasks)
+  const customersWithTasks = customers.filter(c =>
+    projects.some(p => p.customerId === c.id && tasks.some(t => t.projectId === p.id))
+  );
+
+  // Derived project list filtered by selected customer
+  const projectsForFilter = filterCustomerId
+    ? projects.filter(p => p.customerId === filterCustomerId && tasks.some(t => t.projectId === p.id))
+    : projects.filter(p => tasks.some(t => t.projectId === p.id));
+
+  // Reset project filter when customer filter changes
+  const handleCustomerFilter = (val) => {
+    setFilterCustomerId(val);
+    setFilterProjectId('');
+  };
 
   // Untriaged entries, sorted newest meeting date first
   const untriagedEntries = meetingEntries
@@ -587,28 +653,82 @@ export default function Triage() {
     return acc;
   }, {});
 
-  // All tasks grouped by status
+  // All active (non-archived) tasks, filtered
+  const activeTasks = tasks.filter(t => {
+    if (t.status === 'archived') return false;
+    if (filterCustomerId) {
+      const proj = projects.find(p => p.id === t.projectId);
+      if (!proj || proj.customerId !== filterCustomerId) return false;
+    }
+    if (filterProjectId && t.projectId !== filterProjectId) return false;
+    return true;
+  });
+
+  // Archived tasks (filtered the same way)
+  const archivedTasks = tasks.filter(t => {
+    if (t.status !== 'archived') return false;
+    if (filterCustomerId) {
+      const proj = projects.find(p => p.id === t.projectId);
+      if (!proj || proj.customerId !== filterCustomerId) return false;
+    }
+    if (filterProjectId && t.projectId !== filterProjectId) return false;
+    return true;
+  });
+
+  // Group active tasks by status
   const tasksByStatus = TASK_STATUSES.reduce((acc, s) => {
-    acc[s] = tasks
+    acc[s] = activeTasks
       .filter(t => t.status === s)
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     return acc;
   }, {});
 
-  const totalTasks = tasks.length;
+  const totalActiveTasks = activeTasks.length;
   const openCount = (tasksByStatus['open'] || []).length + (tasksByStatus['in-progress'] || []).length;
+  const filtersActive = filterCustomerId || filterProjectId;
 
   // Resolve selected task's project/customer
   const selectedProject = selectedTask ? projects.find(p => p.id === selectedTask.projectId) : null;
   const selectedCustomer = selectedProject ? customers.find(c => c.id === selectedProject.customerId) : null;
 
-  // Keep selectedTask in sync if it gets updated (e.g. status change)
+  // Keep selectedTask in sync if it gets updated
   useEffect(() => {
     if (selectedTask) {
       const updated = tasks.find(t => t.id === selectedTask.id);
       if (updated) setSelectedTask(updated);
+      else setSelectedTask(null); // task was deleted
     }
   }, [tasks]);
+
+  // Handle archive/unarchive toggle
+  const handleArchive = (task) => {
+    if (task.status === 'archived') {
+      // Restore to 'open'
+      updateTask(task.id, { status: 'open' });
+    } else {
+      // Archive — deselect if it was selected
+      if (selectedTask?.id === task.id) setSelectedTask(null);
+      updateTask(task.id, { status: 'archived' });
+    }
+  };
+
+  // Render a task card (used for both active and archived sections)
+  const renderTaskCard = (task) => {
+    const proj = projects.find(p => p.id === task.projectId);
+    const cust = proj ? customers.find(c => c.id === proj.customerId) : null;
+    return (
+      <TaskCard
+        key={task.id}
+        task={task}
+        project={proj}
+        customer={cust}
+        isSelected={selectedTask?.id === task.id}
+        onSelect={setSelectedTask}
+        onStatusChange={(id, val) => updateTask(id, { status: val })}
+        onArchive={handleArchive}
+      />
+    );
+  };
 
   return (
     <div className="flex gap-5 min-h-[calc(100vh-8rem)]">
@@ -668,21 +788,64 @@ export default function Triage() {
 
         {/* Task Board */}
         <div>
+          {/* Board header */}
           <div className="flex items-center gap-2 mb-3">
             <Tag size={15} className="text-indigo-400" />
             <h2 className="text-sm font-semibold text-white">Task Board</h2>
-            {totalTasks > 0 && (
+            {totalActiveTasks > 0 && (
               <span className="bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
                 {openCount} open
               </span>
             )}
+            {filtersActive && (
+              <span className="bg-teal-500/15 text-teal-400 border border-teal-500/20 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                filtered
+              </span>
+            )}
           </div>
 
-          {totalTasks === 0 ? (
+          {/* Filter bar */}
+          <div className="flex gap-2 mb-3">
+            <select
+              value={filterCustomerId}
+              onChange={e => handleCustomerFilter(e.target.value)}
+              className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+            >
+              <option value="">All clients</option>
+              {customersWithTasks.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            <select
+              value={filterProjectId}
+              onChange={e => setFilterProjectId(e.target.value)}
+              className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+              disabled={projectsForFilter.length === 0}
+            >
+              <option value="">All projects</option>
+              {projectsForFilter.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+            {filtersActive && (
+              <button
+                onClick={() => { setFilterCustomerId(''); setFilterProjectId(''); }}
+                className="px-2.5 py-2 rounded-xl bg-gray-800 border border-gray-700 text-[10px] text-gray-400 hover:text-white hover:border-gray-600 transition-colors flex-shrink-0"
+                title="Clear filters"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {/* Board content */}
+          {totalActiveTasks === 0 && !showArchived ? (
             <div className="bg-gray-900 border border-gray-800 rounded-2xl px-5 py-10 text-center">
               <Tag size={24} className="text-gray-700 mx-auto mb-2" />
-              <p className="text-gray-500 text-sm">No tasks yet.</p>
-              <p className="text-gray-600 text-xs mt-1">Convert a meeting entry above to create your first task.</p>
+              <p className="text-gray-500 text-sm">{filtersActive ? 'No tasks match this filter.' : 'No tasks yet.'}</p>
+              <p className="text-gray-600 text-xs mt-1">
+                {filtersActive ? 'Try a different filter.' : 'Convert a meeting entry above to create your first task.'}
+              </p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -699,25 +862,32 @@ export default function Triage() {
                       <span className="text-xs text-gray-600">({group.length})</span>
                     </div>
                     <div className="space-y-2">
-                      {group.map(task => {
-                        const proj = projects.find(p => p.id === task.projectId);
-                        const cust = proj ? customers.find(c => c.id === proj.customerId) : null;
-                        return (
-                          <TaskCard
-                            key={task.id}
-                            task={task}
-                            project={proj}
-                            customer={cust}
-                            isSelected={selectedTask?.id === task.id}
-                            onSelect={setSelectedTask}
-                            onStatusChange={(id, val) => updateTask(id, { status: val })}
-                          />
-                        );
-                      })}
+                      {group.map(renderTaskCard)}
                     </div>
                   </div>
                 );
               })}
+
+              {/* Archived section */}
+              {archivedTasks.length > 0 && (
+                <div>
+                  <button
+                    onClick={() => setShowArchived(v => !v)}
+                    className="flex items-center gap-2 text-[10px] font-semibold text-gray-600 hover:text-gray-400 transition-colors mb-2"
+                  >
+                    <Archive size={11} />
+                    {showArchived ? 'Hide' : 'Show'} Archived ({archivedTasks.length})
+                    <ChevronDown size={11} className={`transition-transform ${showArchived ? 'rotate-180' : ''}`} />
+                  </button>
+                  {showArchived && (
+                    <div className="space-y-2">
+                      {archivedTasks
+                        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+                        .map(renderTaskCard)}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
