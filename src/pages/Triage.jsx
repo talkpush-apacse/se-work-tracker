@@ -367,7 +367,9 @@ function AIWorkspace({ task, project, customer }) {
   const [recipientOverride, setRecipientOverride] = useState(task.assigneeOrTeam || '');
   // Editable mirror of the AI output text — user can tweak before copying/saving
   const [editedText, setEditedText] = useState('');
-  const recognitionRef = useRef(null);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef   = useRef([]);
 
   const history = getTaskAiOutputs(task.id);
 
@@ -384,52 +386,62 @@ function AIWorkspace({ task, project, customer }) {
     setRecipientOverride(task.assigneeOrTeam || '');
   }, [task.id]);
 
-  // ── Web Speech API voice input ──────────────────────────────────────────
-  const toggleListening = () => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      setError('Voice input is not supported in this browser. Try Chrome or Edge.');
-      return;
-    }
-
+  // ── Whisper voice input (MediaRecorder → OpenAI Whisper) ───────────────
+  const toggleListening = async () => {
+    // ── Stop recording — triggers onstop which sends to Whisper
     if (isListening) {
-      recognitionRef.current?.stop();
+      mediaRecorderRef.current?.stop();
       setIsListening(false);
       return;
     }
 
-    const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = 'en-US';
+    // ── Start recording
+    setError(null);
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      setError('Microphone access denied. Allow microphone permission and try again.');
+      return;
+    }
 
-    let finalTranscript = userInput;
+    audioChunksRef.current = [];
+    const recorder = new MediaRecorder(stream);
 
-    recognition.onresult = (event) => {
-      let interim = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const t = event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
-          finalTranscript += (finalTranscript ? ' ' : '') + t;
-        } else {
-          interim = t;
-        }
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) audioChunksRef.current.push(e.data);
+    };
+
+    recorder.onstop = async () => {
+      // Release browser mic indicator
+      stream.getTracks().forEach(t => t.stop());
+
+      const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+      setIsTranscribing(true);
+      setError(null);
+      try {
+        const formData = new FormData();
+        formData.append('file', audioBlob, 'recording.webm');
+        formData.append('model', 'whisper-1');
+
+        const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${import.meta.env.VITE_OPENAI_API_KEY}` },
+          body: formData,
+        });
+
+        if (!res.ok) throw new Error(`Whisper error ${res.status}`);
+        const data = await res.json();
+        setUserInput(prev => prev ? `${prev} ${data.text}` : data.text);
+      } catch (err) {
+        setError(`Transcription failed: ${err.message}`);
+      } finally {
+        setIsTranscribing(false);
       }
-      setUserInput(finalTranscript + (interim ? ' ' + interim : ''));
     };
 
-    recognition.onend = () => {
-      setIsListening(false);
-      setUserInput(finalTranscript);
-    };
-
-    recognition.onerror = (e) => {
-      setIsListening(false);
-      if (e.error !== 'aborted') setError(`Voice error: ${e.error}`);
-    };
-
-    recognitionRef.current = recognition;
-    recognition.start();
+    mediaRecorderRef.current = recorder;
+    recorder.start();
     setIsListening(true);
   };
 
@@ -763,15 +775,21 @@ function AIWorkspace({ task, project, customer }) {
           <p className="text-xs font-medium text-gray-400">Context / Notes</p>
           <button
             onClick={toggleListening}
-            title={isListening ? 'Stop recording' : 'Start voice input'}
+            disabled={isTranscribing}
+            title={isListening ? 'Stop recording' : 'Record voice input (Whisper)'}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all border ${
               isListening
                 ? 'bg-red-600/20 border-red-500/40 text-red-400 animate-pulse'
-                : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-white'
+                : isTranscribing
+                  ? 'bg-gray-800 border-gray-700 text-gray-400 cursor-not-allowed opacity-60'
+                  : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-white'
             }`}
           >
-            {isListening ? <MicOff size={13} /> : <Mic size={13} />}
-            {isListening ? 'Stop' : 'Voice'}
+            {isTranscribing
+              ? <><Loader2 size={13} className="animate-spin" /> Transcribing…</>
+              : isListening
+                ? <><MicOff size={13} /> Stop</>
+                : <><Mic size={13} /> Voice</>}
           </button>
         </div>
         <textarea
