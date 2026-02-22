@@ -138,6 +138,11 @@ export function useStore() {
     setCustomers(prev => prev.filter(c => c.id !== id));
   }, []);
 
+  // Reorder customers by an ordered array of IDs (used by drag-and-drop)
+  const reorderCustomers = useCallback((orderedIds) => {
+    setCustomers(prev => orderedIds.map(id => prev.find(c => c.id === id)).filter(Boolean));
+  }, []);
+
   // Project actions
   const addProject = useCallback((data) => {
     const project = { id: uid(), createdAt: new Date().toISOString(), status: 'Active', ...data };
@@ -277,7 +282,7 @@ export function useStore() {
   return {
     okrs, customers, projects, points, meetingEntries, tasks, aiOutputs,
     addOkr, updateOkr, deleteOkr,
-    addCustomer, updateCustomer, deleteCustomer,
+    addCustomer, updateCustomer, deleteCustomer, reorderCustomers,
     addProject, updateProject, deleteProject,
     addPoint, deletePoint, updatePoint,
     getProjectPoints, getProjectTotals,

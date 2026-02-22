@@ -318,42 +318,46 @@ function ProjectDetail({ project, onBack }) {
       {/* Points tab */}
       {activeTab === 'points' && (
         <>
-          {/* Action buttons row */}
-          <div className="flex gap-3">
-            {isRunning && runningProjectId === project.id ? (
+          {/* Action buttons row — consistent position (justify-between) matching Meeting/Tasks tabs */}
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs text-gray-500">{entries.length} {entries.length === 1 ? 'entry' : 'entries'}</p>
+            <div className="flex gap-2 flex-shrink-0">
+              {isRunning && runningProjectId === project.id ? (
+                <button
+                  onClick={stopTimer}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600/20 hover:bg-red-600/40 text-red-400 font-bold transition-all border border-red-700/40"
+                >
+                  <Square size={13} fill="currentColor" /> Stop Timer
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    if (isRunning) {
+                      setTimerConflict(true);
+                    } else {
+                      startTimer(project.id);
+                    }
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 font-bold transition-all border border-emerald-700/40"
+                >
+                  <Timer size={14} /> Start Timer
+                </button>
+              )}
               <button
-                onClick={stopTimer}
-                className="flex items-center justify-center gap-2 py-3 px-5 rounded-2xl bg-red-600/20 hover:bg-red-600/40 text-red-400 font-bold transition-all border border-red-700/40 flex-shrink-0"
+                onClick={() => setAddModal(true)}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold transition-all shadow-lg shadow-indigo-600/30"
               >
-                <Square size={14} fill="currentColor" /> Stop Timer
+                <Plus size={15} /> Add Points
               </button>
-            ) : (
               <button
-                onClick={() => {
-                  if (isRunning) {
-                    setTimerConflict(true);
-                  } else {
-                    startTimer(project.id);
-                  }
-                }}
-                className="flex items-center justify-center gap-2 py-3 px-5 rounded-2xl bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 font-bold transition-all border border-emerald-700/40 flex-shrink-0"
+                onClick={() => setBulkPointsModal(true)}
+                aria-label="Bulk add points"
+                title="Bulk add points"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 hover:text-white text-xs font-medium transition-all"
               >
-                <Timer size={15} /> Start Timer
+                <ListPlus size={15} /> Bulk Add
               </button>
-            )}
-            <button
-              onClick={() => setAddModal(true)}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-all shadow-lg shadow-indigo-600/30 hover:shadow-indigo-600/50"
-            >
-              <Plus size={18} /> Add Points
-            </button>
-            <button
-              onClick={() => setBulkPointsModal(true)}
-              className="flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 hover:text-white font-medium transition-all flex-shrink-0"
-              title="Bulk add point entries"
-            >
-              <ListPlus size={16} />
-            </button>
+            </div>
           </div>
 
           {/* Points log */}
@@ -738,7 +742,7 @@ export default function Projects({ initialProjectId, onProjectSelect }) {
 
       {/* Filters */}
       <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex bg-gray-800 rounded-xl p-1 gap-1">
+        <div aria-label="Group by" className="flex bg-gray-800 rounded-xl p-1 gap-1">
           {['customer', 'okr'].map(g => (
             <button
               key={g}
@@ -749,7 +753,9 @@ export default function Projects({ initialProjectId, onProjectSelect }) {
             </button>
           ))}
         </div>
-        <div className="flex bg-gray-800 rounded-xl p-1 gap-1">
+        {/* Divider between filter groups */}
+        <div className="w-px h-6 bg-gray-700 flex-shrink-0" />
+        <div aria-label="Filter by status" className="flex bg-gray-800 rounded-xl p-1 gap-1">
           {['All', ...PROJECT_STATUSES].map(s => (
             <button
               key={s}

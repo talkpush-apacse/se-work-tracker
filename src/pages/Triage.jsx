@@ -11,6 +11,7 @@ import {
   TASK_STATUSES, TASK_STATUS_LABELS, TASK_STATUS_COLORS,
   AI_OUTPUT_TYPES, AI_OUTPUT_TYPE_LABELS,
   TASK_RECIPIENTS,
+  CUSTOMER_COLORS,
 } from '../constants';
 
 // ─── Helper: resolve recipient label from value key ───────────────────────────
@@ -626,7 +627,7 @@ function AIWorkspace({ task, project, customer }) {
         >
           <div className="flex items-center gap-2">
             <Settings size={12} className="text-gray-500" />
-            <span className="text-xs font-medium text-gray-400">Customize</span>
+            <span className="text-xs font-medium text-gray-400">Model settings</span>
             {/* Indicators: provider badge + custom prompt dot */}
             <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${
               currentProvider === 'claude'
@@ -639,7 +640,7 @@ function AIWorkspace({ task, project, customer }) {
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" title="Custom prompt active" />
             )}
           </div>
-          <ChevronDown size={13} className={`text-gray-600 transition-transform ${showCustomize ? 'rotate-180' : ''}`} />
+          <ChevronDown size={16} className={`text-gray-600 transition-transform ${showCustomize ? 'rotate-180' : ''}`} />
         </button>
 
         {showCustomize && (
@@ -891,6 +892,8 @@ function AIWorkspace({ task, project, customer }) {
 
 // ─── Quick add task form (no meeting entry, just description + project link) ───
 function QuickAddTaskForm({ projects, customers, onSubmit, onCancel }) {
+  const { addCustomer, addProject } = useAppStore();
+
   const [form, setForm] = useState({
     projectId: '',
     description: '',
@@ -899,16 +902,54 @@ function QuickAddTaskForm({ projects, customers, onSubmit, onCancel }) {
     status: 'open',
   });
 
+  // Inline new-project state
+  const [showNewProject, setShowNewProject] = useState(false);
+  const [newProject, setNewProject] = useState({ name: '', customerId: '' });
+
+  // Inline new-customer state (nested inside new-project)
+  const [showNewCustomer, setShowNewCustomer] = useState(false);
+  const [newCustomer, setNewCustomer] = useState({ name: '', color: CUSTOMER_COLORS[0].value });
+
+  // Live lists (may grow if user creates new entries)
+  const [localCustomers, setLocalCustomers] = useState(customers);
+  const [localProjects, setLocalProjects] = useState(projects);
+
   // Derive a flat list: project name + customer name for the selector
-  const projectOptions = projects
+  const projectOptions = localProjects
     .filter(p => p.status !== 'Completed')
     .map(p => {
-      const customer = customers.find(c => c.id === p.customerId);
+      const customer = localCustomers.find(c => c.id === p.customerId);
       return { id: p.id, label: `${p.name}${customer ? ` — ${customer.name}` : ''}` };
     })
     .sort((a, b) => a.label.localeCompare(b.label));
 
   const canSubmit = form.projectId && form.description.trim();
+
+  // ── Create a new customer inline ──────────────────────────────────────────
+  const handleCreateCustomer = () => {
+    if (!newCustomer.name.trim()) return;
+    const created = addCustomer({ name: newCustomer.name.trim(), color: newCustomer.color });
+    setLocalCustomers(prev => [...prev, created]);
+    setNewProject(p => ({ ...p, customerId: created.id }));
+    setNewCustomer({ name: '', color: CUSTOMER_COLORS[0].value });
+    setShowNewCustomer(false);
+  };
+
+  // ── Create a new project inline ───────────────────────────────────────────
+  const handleCreateProject = () => {
+    if (!newProject.name.trim()) return;
+    const created = addProject({
+      name: newProject.name.trim(),
+      customerId: newProject.customerId || null,
+      okrId: null,
+      status: 'Active',
+    });
+    setLocalProjects(prev => [...prev, created]);
+    setForm(p => ({ ...p, projectId: created.id }));
+    setNewProject({ name: '', customerId: '' });
+    setShowNewProject(false);
+    setShowNewCustomer(false);
+  };
 
   return (
     <div className="bg-gray-800/60 border border-indigo-500/30 rounded-xl p-3 space-y-3">
@@ -916,7 +957,16 @@ function QuickAddTaskForm({ projects, customers, onSubmit, onCancel }) {
 
       {/* Project selector */}
       <div>
-        <label className="block text-xs text-gray-400 mb-1">Project *</label>
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-xs text-gray-400">Project *</label>
+          <button
+            type="button"
+            onClick={() => { setShowNewProject(v => !v); setShowNewCustomer(false); }}
+            className="text-[10px] font-semibold text-indigo-400 hover:text-indigo-300 transition-colors"
+          >
+            {showNewProject ? '✕ Cancel' : '+ New Project'}
+          </button>
+        </div>
         <select
           value={form.projectId}
           onChange={e => setForm(p => ({ ...p, projectId: e.target.value }))}
@@ -927,6 +977,84 @@ function QuickAddTaskForm({ projects, customers, onSubmit, onCancel }) {
             <option key={p.id} value={p.id}>{p.label}</option>
           ))}
         </select>
+
+        {/* ── Inline new project mini-form ── */}
+        {showNewProject && (
+          <div className="mt-2 p-2.5 bg-gray-800 border border-gray-700 rounded-xl space-y-2">
+            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">New Project</p>
+            <input
+              value={newProject.name}
+              onChange={e => setNewProject(p => ({ ...p, name: e.target.value }))}
+              placeholder="Project name *"
+              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+            />
+            {/* Customer selector within new project */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] text-gray-500">Customer <span className="text-gray-600">(optional)</span></span>
+                <button
+                  type="button"
+                  onClick={() => setShowNewCustomer(v => !v)}
+                  className="text-[10px] font-semibold text-indigo-400 hover:text-indigo-300 transition-colors"
+                >
+                  {showNewCustomer ? '✕ Cancel' : '+ New Customer'}
+                </button>
+              </div>
+              <select
+                value={newProject.customerId}
+                onChange={e => setNewProject(p => ({ ...p, customerId: e.target.value }))}
+                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+              >
+                <option value="">— No customer —</option>
+                {localCustomers.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* ── Inline new customer sub-form ── */}
+            {showNewCustomer && (
+              <div className="p-2 bg-gray-900 border border-gray-700 rounded-lg space-y-2">
+                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">New Customer</p>
+                <input
+                  value={newCustomer.name}
+                  onChange={e => setNewCustomer(p => ({ ...p, name: e.target.value }))}
+                  placeholder="Customer name *"
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+                />
+                <div className="flex flex-wrap gap-1.5">
+                  {CUSTOMER_COLORS.map(({ name, value }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setNewCustomer(p => ({ ...p, color: value }))}
+                      title={name}
+                      className={`w-5 h-5 rounded-full transition-all ${newCustomer.color === value ? 'ring-2 ring-white ring-offset-1 ring-offset-gray-900 scale-110' : 'hover:scale-105'}`}
+                      style={{ backgroundColor: value }}
+                    />
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  disabled={!newCustomer.name.trim()}
+                  onClick={handleCreateCustomer}
+                  className="w-full py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-white transition-colors"
+                >
+                  Create Customer
+                </button>
+              </div>
+            )}
+
+            <button
+              type="button"
+              disabled={!newProject.name.trim()}
+              onClick={handleCreateProject}
+              className="w-full py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-white transition-colors"
+            >
+              Create Project
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Description */}

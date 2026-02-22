@@ -427,8 +427,16 @@ export default function OKRs() {
                           )}
 
                           {keyResults.length === 0 && linkedProjects.length === 0 && (
-                            <div className="px-5 py-4 text-xs text-gray-600 text-center italic">
-                              No key results or linked projects yet.
+                            <div className="px-5 py-5 text-center">
+                              <p className="text-xs text-gray-600 italic mb-3">No key results or linked projects yet.</p>
+                              <button
+                                onClick={() => updateOkr(okr.id, {
+                                  keyResults: [{ id: krUid(), text: '', type: 'boolean', value: null }],
+                                })}
+                                className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-400 hover:text-indigo-300 border border-indigo-500/30 hover:border-indigo-500/60 bg-indigo-500/10 px-3 py-1.5 rounded-lg transition-all"
+                              >
+                                <Plus size={12} /> Add Key Result
+                              </button>
                             </div>
                           )}
                         </div>

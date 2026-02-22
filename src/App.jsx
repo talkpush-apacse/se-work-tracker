@@ -28,8 +28,8 @@ function AppContent() {
     <div className="min-h-screen bg-gray-950">
       <Navigation activeTab={activeTab} onTabChange={handleTabChange} />
 
-      {/* Main content */}
-      <main className="md:ml-56 pt-16 md:pt-0">
+      {/* Main content — offset matches sidebar: icon-only (md:w-16) at md, full (lg:w-56) at lg */}
+      <main className="md:ml-16 lg:ml-56 pt-16 md:pt-0">
         <div className="max-w-6xl mx-auto px-4 py-6">
           {/* TimerWidget is global — appears on all tabs while a timer is running */}
           <TimerWidget />
@@ -41,7 +41,7 @@ function AppContent() {
             />
           )}
           {activeTab === 'triage' && <Triage />}
-          {activeTab === 'analytics' && <Analytics />}
+          {activeTab === 'analytics' && <Analytics onNavigate={handleNavigate} />}
           {activeTab === 'okrs' && <OKRs />}
           {activeTab === 'customers' && <Customers />}
         </div>

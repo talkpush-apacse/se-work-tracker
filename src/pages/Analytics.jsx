@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { BarChart3 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, ScatterChart, Scatter, Legend,
@@ -33,7 +34,7 @@ const CustomTooltip = ({ active, payload, label }) => {
   );
 };
 
-export default function Analytics() {
+export default function Analytics({ onNavigate }) {
   const { projects, customers, okrs, points } = useAppStore();
   const [rangeMode, setRangeMode] = useState('thisWeek'); // thisWeek | lastWeek | custom
   const [granularity, setGranularity] = useState('daily');
@@ -204,8 +205,10 @@ export default function Analytics() {
               <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className={inputClass} />
             </div>
           )}
+          {/* Divider between filter groups */}
+          <div className="w-px h-6 bg-gray-700 flex-shrink-0" />
           {/* Granularity */}
-          <div className="flex bg-gray-800 rounded-xl p-1 gap-1">
+          <div aria-label="View by" className="flex bg-gray-800 rounded-xl p-1 gap-1">
             {[['daily', 'Daily'], ['weekly', 'Weekly'], ['monthly', 'Monthly']].map(([v, l]) => (
               <button key={v} onClick={() => setGranularity(v)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${granularity === v ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}>{l}</button>
             ))}
@@ -218,8 +221,18 @@ export default function Analytics() {
       </div>
 
       {filteredPoints.length === 0 ? (
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl py-16 text-center">
-          <p className="text-gray-500">No data in selected range. Start logging points!</p>
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl py-20 text-center">
+          <BarChart3 size={36} className="text-gray-700 mx-auto mb-4" />
+          <p className="text-base font-semibold text-gray-400 mb-2">No data yet</p>
+          <p className="text-sm text-gray-600 mb-6">Start logging points on your projects to see your activity here.</p>
+          {onNavigate && (
+            <button
+              onClick={() => onNavigate('projects')}
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-400 hover:text-indigo-300 transition-colors"
+            >
+              Go to Projects →
+            </button>
+          )}
         </div>
       ) : (
         <>

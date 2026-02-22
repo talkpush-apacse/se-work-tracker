@@ -118,7 +118,7 @@ export default function Dashboard({ onNavigate }) {
         <div>
           <h1 className="text-2xl font-bold text-white">Dashboard</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            This week: <span className="text-indigo-400 font-semibold">{totalPts} pts</span> across <span className="text-indigo-400 font-semibold">{weekPoints.length}</span> entries
+            This week: <span className={totalPts > 0 ? 'text-indigo-400 font-semibold' : 'text-gray-400'}>{totalPts} pts</span> across <span className={weekPoints.length > 0 ? 'text-indigo-400 font-semibold' : 'text-gray-400'}>{weekPoints.length}</span> entries
           </p>
         </div>
         {streak > 0 && (
@@ -133,8 +133,8 @@ export default function Dashboard({ onNavigate }) {
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <StatCard icon={Zap} label="Points this week" value={totalPts} color="indigo" />
         <StatCard icon={Clock} label="Hours this week" value={totalHrs.toFixed(1)} color="violet" />
-        <StatCard icon={Star} label="Top project" value={topProject?.name || '—'} sub="this week" color="amber" />
-        <StatCard icon={Activity} label="Top activity" value={topActivity ? topActivity.split(' ')[0] : '—'} sub="by points" color="emerald" />
+        <StatCard icon={Star} label="Top project" value={topProject?.name || 'None yet'} sub="this week" color="amber" />
+        <StatCard icon={Activity} label="Top activity" value={topActivity ? topActivity.split(' ')[0] : 'None yet'} sub="by points" color="emerald" />
         <StatCard icon={TrendingUp} label="Active projects" value={activeProjects.length} color="rose" />
       </div>
 
@@ -250,7 +250,17 @@ export default function Dashboard({ onNavigate }) {
             <h2 className="font-semibold text-white flex items-center gap-2"><Activity size={16} className="text-indigo-400" /> Recent Activity</h2>
           </div>
           {recentActivity.length === 0 ? (
-            <div className="px-5 py-12 text-center text-sm text-gray-500">No activity yet</div>
+            <div className="px-5 py-12 text-center">
+              <Activity size={28} className="text-gray-700 mx-auto mb-3" />
+              <p className="text-sm font-medium text-gray-500 mb-1">No activity yet</p>
+              <p className="text-xs text-gray-600 mb-4">Log points on your projects to see your work history here.</p>
+              <button
+                onClick={() => onNavigate('projects')}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-400 hover:text-indigo-300 transition-colors"
+              >
+                Log your first points →
+              </button>
+            </div>
           ) : (
             <div className="divide-y divide-gray-800/60 max-h-96 overflow-y-auto scrollbar-thin">
               {recentActivity.map(entry => (
@@ -285,7 +295,11 @@ export default function Dashboard({ onNavigate }) {
               const maxOkrPts = okrHealth[0]?.totalPoints || 1;
               const pct = maxOkrPts > 0 ? (okr.totalPoints / maxOkrPts) * 100 : 0;
               return (
-                <div key={okr.id} className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
+                <button
+                  key={okr.id}
+                  onClick={() => onNavigate('okrs')}
+                  className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50 text-left w-full cursor-pointer hover:border-indigo-500/50 hover:bg-gray-800/80 transition-all"
+                >
                   <p className="text-sm font-semibold text-white leading-snug mb-3 line-clamp-2">{okr.title}</p>
                   <div className="h-1.5 bg-gray-700 rounded-full overflow-hidden mb-2">
                     <div className="h-full bg-indigo-500 rounded-full transition-all duration-700" style={{ width: `${pct}%` }} />
@@ -294,7 +308,7 @@ export default function Dashboard({ onNavigate }) {
                     <span className="text-gray-400">{okr.projectCount} project{okr.projectCount !== 1 ? 's' : ''}</span>
                     <span className="text-white font-bold">{okr.totalPoints} pts · {okr.totalHours.toFixed(1)}h</span>
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
