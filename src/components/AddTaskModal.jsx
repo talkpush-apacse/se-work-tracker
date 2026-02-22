@@ -4,6 +4,7 @@ import { useAppStore } from '../context/StoreContext';
 import {
   TASK_TYPES, TASK_TYPE_LABELS,
   TASK_STATUSES, TASK_STATUS_LABELS,
+  TASK_RECIPIENTS,
 } from '../constants';
 
 export default function AddTaskModal({ project, onClose }) {
@@ -15,8 +16,6 @@ export default function AddTaskModal({ project, onClose }) {
     status: 'open',
   });
   const [errors, setErrors] = useState({});
-
-  const showAssignee = form.taskType === 'coordinate' || form.taskType === 'comms';
 
   const validate = () => {
     const e = {};
@@ -33,7 +32,7 @@ export default function AddTaskModal({ project, onClose }) {
       meetingEntryId: null,
       description: form.description.trim(),
       taskType: form.taskType,
-      assigneeOrTeam: showAssignee ? form.assigneeOrTeam.trim() || null : null,
+      assigneeOrTeam: form.assigneeOrTeam || null,
       status: form.status,
     });
     onClose();
@@ -82,20 +81,21 @@ export default function AddTaskModal({ project, onClose }) {
           </div>
         </div>
 
-        {showAssignee && (
-          <div>
-            <label className="block text-xs font-medium text-gray-400 mb-1.5">
-              Assignee / Team <span className="text-gray-600">(optional)</span>
-            </label>
-            <input
-              type="text"
-              value={form.assigneeOrTeam}
-              onChange={e => setForm(p => ({ ...p, assigneeOrTeam: e.target.value }))}
-              placeholder="e.g. Client IT Team, John from Ops"
-              className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
-            />
-          </div>
-        )}
+        <div>
+          <label className="block text-xs font-medium text-gray-400 mb-1.5">
+            Recipient <span className="text-gray-600">(optional)</span>
+          </label>
+          <select
+            value={form.assigneeOrTeam}
+            onChange={e => setForm(p => ({ ...p, assigneeOrTeam: e.target.value }))}
+            className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+          >
+            <option value="">— Select recipient —</option>
+            {TASK_RECIPIENTS.map(r => (
+              <option key={r.value} value={r.value}>{r.label}</option>
+            ))}
+          </select>
+        </div>
 
         <div className="flex gap-3 pt-1">
           <button

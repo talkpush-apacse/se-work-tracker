@@ -55,6 +55,17 @@ export const TASK_STATUS_COLORS = {
   'blocked': { bg: 'bg-red-500/15', text: 'text-red-400', border: 'border-red-500/20' },
 };
 
+// Task recipients — who this task/message is directed at
+export const TASK_RECIPIENTS = [
+  { value: 'client',              label: 'Client' },
+  { value: 'internal-core',       label: 'Internal — Core Team' },
+  { value: 'internal-management', label: 'Internal — Management' },
+  { value: 'internal-support',    label: 'Internal — Product Support' },
+  { value: 'internal-crm-dev',    label: 'Internal — CRM Developers' },
+  { value: 'internal-chatbot-dev',label: 'Internal — Chatbot Developers' },
+  { value: 'internal-analytics',  label: 'Internal — Analytics' },
+];
+
 // AI output types
 export const AI_OUTPUT_TYPES = ['email', 'slack', 'troubleshooting', 'configuration', 'summary'];
 

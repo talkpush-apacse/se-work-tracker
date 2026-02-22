@@ -9,6 +9,7 @@ import {
   TASK_TYPES, TASK_TYPE_LABELS, TASK_TYPE_COLORS,
   TASK_STATUSES, TASK_STATUS_LABELS, TASK_STATUS_COLORS,
   AI_OUTPUT_TYPES, AI_OUTPUT_TYPE_LABELS,
+  TASK_RECIPIENTS,
 } from '../constants';
 
 // ─── System prompts per output type ───────────────────────────────────────────
@@ -50,11 +51,9 @@ function TriageForm({ entry, project, customer, onSubmit, onCancel }) {
   const [form, setForm] = useState({
     description: entry.rawNotes.split('\n')[0].slice(0, 120), // pre-fill from first line
     taskType: 'mine',
-    assigneeOrTeam: '',
+    assigneeOrTeam: '',  // stores the recipient value key
     status: 'open',
   });
-
-  const showAssignee = form.taskType === 'coordinate' || form.taskType === 'comms';
 
   return (
     <div className="mt-3 border-t border-gray-700/60 pt-3 space-y-3">
@@ -97,18 +96,19 @@ function TriageForm({ entry, project, customer, onSubmit, onCancel }) {
         </div>
       </div>
 
-      {showAssignee && (
-        <div>
-          <label className="block text-xs text-gray-400 mb-1">Assignee / Team</label>
-          <input
-            type="text"
-            value={form.assigneeOrTeam}
-            onChange={e => setForm(p => ({ ...p, assigneeOrTeam: e.target.value }))}
-            placeholder="e.g. Client IT Team, John from Ops"
-            className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
-          />
-        </div>
-      )}
+      <div>
+        <label className="block text-xs text-gray-400 mb-1">Recipient <span className="text-gray-600">(optional)</span></label>
+        <select
+          value={form.assigneeOrTeam}
+          onChange={e => setForm(p => ({ ...p, assigneeOrTeam: e.target.value }))}
+          className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+        >
+          <option value="">— Select recipient —</option>
+          {TASK_RECIPIENTS.map(r => (
+            <option key={r.value} value={r.value}>{r.label}</option>
+          ))}
+        </select>
+      </div>
 
       <div className="flex gap-2 pt-1">
         <button
@@ -251,7 +251,7 @@ function TaskCard({ task, project, customer, isSelected, onSelect, onStatusChang
         </span>
         {task.assigneeOrTeam && (
           <span className="flex items-center gap-0.5 text-[10px] text-gray-500">
-            <User size={9} /> {task.assigneeOrTeam}
+            <User size={9} /> {TASK_RECIPIENTS.find(r => r.value === task.assigneeOrTeam)?.label || task.assigneeOrTeam}
           </span>
         )}
       </div>
@@ -438,7 +438,7 @@ function AIWorkspace({ task, project, customer }) {
         {project && <p className="text-xs text-gray-500 mt-1">{project.name}</p>}
         {task.assigneeOrTeam && (
           <p className="flex items-center gap-1 text-xs text-gray-500 mt-1">
-            <User size={11} /> {task.assigneeOrTeam}
+            <User size={11} /> {TASK_RECIPIENTS.find(r => r.value === task.assigneeOrTeam)?.label || task.assigneeOrTeam}
           </p>
         )}
       </div>

@@ -9,7 +9,7 @@ import BulkAddProjectsModal from '../components/BulkAddProjectsModal';
 import BulkAddPointsModal from '../components/BulkAddPointsModal';
 import NewMeetingEntryModal from '../components/NewMeetingEntryModal';
 import AddTaskModal from '../components/AddTaskModal';
-import { CUSTOMER_COLORS, PROJECT_STATUSES, ACTIVITY_TYPES, ACTIVITY_COLORS, TASK_TYPE_LABELS, TASK_TYPE_COLORS, TASK_STATUS_LABELS, TASK_STATUS_COLORS, TASK_STATUSES } from '../constants';
+import { CUSTOMER_COLORS, PROJECT_STATUSES, ACTIVITY_TYPES, ACTIVITY_COLORS, TASK_TYPE_LABELS, TASK_TYPE_COLORS, TASK_STATUS_LABELS, TASK_STATUS_COLORS, TASK_STATUSES, TASK_RECIPIENTS } from '../constants';
 import { formatDate, formatDateTime, formatRelative } from '../utils/dateHelpers';
 
 const STATUS_ICONS = {
@@ -522,7 +522,7 @@ function ProjectDetail({ project, onBack }) {
                                     {TASK_TYPE_LABELS[task.taskType]}
                                   </span>
                                   {task.assigneeOrTeam && (
-                                    <span className="text-[10px] text-gray-500">→ {task.assigneeOrTeam}</span>
+                                    <span className="text-[10px] text-gray-500">→ {TASK_RECIPIENTS.find(r => r.value === task.assigneeOrTeam)?.label || task.assigneeOrTeam}</span>
                                   )}
                                 </div>
                               </div>
