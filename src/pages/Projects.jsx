@@ -8,7 +8,8 @@ import AddPointsModal from '../components/AddPointsModal';
 import BulkAddProjectsModal from '../components/BulkAddProjectsModal';
 import BulkAddPointsModal from '../components/BulkAddPointsModal';
 import NewMeetingEntryModal from '../components/NewMeetingEntryModal';
-import { CUSTOMER_COLORS, PROJECT_STATUSES, ACTIVITY_TYPES, ACTIVITY_COLORS } from '../constants';
+import AddTaskModal from '../components/AddTaskModal';
+import { CUSTOMER_COLORS, PROJECT_STATUSES, ACTIVITY_TYPES, ACTIVITY_COLORS, TASK_TYPE_LABELS, TASK_TYPE_COLORS, TASK_STATUS_LABELS, TASK_STATUS_COLORS, TASK_STATUSES } from '../constants';
 import { formatDate, formatDateTime, formatRelative } from '../utils/dateHelpers';
 
 const STATUS_ICONS = {
@@ -181,10 +182,11 @@ function EditEntryModal({ entry, onClose }) {
 }
 
 function ProjectDetail({ project, onBack }) {
-  const { points, customers, okrs, addPoint, deletePoint, updatePoint, updateProject, deleteProject, getProjectMeetingEntries } = useAppStore();
+  const { points, customers, okrs, addPoint, deletePoint, updatePoint, updateProject, deleteProject, getProjectMeetingEntries, getProjectTasks, updateTask } = useAppStore();
   const { isRunning, projectId: runningProjectId, startTimer, stopTimer } = useTimerContext();
-  const [activeTab, setActiveTab] = useState('points'); // 'points' | 'meetings'
+  const [activeTab, setActiveTab] = useState('points'); // 'points' | 'meetings' | 'tasks'
   const [addModal, setAddModal] = useState(false);
+  const [addTaskModal, setAddTaskModal] = useState(false);
   const [bulkPointsModal, setBulkPointsModal] = useState(false);
   const [editModal, setEditModal] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
@@ -207,6 +209,15 @@ function ProjectDetail({ project, onBack }) {
   const meetingsByDate = meetingEntries.reduce((acc, entry) => {
     if (!acc[entry.meetingDate]) acc[entry.meetingDate] = [];
     acc[entry.meetingDate].push(entry);
+    return acc;
+  }, {});
+
+  // Tasks for this project, grouped by status
+  const projectTasks = getProjectTasks(project.id).sort(
+    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+  );
+  const tasksByStatus = TASK_STATUSES.reduce((acc, s) => {
+    acc[s] = projectTasks.filter(t => t.status === s);
     return acc;
   }, {});
 
@@ -288,6 +299,17 @@ function ProjectDetail({ project, onBack }) {
           {meetingEntries.length > 0 && (
             <span className="ml-0.5 bg-indigo-600/40 text-indigo-300 text-[10px] px-1.5 py-0.5 rounded-full font-semibold">
               {meetingEntries.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab('tasks')}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition-all ${activeTab === 'tasks' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}
+        >
+          Tasks
+          {projectTasks.length > 0 && (
+            <span className="ml-0.5 bg-indigo-600/40 text-indigo-300 text-[10px] px-1.5 py-0.5 rounded-full font-semibold">
+              {projectTasks.length}
             </span>
           )}
         </button>
@@ -453,6 +475,87 @@ function ProjectDetail({ project, onBack }) {
             ))
           )}
         </div>
+      )}
+
+      {/* Tasks tab */}
+      {activeTab === 'tasks' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-gray-500">{projectTasks.length} {projectTasks.length === 1 ? 'task' : 'tasks'}</p>
+            <button
+              onClick={() => setAddTaskModal(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold transition-all shadow-lg shadow-indigo-600/30"
+            >
+              <Plus size={15} /> Add Task
+            </button>
+          </div>
+
+          {projectTasks.length === 0 ? (
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl px-5 py-14 text-center">
+              <p className="text-gray-500 text-sm">No tasks yet.</p>
+              <p className="text-gray-600 text-xs mt-1">Click "Add Task" to create your first task for this project.</p>
+            </div>
+          ) : (
+            <div className="space-y-5">
+              {TASK_STATUSES.map(status => {
+                const group = tasksByStatus[status] || [];
+                if (group.length === 0) return null;
+                const statusColors = TASK_STATUS_COLORS[status];
+                return (
+                  <div key={status}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className={`text-[10px] font-bold uppercase tracking-wider ${statusColors.text}`}>
+                        {TASK_STATUS_LABELS[status]}
+                      </span>
+                      <span className="text-xs text-gray-600">({group.length})</span>
+                    </div>
+                    <div className="space-y-2">
+                      {group.map(task => {
+                        const typeColors = TASK_TYPE_COLORS[task.taskType] || TASK_TYPE_COLORS.mine;
+                        return (
+                          <div key={task.id} className="bg-gray-900 border border-gray-800 rounded-xl p-3">
+                            <div className="flex items-start gap-3">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm text-white leading-snug">{task.description}</p>
+                                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${typeColors.bg} ${typeColors.text} ${typeColors.border}`}>
+                                    {TASK_TYPE_LABELS[task.taskType]}
+                                  </span>
+                                  {task.assigneeOrTeam && (
+                                    <span className="text-[10px] text-gray-500">→ {task.assigneeOrTeam}</span>
+                                  )}
+                                </div>
+                              </div>
+                              {/* Inline status dropdown */}
+                              <select
+                                value={task.status}
+                                onChange={e => updateTask(task.id, { status: e.target.value })}
+                                className={`text-[10px] font-semibold rounded-lg px-2 py-1 border cursor-pointer focus:outline-none flex-shrink-0 ${statusColors.bg} ${statusColors.text} ${statusColors.border} bg-transparent`}
+                              >
+                                {TASK_STATUSES.map(s => (
+                                  <option key={s} value={s} className="bg-gray-800 text-white">
+                                    {TASK_STATUS_LABELS[s]}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {addTaskModal && (
+        <AddTaskModal
+          project={project}
+          onClose={() => setAddTaskModal(false)}
+        />
       )}
 
       {newMeetingModal && (
