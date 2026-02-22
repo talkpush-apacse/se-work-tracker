@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { Check } from 'lucide-react';
 import Modal from './Modal';
 import { useAppStore } from '../context/StoreContext';
 import {
@@ -7,15 +8,28 @@ import {
   TASK_RECIPIENTS,
 } from '../constants';
 
+const BLANK_FORM = {
+  description: '',
+  taskType: 'mine',
+  assigneeOrTeam: '',
+  status: 'open',
+};
+
 export default function AddTaskModal({ project, onClose }) {
   const { addTask } = useAppStore();
-  const [form, setForm] = useState({
-    description: '',
-    taskType: 'mine',
-    assigneeOrTeam: '',
-    status: 'open',
-  });
+  const [form, setForm] = useState(BLANK_FORM);
   const [errors, setErrors] = useState({});
+  const [savedCount, setSavedCount] = useState(0);
+  const [showFlash, setShowFlash] = useState(false);
+  const textareaRef = useRef(null);
+
+  // Refocus textarea when flash appears (after "Save & Add Another")
+  useEffect(() => {
+    if (showFlash) {
+      const t = setTimeout(() => setShowFlash(false), 1800);
+      return () => clearTimeout(t);
+    }
+  }, [showFlash]);
 
   const validate = () => {
     const e = {};
@@ -23,10 +37,9 @@ export default function AddTaskModal({ project, onClose }) {
     return e;
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const saveTask = () => {
     const errs = validate();
-    if (Object.keys(errs).length) { setErrors(errs); return; }
+    if (Object.keys(errs).length) { setErrors(errs); return false; }
     addTask({
       projectId: project.id,
       meetingEntryId: null,
@@ -35,15 +48,47 @@ export default function AddTaskModal({ project, onClose }) {
       assigneeOrTeam: form.assigneeOrTeam || null,
       status: form.status,
     });
-    onClose();
+    return true;
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (saveTask()) onClose();
+  };
+
+  const handleSaveAndAnother = () => {
+    if (!saveTask()) return;
+    setSavedCount(n => n + 1);
+    setForm(BLANK_FORM);
+    setErrors({});
+    setShowFlash(true);
+    // Refocus after state settles
+    setTimeout(() => textareaRef.current?.focus(), 50);
   };
 
   return (
     <Modal title="Add Task" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
+
+        {/* Saved confirmation flash */}
+        {showFlash && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
+            <Check size={13} />
+            Task saved! Add another one.
+          </div>
+        )}
+
+        {/* Running count badge */}
+        {savedCount > 0 && !showFlash && (
+          <p className="text-xs text-gray-500">
+            <span className="font-semibold text-indigo-400">{savedCount}</span> {savedCount === 1 ? 'task' : 'tasks'} added this session
+          </p>
+        )}
+
         <div>
           <label className="block text-xs font-medium text-gray-400 mb-1.5">Task Description *</label>
           <textarea
+            ref={textareaRef}
             rows={3}
             autoFocus
             value={form.description}
@@ -97,21 +142,34 @@ export default function AddTaskModal({ project, onClose }) {
           </select>
         </div>
 
-        <div className="flex gap-3 pt-1">
+        <div className="space-y-2 pt-1">
+          {/* Save & Add Another — full width, secondary style */}
           <button
             type="button"
-            onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl bg-gray-700 hover:bg-gray-600 text-sm font-medium transition-colors"
+            onClick={handleSaveAndAnother}
+            className="w-full py-2.5 rounded-xl bg-gray-700 hover:bg-gray-600 border border-gray-600 text-sm font-semibold text-gray-200 transition-colors"
           >
-            Cancel
+            + Save & Add Another
           </button>
-          <button
-            type="submit"
-            className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm font-bold text-white transition-colors"
-          >
-            Add Task
-          </button>
+
+          {/* Cancel + Done row */}
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-sm font-medium text-gray-400 transition-colors"
+            >
+              {savedCount > 0 ? 'Done' : 'Cancel'}
+            </button>
+            <button
+              type="submit"
+              className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm font-bold text-white transition-colors"
+            >
+              Add Task
+            </button>
+          </div>
         </div>
+
       </form>
     </Modal>
   );
