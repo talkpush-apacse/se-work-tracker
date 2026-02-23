@@ -4,11 +4,14 @@ import {
   Loader2, ClipboardList, Sparkles, ChevronRight,
   Calendar, User, Tag, AlertCircle, Archive, ArchiveX,
   Settings, RotateCcw, Pencil, GripVertical, ExternalLink, ArrowLeft,
+  Timer, Square,
 } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useAppStore } from '../context/StoreContext';
+import { useTimerContext } from '../context/TimerContext';
+import ConfirmDialog from '../components/ConfirmDialog';
 import {
   TASK_TYPES, TASK_TYPE_LABELS, TASK_TYPE_COLORS,
   TASK_STATUSES, TASK_STATUS_LABELS, TASK_STATUS_COLORS,
@@ -1361,6 +1364,8 @@ function QuickAddTaskForm({ projects, customers, onSubmit, onCancel }) {
 // ─── Sortable task row (compact queue card with drag handle) ──────────────────
 function SortableTaskRow({ task, project, customer, onOpenDetail }) {
   const { updateTask } = useAppStore();
+  const { isRunning, taskId: runningTaskId } = useTimerContext();
+  const isTimerActive = isRunning && runningTaskId === task.id;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
 
@@ -1396,6 +1401,10 @@ function SortableTaskRow({ task, project, customer, onOpenDetail }) {
         onClick={() => onOpenDetail(task)}
       >
         <div className="flex items-baseline gap-1.5 min-w-0">
+          {/* Pulsing dot when this task's timer is running */}
+          {isTimerActive && (
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0 self-center" title="Timer running" />
+          )}
           {customer && (
             <span
               className="text-[10px] font-semibold flex-shrink-0 px-1.5 py-0.5 rounded-full"
@@ -1449,8 +1458,21 @@ function SortableTaskRow({ task, project, customer, onOpenDetail }) {
 }
 
 // ─── Task detail view (full-width page: metadata + notes + AI Workspace) ───────
+// Format seconds → HH:MM:SS
+function fmtHMS(totalSeconds) {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  return [h, m, s].map(n => String(n).padStart(2, '0')).join(':');
+}
+
 function TaskDetailView({ task, project, customer, onBack }) {
   const { updateTask, deleteTask, projects, customers, addTask } = useAppStore();
+  const { isRunning, projectId: runningProjectId, taskId: runningTaskId, elapsedSeconds, startTimer, stopTimer } = useTimerContext();
+
+  // Timer computed flags
+  const isRunningForThisTask = isRunning && runningTaskId === task.id;
+  const isRunningElsewhere   = isRunning && !isRunningForThisTask;
 
   // Local draft state — all saved on blur or debounced
   const [descDraft,  setDescDraft]  = useState(task.description);
@@ -1458,6 +1480,7 @@ function TaskDetailView({ task, project, customer, onBack }) {
   const [notesDraft, setNotesDraft] = useState(task.notes      || '');
   const notesTimerRef = useRef(null);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [timerConflict, setTimerConflict] = useState(false);
 
   // Sync draft when task prop changes (e.g. status updated from outside)
   useEffect(() => { setDescDraft(task.description); }, [task.description]);
@@ -1607,8 +1630,8 @@ function TaskDetailView({ task, project, customer, onBack }) {
             />
           </div>
 
-          {/* Footer: meta info + archive */}
-          <div className="flex items-center justify-between pt-2 border-t border-gray-800">
+          {/* Footer: meta info + timer + archive */}
+          <div className="flex items-center justify-between pt-2 border-t border-gray-800 gap-2 flex-wrap">
             <div className="flex items-center gap-2 text-[10px] text-gray-600">
               <Calendar size={10} />
               <span>
@@ -1620,7 +1643,35 @@ function TaskDetailView({ task, project, customer, onBack }) {
                 : 'text-red-400 bg-red-500/10 border-red-500/20'
               }`}>{ageDays}d old</span>
             </div>
+
             <div className="flex items-center gap-2">
+              {/* Task timer button */}
+              {isRunningForThisTask ? (
+                <button
+                  onClick={stopTimer}
+                  className="flex items-center gap-1.5 text-[10px] font-semibold px-2 py-1 rounded-lg bg-red-600/20 hover:bg-red-600/40 text-red-400 border border-red-700/40 transition-all font-mono tabular-nums"
+                  title="Stop timer"
+                >
+                  <Square size={10} fill="currentColor" />
+                  {fmtHMS(elapsedSeconds)}
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    if (isRunningElsewhere) {
+                      setTimerConflict(true);
+                    } else {
+                      startTimer(task.projectId, task.id, task.description);
+                    }
+                  }}
+                  className="flex items-center gap-1.5 text-[10px] font-semibold px-2 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 border border-emerald-700/40 transition-all"
+                  title="Start timer for this task"
+                >
+                  <Timer size={10} /> Start Timer
+                </button>
+              )}
+
+              {/* Archive / Delete */}
               {!showConfirmDelete ? (
                 <button
                   onClick={() => updateTask(task.id, { status: 'archived' })}
@@ -1658,6 +1709,17 @@ function TaskDetailView({ task, project, customer, onBack }) {
           <AIWorkspace task={task} project={project} customer={customer} />
         </div>
       </div>
+
+      {/* Timer conflict dialog */}
+      {timerConflict && (
+        <ConfirmDialog
+          title="Timer Already Running"
+          message="A timer is running for another task or project. Stop it first (you'll be prompted to save that session), then start the timer here."
+          danger={false}
+          onConfirm={() => { stopTimer(); setTimerConflict(false); }}
+          onCancel={() => setTimerConflict(false)}
+        />
+      )}
     </div>
   );
 }

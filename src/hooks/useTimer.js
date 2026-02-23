@@ -56,6 +56,8 @@ export function useTimer() {
     const elapsed = Math.min(calcElapsed(current.startedAt), MAX_SECONDS);
     setStoppedSession({
       projectId: current.projectId,
+      taskId: current.taskId ?? null,
+      taskDescription: current.taskDescription ?? null,
       elapsedSeconds: elapsed,
       startedAt: current.startedAt,
     });
@@ -117,13 +119,14 @@ export function useTimer() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // Empty deps is intentional: run exactly once on mount
 
-  const startTimer = useCallback((projectId) => {
+  // taskId and taskDescription are optional — project-level timers pass neither
+  const startTimer = useCallback((projectId, taskId = null, taskDescription = null) => {
     // Guard against double-start
     const existing = loadTimerState();
     if (existing && existing.isRunning) return;
 
     const startedAt = new Date().toISOString();
-    const state = { projectId, startedAt, isRunning: true };
+    const state = { projectId, taskId, taskDescription, startedAt, isRunning: true };
     saveTimerState(state);
     setTimerState(state);
     setElapsedSeconds(0);
@@ -137,6 +140,7 @@ export function useTimer() {
   return {
     isRunning: !!timerState,
     projectId: timerState?.projectId ?? null,
+    taskId: timerState?.taskId ?? null,
     elapsedSeconds,
     startedAt: timerState?.startedAt ?? null,
     stoppedSession,

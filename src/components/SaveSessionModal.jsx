@@ -20,7 +20,8 @@ export default function SaveSessionModal({ session, onClose }) {
     points: '',
     hours: String(prefilledHours),
     activityType: '',
-    comment: '',
+    // Pre-fill from task description when timer was started on a specific task
+    comment: session.taskDescription || '',
   });
   const [errors, setErrors] = useState({});
   const [showDiscard, setShowDiscard] = useState(false);
