@@ -1735,7 +1735,7 @@ export default function Triage() {
   const [filterCustomerId, setFilterCustomerId] = useState('');
   const [filterProjectId, setFilterProjectId] = useState('');
   const [filterTaskType,   setFilterTaskType]   = useState('');
-  const [filterStatus,     setFilterStatus]     = useState('');
+  const [filterStatus,     setFilterStatus]     = useState('open'); // default to Open on page load
   // 'active' tab: open/in-progress/blocked; 'closed' tab: done + archived
   const [boardTab, setBoardTab] = useState('active');
 
