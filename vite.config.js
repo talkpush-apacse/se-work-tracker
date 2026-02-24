@@ -4,6 +4,8 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Ensure relative asset paths so Capacitor can load from file://
+  base: './',
   plugins: [
     react(),
     VitePWA({

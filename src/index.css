@@ -3,11 +3,39 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --sat: env(safe-area-inset-top);
+    --sar: env(safe-area-inset-right);
+    --sab: env(safe-area-inset-bottom);
+    --sal: env(safe-area-inset-left);
+  }
+
   body {
     @apply bg-gray-950 text-gray-100 font-sans;
     margin: 0;
     min-width: 320px;
     min-height: 100vh;
+    /* Prevent iOS overscroll bounce */
+    overscroll-behavior: none;
+    -webkit-user-select: none;
+    user-select: text;
+  }
+
+  /* iOS Capacitor: prevent rubber-band overscroll on html */
+  html {
+    overflow: hidden;
+    height: 100%;
+  }
+  body {
+    height: 100%;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Ensure inputs are selectable */
+  input, textarea, [contenteditable] {
+    -webkit-user-select: text;
+    user-select: text;
   }
 }
 

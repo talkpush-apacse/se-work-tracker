@@ -28,3 +28,9 @@ dist-ssr
 *.sln
 *.sw?
 .vercel
+
+# Capacitor iOS build artifacts
+ios/App/App/public
+ios/App/Pods
+ios/DerivedData
+*.xcworkspace/xcuserdata

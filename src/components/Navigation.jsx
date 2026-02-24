@@ -1,4 +1,4 @@
-import { LayoutDashboard, FolderKanban, BarChart3, Target, Users, Menu, X, Download, Upload, ListTodo } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, BarChart3, Target, Users, Menu, X, Download, Upload, ListTodo, MoreHorizontal } from 'lucide-react';
 import { useState, useRef } from 'react';
 import { useAppStore } from '../context/StoreContext';
 
@@ -11,8 +11,13 @@ const tabs = [
   { id: 'analytics', label: 'Analytics', icon: BarChart3 },
 ];
 
-export default function Navigation({ activeTab, onTabChange }) {
+// Primary tabs shown in the bottom bar (max 5 for iPhone)
+const primaryTabs = ['triage', 'projects', 'dashboard', 'analytics'];
+const secondaryTabs = ['okrs', 'customers'];
+
+export default function Navigation({ activeTab, onTabChange, keyboardVisible }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const { exportData, importData } = useAppStore();
   const fileRef = useRef();
 
@@ -21,6 +26,8 @@ export default function Navigation({ activeTab, onTabChange }) {
     if (file) importData(file);
     e.target.value = '';
   };
+
+  const isSecondaryActive = secondaryTabs.includes(activeTab);
 
   return (
     <>
@@ -80,58 +87,85 @@ export default function Navigation({ activeTab, onTabChange }) {
         </div>
       </aside>
 
-      {/* Mobile top bar */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-gray-900 border-b border-gray-800 flex items-center justify-between px-4 py-3">
-        {/* Logo — click navigates to Dashboard */}
-        <button
-          onClick={() => { onTabChange('dashboard'); setMenuOpen(false); }}
-          className="flex items-center gap-2"
-        >
-          <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-xs">SE</div>
-          <span className="text-sm font-bold text-white">Work Tracker</span>
-        </button>
-        <button onClick={() => setMenuOpen(!menuOpen)} className="text-gray-400 hover:text-white p-1">
-          {menuOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
-      </div>
+      {/* ============================================= */}
+      {/* Mobile bottom tab bar (iOS-native style)      */}
+      {/* ============================================= */}
+      {!keyboardVisible && (
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-gray-900/95 backdrop-blur-lg border-t border-gray-800" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 8px)' }}>
+          <div className="flex items-center justify-around px-2 pt-1.5">
+            {primaryTabs.map((tabId) => {
+              const tab = tabs.find(t => t.id === tabId);
+              const Icon = tab.icon;
+              const isActive = activeTab === tabId;
+              return (
+                <button
+                  key={tabId}
+                  onClick={() => { onTabChange(tabId); setMoreOpen(false); }}
+                  className={`flex flex-col items-center justify-center min-w-[56px] py-1 px-1 transition-colors ${
+                    isActive ? 'text-indigo-400' : 'text-gray-500 active:text-gray-300'
+                  }`}
+                >
+                  <Icon size={22} strokeWidth={isActive ? 2.5 : 1.5} />
+                  <span className={`text-[10px] mt-0.5 ${isActive ? 'font-semibold' : 'font-medium'}`}>{tab.label}</span>
+                </button>
+              );
+            })}
 
-      {/* Mobile nav drawer */}
-      {menuOpen && (
-        <div className="md:hidden fixed inset-0 z-30 bg-black/60" onClick={() => setMenuOpen(false)}>
-          <div
-            className="absolute top-14 left-0 right-0 bg-gray-900 border-b border-gray-800 p-3 space-y-1"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {tabs.map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                onClick={() => { onTabChange(id); setMenuOpen(false); }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-                  activeTab === id
-                    ? 'bg-indigo-600 text-white'
-                    : 'text-gray-400 hover:text-white hover:bg-gray-800'
-                }`}
-              >
-                <Icon size={16} /> {label}
-              </button>
-            ))}
-            <div className="flex gap-2 pt-2 border-t border-gray-800">
-              <button
-                onClick={() => { exportData(); setMenuOpen(false); }}
-                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs text-gray-400 hover:text-white hover:bg-gray-800 transition-all"
-              >
-                <Download size={13} /> Export
-              </button>
-              <button
-                onClick={() => { fileRef.current?.click(); setMenuOpen(false); }}
-                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs text-gray-400 hover:text-white hover:bg-gray-800 transition-all"
-              >
-                <Upload size={13} /> Import
-              </button>
-            </div>
-            <input ref={fileRef} type="file" accept=".json" onChange={handleImport} className="hidden" />
+            {/* More button for secondary tabs */}
+            <button
+              onClick={() => setMoreOpen(!moreOpen)}
+              className={`flex flex-col items-center justify-center min-w-[56px] py-1 px-1 transition-colors ${
+                isSecondaryActive || moreOpen ? 'text-indigo-400' : 'text-gray-500 active:text-gray-300'
+              }`}
+            >
+              <MoreHorizontal size={22} strokeWidth={isSecondaryActive ? 2.5 : 1.5} />
+              <span className={`text-[10px] mt-0.5 ${isSecondaryActive ? 'font-semibold' : 'font-medium'}`}>More</span>
+            </button>
           </div>
-        </div>
+
+          {/* "More" popover */}
+          {moreOpen && (
+            <div className="absolute bottom-full left-0 right-0 bg-gray-900 border-t border-gray-800 p-3 space-y-1 animate-slide-up">
+              {secondaryTabs.map((tabId) => {
+                const tab = tabs.find(t => t.id === tabId);
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tabId}
+                    onClick={() => { onTabChange(tabId); setMoreOpen(false); }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                      activeTab === tabId
+                        ? 'bg-indigo-600 text-white'
+                        : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                    }`}
+                  >
+                    <Icon size={18} /> {tab.label}
+                  </button>
+                );
+              })}
+              <div className="flex gap-2 pt-2 border-t border-gray-800">
+                <button
+                  onClick={() => { exportData(); setMoreOpen(false); }}
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs text-gray-400 hover:text-white hover:bg-gray-800 transition-all"
+                >
+                  <Download size={14} /> Export
+                </button>
+                <button
+                  onClick={() => { fileRef.current?.click(); setMoreOpen(false); }}
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs text-gray-400 hover:text-white hover:bg-gray-800 transition-all"
+                >
+                  <Upload size={14} /> Import
+                </button>
+              </div>
+              <input ref={fileRef} type="file" accept=".json" onChange={handleImport} className="hidden" />
+            </div>
+          )}
+        </nav>
+      )}
+
+      {/* Close "more" overlay when tapping outside */}
+      {moreOpen && (
+        <div className="md:hidden fixed inset-0 z-30" onClick={() => setMoreOpen(false)} />
       )}
     </>
   );
