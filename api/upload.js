@@ -19,9 +19,25 @@ export default async function handler(req, res) {
 
   // ── UPLOAD ──────────────────────────────────────────────
   if (req.method === 'POST') {
-    const filename = req.query.filename;
-    if (!filename) {
+    const raw = req.query.filename;
+    if (!raw) {
       return res.status(400).json({ error: 'Missing filename query parameter' });
+    }
+
+    // Sanitize filename: keep only safe characters, limit length
+    const filename = raw.replace(/[^\w.\-]/g, '_').slice(0, 200);
+
+    // Validate extension
+    const ALLOWED_EXT = new Set(['png','jpg','jpeg','gif','webp','svg','pdf','doc','docx','xls','xlsx','txt','csv']);
+    const ext = filename.split('.').pop()?.toLowerCase();
+    if (!ext || !ALLOWED_EXT.has(ext)) {
+      return res.status(400).json({ error: 'File type not allowed' });
+    }
+
+    // Validate size via Content-Length header
+    const contentLength = parseInt(req.headers['content-length'], 10);
+    if (contentLength && contentLength > 4.5 * 1024 * 1024) {
+      return res.status(413).json({ error: 'File too large (max 4.5 MB)' });
     }
 
     try {
@@ -48,8 +64,8 @@ export default async function handler(req, res) {
       const body = JSON.parse(Buffer.concat(chunks).toString());
 
       const { url } = body;
-      if (!url) {
-        return res.status(400).json({ error: 'Missing url in body' });
+      if (!url || typeof url !== 'string' || !url.includes('.public.blob.vercel-storage.com/')) {
+        return res.status(400).json({ error: 'Invalid or missing blob URL' });
       }
 
       await del(url, { token: process.env.BLOB_READ_WRITE_TOKEN });

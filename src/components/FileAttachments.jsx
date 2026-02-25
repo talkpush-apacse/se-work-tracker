@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Upload, FileText, Image as ImageIcon, File, Download, Trash2,
   Loader2, AlertCircle,
@@ -49,11 +49,16 @@ export default function FileAttachments({ attachments = [], onUpdate }) {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef(null);
   const dragCountRef = useRef(0); // Track nested drag enter/leave
+  const errorTimerRef = useRef(null);
+
+  // Clean up error timeout on unmount
+  useEffect(() => () => clearTimeout(errorTimerRef.current), []);
 
   // Show error for 4 seconds then auto-dismiss
   const showError = useCallback((msg) => {
     setError(msg);
-    setTimeout(() => setError(null), 4000);
+    clearTimeout(errorTimerRef.current);
+    errorTimerRef.current = setTimeout(() => setError(null), 4000);
   }, []);
 
   // ── Upload handler ──────────────────────────────────
@@ -75,34 +80,37 @@ export default function FileAttachments({ attachments = [], onUpdate }) {
     setUploading(true);
     setUploadProgress(0);
 
-    const result = await uploadFile(file, (pct) => setUploadProgress(pct));
+    try {
+      const result = await uploadFile(file, (pct) => setUploadProgress(pct));
 
-    if (result?.url) {
-      const newAttachment = {
-        id: uid(),
-        name: file.name,
-        url: result.url,
-        size: file.size,
-        type: file.type,
-        uploadedAt: new Date().toISOString(),
-      };
-      onUpdate([...attachments, newAttachment]);
-    } else {
+      if (result?.url) {
+        const newAttachment = {
+          id: uid(),
+          name: file.name,
+          url: result.url,
+          size: file.size,
+          type: file.type,
+          uploadedAt: new Date().toISOString(),
+        };
+        onUpdate([...attachments, newAttachment]);
+      } else {
+        showError('Upload failed. Please try again.');
+      }
+    } catch {
       showError('Upload failed. Please try again.');
+    } finally {
+      setUploading(false);
+      setUploadProgress(0);
+      // Reset file input so the same file can be re-selected
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
-
-    setUploading(false);
-    setUploadProgress(0);
-
-    // Reset file input so the same file can be re-selected
-    if (fileInputRef.current) fileInputRef.current.value = '';
   }, [attachments, onUpdate, showError]);
 
   // ── Delete handler ──────────────────────────────────
-  const handleDelete = useCallback(async (att) => {
-    // Remove from blob storage (best-effort — still remove metadata even if this fails)
-    await deleteFile(att.url);
+  const handleDelete = useCallback((att) => {
+    // Update UI immediately, delete blob in background (best-effort)
     onUpdate(attachments.filter((a) => a.id !== att.id));
+    deleteFile(att.url);
   }, [attachments, onUpdate]);
 
   // ── Drag-and-drop handlers ─────────────────────────

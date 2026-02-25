@@ -48,22 +48,25 @@ export function useTimer() {
     }
   }, []);
 
-  const stopTimer = useCallback(() => {
+  // silent: true skips setting stoppedSession (no SaveSessionModal), returns session data for auto-save
+  const stopTimer = useCallback(({ silent = false } = {}) => {
     clearInterval_();
     // Read directly from localStorage for accuracy (React state may be stale)
     const current = loadTimerState();
-    if (!current) return;
+    if (!current) return null;
     const elapsed = Math.min(calcElapsed(current.startedAt), MAX_SECONDS);
-    setStoppedSession({
+    const session = {
       projectId: current.projectId,
       taskId: current.taskId ?? null,
       taskDescription: current.taskDescription ?? null,
       elapsedSeconds: elapsed,
       startedAt: current.startedAt,
-    });
+    };
+    if (!silent) setStoppedSession(session);
     saveTimerState(null);
     setTimerState(null);
     setElapsedSeconds(0);
+    return session;
   }, [clearInterval_]);
 
   const startInterval = useCallback((startedAt) => {
@@ -89,7 +92,8 @@ export function useTimer() {
   useEffect(() => {
     const handler = (e) => {
       if (e.key === TIMER_KEY) {
-        const newState = e.newValue ? JSON.parse(e.newValue) : null;
+        let newState = null;
+        try { newState = e.newValue ? JSON.parse(e.newValue) : null; } catch {}
         if (!newState) {
           clearInterval_();
           setTimerState(null);

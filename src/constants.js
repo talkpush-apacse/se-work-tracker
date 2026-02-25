@@ -4,6 +4,7 @@ export const ACTIVITY_TYPES = [
   'Troubleshoot / Firefighting',
   'Configuration',
   'Reporting',
+  'Task Review',
 ];
 
 export const CUSTOMER_COLORS = [
@@ -96,4 +97,9 @@ export const ACTIVITY_COLORS = {
   'Troubleshoot / Firefighting': '#f43f5e',
   'Configuration': '#10b981',
   'Reporting': '#f59e0b',
+  'Task Review': '#06b6d4',
 };
+
+// Points-per-hour rate for auto-tracked task sessions (2150 / 160 hours)
+export const AUTO_TRACK_RATE = 2150 / 160; // 13.4375
+export const AUTO_TRACK_MIN_SECONDS = 30;  // Ignore sessions shorter than 30s

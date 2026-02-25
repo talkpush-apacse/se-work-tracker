@@ -20,6 +20,8 @@ import {
   TASK_RECIPIENTS,
   CUSTOMER_COLORS,
   TASK_TYPE_POINTS,
+  AUTO_TRACK_RATE,
+  AUTO_TRACK_MIN_SECONDS,
 } from '../constants';
 
 // ─── Helper: resolve recipient label from value key ───────────────────────────
@@ -1758,7 +1760,8 @@ function TaskDetailView({ task, project, customer, onBack }) {
 
 // ─── Main Triage page ──────────────────────────────────────────────────────────
 export default function Triage() {
-  const { meetingEntries, tasks, projects, customers, updateTask, addTask, reorderTasks } = useAppStore();
+  const { meetingEntries, tasks, projects, customers, updateTask, addTask, reorderTasks, addPoint } = useAppStore();
+  const { isRunning, taskId: runningTaskId, startTimer, stopTimer } = useTimerContext();
   const [taskDetailId, setTaskDetailId] = useState(null);
   const [triageRefresh, setTriageRefresh] = useState(0);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
@@ -1781,15 +1784,20 @@ export default function Triage() {
   // dnd-kit sensors
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
+  // O(1) lookup maps — avoids repeated .find() in filter loops
+  const projectMap = new Map(projects.map(p => [p.id, p]));
+  const customerMap = new Map(customers.map(c => [c.id, c]));
+  const projectIdsWithTasks = new Set(tasks.map(t => t.projectId));
+
   // Derived customer list for filter dropdown (only customers that have tasks)
   const customersWithTasks = customers.filter(c =>
-    projects.some(p => p.customerId === c.id && tasks.some(t => t.projectId === p.id))
+    projects.some(p => p.customerId === c.id && projectIdsWithTasks.has(p.id))
   );
 
   // Derived project list filtered by selected customer
   const projectsForFilter = filterCustomerId
-    ? projects.filter(p => p.customerId === filterCustomerId && tasks.some(t => t.projectId === p.id))
-    : projects.filter(p => tasks.some(t => t.projectId === p.id));
+    ? projects.filter(p => p.customerId === filterCustomerId && projectIdsWithTasks.has(p.id))
+    : projects.filter(p => projectIdsWithTasks.has(p.id));
 
   // Reset project filter when customer filter changes
   const handleCustomerFilter = (val) => {
@@ -1805,9 +1813,9 @@ export default function Triage() {
 
   // Group untriaged entries by customer
   const untriagedByCustomer = untriagedEntries.reduce((acc, entry) => {
-    const project = projects.find(p => p.id === entry.projectId);
+    const project = projectMap.get(entry.projectId);
     if (!project) return acc;
-    const customer = customers.find(c => c.id === project.customerId);
+    const customer = customerMap.get(project.customerId);
     const key = customer?.id || '_none';
     if (!acc[key]) acc[key] = { customer, entries: [] };
     acc[key].entries.push({ entry, project, customer });
@@ -1816,21 +1824,15 @@ export default function Triage() {
 
   // Active tasks: open, in-progress, blocked (excludes done and archived)
   const activeTasks = tasks.filter(t => {
-    if (['done', 'archived'].includes(t.status)) return false;
-    if (filterCustomerId) {
-      const proj = projects.find(p => p.id === t.projectId);
-      if (!proj || proj.customerId !== filterCustomerId) return false;
-    }
+    if (t.status === 'done' || t.status === 'archived') return false;
+    const proj = projectMap.get(t.projectId);
+    if (filterCustomerId && (!proj || proj.customerId !== filterCustomerId)) return false;
     if (filterProjectId && t.projectId !== filterProjectId) return false;
     if (filterTaskType && t.taskType !== filterTaskType) return false;
     if (filterStatus   && t.status   !== filterStatus)   return false;
-    if (filterPriorityProjects) {
-      const proj = projects.find(p => p.id === t.projectId);
-      if (!proj?.pinned) return false;
-    }
+    if (filterPriorityProjects && !proj?.pinned) return false;
     if (filterPriorityClients) {
-      const proj = projects.find(p => p.id === t.projectId);
-      const cust = customers.find(c => c.id === proj?.customerId);
+      const cust = customerMap.get(proj?.customerId);
       if (!cust?.pinned) return false;
     }
     return true;
@@ -1838,20 +1840,14 @@ export default function Triage() {
 
   // Closed tasks: done + archived
   const closedTasks = tasks.filter(t => {
-    if (!['done', 'archived'].includes(t.status)) return false;
-    if (filterCustomerId) {
-      const proj = projects.find(p => p.id === t.projectId);
-      if (!proj || proj.customerId !== filterCustomerId) return false;
-    }
+    if (t.status !== 'done' && t.status !== 'archived') return false;
+    const proj = projectMap.get(t.projectId);
+    if (filterCustomerId && (!proj || proj.customerId !== filterCustomerId)) return false;
     if (filterProjectId && t.projectId !== filterProjectId) return false;
     if (filterTaskType && t.taskType !== filterTaskType) return false;
-    if (filterPriorityProjects) {
-      const proj = projects.find(p => p.id === t.projectId);
-      if (!proj?.pinned) return false;
-    }
+    if (filterPriorityProjects && !proj?.pinned) return false;
     if (filterPriorityClients) {
-      const proj = projects.find(p => p.id === t.projectId);
-      const cust = customers.find(c => c.id === proj?.customerId);
+      const cust = customerMap.get(proj?.customerId);
       if (!cust?.pinned) return false;
     }
     return true;
@@ -1876,9 +1872,37 @@ export default function Triage() {
     clearSelection();
   };
 
-  // Task detail open/close
-  const handleOpenDetail = (task) => setTaskDetailId(task.id);
-  const handleCloseDetail = () => setTaskDetailId(null);
+  // ── Auto-timer: start on task open, stop + auto-save points on close ───
+  const autoSaveSession = (session) => {
+    if (!session || session.elapsedSeconds < AUTO_TRACK_MIN_SECONDS) return;
+    const hours = session.elapsedSeconds / 3600;
+    const pts = Math.round(hours * AUTO_TRACK_RATE * 100) / 100;
+    addPoint({
+      projectId: session.projectId,
+      points: pts,
+      hours: Math.round(hours * 100) / 100,
+      activityType: 'Task Review',
+      comment: `Auto-tracked: ${session.taskDescription || 'Task review'}`,
+    });
+  };
+
+  const handleOpenDetail = (task) => {
+    // Auto-stop previous timer if running for a different task
+    if (isRunning && runningTaskId && runningTaskId !== task.id) {
+      autoSaveSession(stopTimer({ silent: true }));
+    }
+    // Always attempt start — startTimer's internal localStorage guard prevents double-start
+    startTimer(task.projectId, task.id, task.description);
+    setTaskDetailId(task.id);
+  };
+
+  const handleCloseDetail = () => {
+    // Auto-stop timer if running for the current task
+    if (isRunning && runningTaskId === taskDetailId) {
+      autoSaveSession(stopTimer({ silent: true }));
+    }
+    setTaskDetailId(null);
+  };
 
   // Drag-and-drop reorder handler
   const handleDragEnd = (event) => {
