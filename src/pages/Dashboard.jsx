@@ -61,7 +61,7 @@ export default function Dashboard({ onNavigate }) {
 
   // Most common activity this week
   const actCounts = {};
-  weekPoints.forEach(p => { actCounts[p.activityType] = (actCounts[p.activityType] || 0) + p.points; });
+  weekPoints.forEach(p => { const key = p.activityType || 'General'; actCounts[key] = (actCounts[key] || 0) + p.points; });
   const topActivity = Object.entries(actCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
 
   const streak = getStreakDays(points);
@@ -268,7 +268,7 @@ export default function Dashboard({ onNavigate }) {
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-white truncate">{entry.project?.name || 'Unknown'}</p>
-                      <p className="text-[11px] text-gray-500">{entry.activityType}</p>
+                      <p className="text-[11px] text-gray-500">{entry.activityType || 'General'}</p>
                       {entry.comment && <p className="text-[11px] text-gray-600 mt-0.5 truncate">{entry.comment}</p>}
                     </div>
                     <div className="text-right flex-shrink-0">

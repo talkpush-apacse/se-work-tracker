@@ -100,7 +100,6 @@ function EditEntryModal({ entry, onClose }) {
     const e = {};
     if (!form.points || isNaN(form.points) || Number(form.points) <= 0) e.points = 'Enter a valid positive number';
     if (!form.hours || isNaN(form.hours) || Number(form.hours) < 0) e.hours = 'Enter a valid number';
-    if (!form.activityType) e.activityType = 'Select an activity type';
     return e;
   };
 
@@ -129,7 +128,7 @@ function EditEntryModal({ entry, onClose }) {
           <div>
             <label className="block text-xs font-medium text-gray-400 mb-1.5">Points *</label>
             <input
-              type="number" step="1" min="1" autoFocus
+              type="number" step="0.01" min="0.01" autoFocus
               {...f('points')}
               className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
             />
@@ -146,7 +145,7 @@ function EditEntryModal({ entry, onClose }) {
           </div>
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1.5">Activity Type *</label>
+          <label className="block text-xs font-medium text-gray-400 mb-1.5">Activity Type <span className="text-gray-600">(optional)</span></label>
           <select
             {...f('activityType')}
             className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
@@ -564,7 +563,7 @@ function ProjectDetail({ project, onBack }) {
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-semibold text-white">{entry.activityType}</span>
+                        <span className="text-xs font-semibold text-white">{entry.activityType || 'General'}</span>
                         <span className="text-[10px] text-gray-500">{formatDateTime(entry.timestamp)}</span>
                       </div>
                       {entry.comment && <p className="text-xs text-gray-400 mt-0.5">{entry.comment}</p>}

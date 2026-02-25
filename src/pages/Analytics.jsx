@@ -94,9 +94,10 @@ export default function Analytics({ onNavigate }) {
   const byActivity = useMemo(() => {
     const map = {};
     filteredPoints.forEach(p => {
-      if (!map[p.activityType]) map[p.activityType] = { pts: 0, hrs: 0 };
-      map[p.activityType].pts += p.points;
-      map[p.activityType].hrs += p.hours;
+      const key = p.activityType || 'General';
+      if (!map[key]) map[key] = { pts: 0, hrs: 0 };
+      map[key].pts += p.points;
+      map[key].hrs += p.hours;
     });
     const total = Object.values(map).reduce((s, v) => s + v.pts, 0);
     return Object.entries(map)

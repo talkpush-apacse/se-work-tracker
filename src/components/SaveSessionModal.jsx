@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import Modal from './Modal';
-import { ACTIVITY_TYPES } from '../constants';
+import { ACTIVITY_TYPES, AUTO_TRACK_RATE } from '../constants';
 import { useAppStore } from '../context/StoreContext';
 
 function formatHMS(totalSeconds) {
@@ -15,9 +15,10 @@ export default function SaveSessionModal({ session, onClose }) {
 
   const project = projects.find(p => p.id === session.projectId);
   const prefilledHours = parseFloat((session.elapsedSeconds / 3600).toFixed(2));
+  const prefilledPoints = Math.round(prefilledHours * AUTO_TRACK_RATE * 100) / 100;
 
   const [form, setForm] = useState({
-    points: '',
+    points: String(prefilledPoints),
     hours: String(prefilledHours),
     activityType: '',
     // Pre-fill from task description when timer was started on a specific task
@@ -32,7 +33,6 @@ export default function SaveSessionModal({ session, onClose }) {
       e.points = 'Enter a valid positive number';
     if (!form.hours || isNaN(form.hours) || Number(form.hours) < 0)
       e.hours = 'Enter a valid number';
-    if (!form.activityType) e.activityType = 'Select an activity type';
     return e;
   };
 
@@ -73,7 +73,7 @@ export default function SaveSessionModal({ session, onClose }) {
           {formatHMS(session.elapsedSeconds)}
         </p>
         <p className="text-xs text-gray-500 mt-0.5">
-          = {prefilledHours}h · pre-filled below, edit if needed
+          = {prefilledHours}h / {prefilledPoints} pts · pre-filled below, edit if needed
         </p>
       </div>
 
@@ -83,8 +83,8 @@ export default function SaveSessionModal({ session, onClose }) {
             <label className="block text-xs font-medium text-gray-400 mb-1.5">Points *</label>
             <input
               type="number"
-              step="1"
-              min="1"
+              step="0.01"
+              min="0.01"
               placeholder="e.g. 5"
               autoFocus
               {...field('points')}
@@ -106,7 +106,7 @@ export default function SaveSessionModal({ session, onClose }) {
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1.5">Activity Type *</label>
+          <label className="block text-xs font-medium text-gray-400 mb-1.5">Activity Type <span className="text-gray-600">(optional)</span></label>
           <select
             {...field('activityType')}
             className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"

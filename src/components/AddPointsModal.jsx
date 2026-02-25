@@ -17,7 +17,6 @@ export default function AddPointsModal({ project, onClose, onSuccess }) {
     const e = {};
     if (!form.points || isNaN(form.points) || Number(form.points) <= 0) e.points = 'Enter a valid positive number';
     if (!form.hours || isNaN(form.hours) || Number(form.hours) < 0) e.hours = 'Enter a valid number';
-    if (!form.activityType) e.activityType = 'Select an activity type';
     return e;
   };
 
@@ -50,8 +49,8 @@ export default function AddPointsModal({ project, onClose, onSuccess }) {
             <label className="block text-xs font-medium text-gray-400 mb-1.5">Points *</label>
             <input
               type="number"
-              step="1"
-              min="1"
+              step="0.01"
+              min="0.01"
               placeholder="e.g. 5"
               {...field('points')}
               className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
@@ -73,7 +72,7 @@ export default function AddPointsModal({ project, onClose, onSuccess }) {
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1.5">Activity Type *</label>
+          <label className="block text-xs font-medium text-gray-400 mb-1.5">Activity Type <span className="text-gray-600">(optional)</span></label>
           <select
             {...field('activityType')}
             className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
