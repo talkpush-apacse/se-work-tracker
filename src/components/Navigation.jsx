@@ -1,4 +1,4 @@
-import { LayoutDashboard, FolderKanban, BarChart3, Target, Users, Menu, X, Download, Upload, ListTodo } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, BarChart3, Target, Users, Menu, X, Download, Upload, ListTodo, Cloud, CloudOff, Loader2 } from 'lucide-react';
 import { useState, useRef } from 'react';
 import { useAppStore } from '../context/StoreContext';
 
@@ -13,7 +13,7 @@ const tabs = [
 
 export default function Navigation({ activeTab, onTabChange }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const { exportData, importData } = useAppStore();
+  const { exportData, importData, syncStatus } = useAppStore();
   const fileRef = useRef();
 
   const handleImport = (e) => {
@@ -60,6 +60,24 @@ export default function Navigation({ activeTab, onTabChange }) {
         </nav>
 
         <div className="p-2 lg:p-3 border-t border-gray-800 space-y-1">
+          {/* Sync status indicator */}
+          <div className="flex items-center justify-center lg:justify-start gap-2 px-2 lg:px-3 py-1.5 text-xs">
+            {syncStatus === 'loading' && (
+              <><Loader2 size={12} className="animate-spin text-blue-400 flex-shrink-0" /><span className="hidden lg:block text-blue-400">Loading...</span></>
+            )}
+            {syncStatus === 'saving' && (
+              <><Loader2 size={12} className="animate-spin text-amber-400 flex-shrink-0" /><span className="hidden lg:block text-amber-400">Saving...</span></>
+            )}
+            {syncStatus === 'synced' && (
+              <><Cloud size={12} className="text-emerald-400 flex-shrink-0" /><span className="hidden lg:block text-emerald-400">Synced</span></>
+            )}
+            {syncStatus === 'offline' && (
+              <><CloudOff size={12} className="text-gray-500 flex-shrink-0" /><span className="hidden lg:block text-gray-500">Offline</span></>
+            )}
+            {syncStatus === 'error' && (
+              <><CloudOff size={12} className="text-red-400 flex-shrink-0" /><span className="hidden lg:block text-red-400">Sync error</span></>
+            )}
+          </div>
           <button
             onClick={exportData}
             title="Export Data"
@@ -90,9 +108,17 @@ export default function Navigation({ activeTab, onTabChange }) {
           <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-xs">SE</div>
           <span className="text-sm font-bold text-white">Work Tracker</span>
         </button>
+        {/* Mobile sync dot */}
+        <div className="flex items-center gap-2">
+          {syncStatus === 'loading' && <Loader2 size={12} className="animate-spin text-blue-400" />}
+          {syncStatus === 'saving' && <Loader2 size={12} className="animate-spin text-amber-400" />}
+          {syncStatus === 'synced' && <Cloud size={12} className="text-emerald-400" />}
+          {syncStatus === 'offline' && <CloudOff size={12} className="text-gray-500" />}
+          {syncStatus === 'error' && <CloudOff size={12} className="text-red-400" />}
         <button onClick={() => setMenuOpen(!menuOpen)} className="text-gray-400 hover:text-white p-1">
           {menuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
+        </div>
       </div>
 
       {/* Mobile nav drawer */}

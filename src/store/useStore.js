@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { TASK_TYPE_POINTS } from '../constants';
+import { fetchAllData, saveEntity, seedAllData } from '../lib/api';
 
 const KEYS = {
   okrs: 'gpt-okrs',
@@ -12,6 +13,8 @@ const KEYS = {
   aiOutputs: 'gpt-ai-outputs',
   aiSettings: 'gpt-ai-settings',
 };
+
+const MIGRATION_FLAG = 'gpt-migrated-to-neon';
 
 // Default AI settings shape — empty string means "use built-in default prompt"
 const DEFAULT_AI_SETTINGS = {
@@ -81,6 +84,19 @@ function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
 
+// ─── Debounce helper for API saves ───────────────────────────────
+// One timer per entity so rapid changes to the same entity collapse,
+// but changes to different entities can fire independently.
+function createDebouncedSaver() {
+  const timers = {};
+  return (entity, data) => {
+    clearTimeout(timers[entity]);
+    timers[entity] = setTimeout(() => {
+      saveEntity(entity, data);
+    }, 500);
+  };
+}
+
 export function useStore() {
   const [okrs, setOkrs] = useState(() => migrateOkrs(load(KEYS.okrs)));
   const [customers, setCustomers] = useState(() => load(KEYS.customers));
@@ -102,6 +118,18 @@ export function useStore() {
     };
   });
 
+  // Sync status: 'loading' | 'synced' | 'saving' | 'offline' | 'error'
+  const [syncStatus, setSyncStatus] = useState('loading');
+
+  // Stable debounced saver — created once per component lifetime
+  const debouncedSave = useRef(createDebouncedSaver()).current;
+
+  // Track whether initial Neon fetch has completed.
+  // We suppress API saves until mount-fetch is done to avoid echoing
+  // stale localStorage data back to Neon before we've received remote data.
+  const mountedRef = useRef(false);
+
+  // ─── localStorage save effects (unchanged — instant, synchronous cache) ───
   useEffect(() => { save(KEYS.okrs, okrs); }, [okrs]);
   useEffect(() => { save(KEYS.customers, customers); }, [customers]);
   useEffect(() => { save(KEYS.projects, projects); }, [projects]);
@@ -111,6 +139,96 @@ export function useStore() {
   useEffect(() => { save(KEYS.milestones, milestones); }, [milestones]);
   useEffect(() => { save(KEYS.aiOutputs, aiOutputs); }, [aiOutputs]);
   useEffect(() => { save(KEYS.aiSettings, aiSettings); }, [aiSettings]);
+
+  // ─── Neon save effects (debounced 500ms, only after mount-fetch) ──────────
+  useEffect(() => { if (mountedRef.current) { debouncedSave('okrs', okrs); setSyncStatus('saving'); } }, [okrs]);
+  useEffect(() => { if (mountedRef.current) { debouncedSave('customers', customers); setSyncStatus('saving'); } }, [customers]);
+  useEffect(() => { if (mountedRef.current) { debouncedSave('projects', projects); setSyncStatus('saving'); } }, [projects]);
+  useEffect(() => { if (mountedRef.current) { debouncedSave('points', points); setSyncStatus('saving'); } }, [points]);
+  useEffect(() => { if (mountedRef.current) { debouncedSave('meetingEntries', meetingEntries); setSyncStatus('saving'); } }, [meetingEntries]);
+  useEffect(() => { if (mountedRef.current) { debouncedSave('tasks', tasks); setSyncStatus('saving'); } }, [tasks]);
+  useEffect(() => { if (mountedRef.current) { debouncedSave('milestones', milestones); setSyncStatus('saving'); } }, [milestones]);
+  useEffect(() => { if (mountedRef.current) { debouncedSave('aiOutputs', aiOutputs); setSyncStatus('saving'); } }, [aiOutputs]);
+  useEffect(() => { if (mountedRef.current) { debouncedSave('aiSettings', aiSettings); setSyncStatus('saving'); } }, [aiSettings]);
+
+  // Update syncStatus back to 'synced' after the debounce window
+  useEffect(() => {
+    if (syncStatus === 'saving') {
+      const t = setTimeout(() => setSyncStatus('synced'), 800);
+      return () => clearTimeout(t);
+    }
+  }, [syncStatus]);
+
+  // ─── Mount effect: fetch from Neon, auto-migrate if first run ─────────────
+  useEffect(() => {
+    let cancelled = false;
+
+    async function init() {
+      const remote = await fetchAllData();
+
+      if (cancelled) return;
+
+      if (!remote) {
+        // Neon unreachable — work offline from localStorage
+        setSyncStatus('offline');
+        mountedRef.current = true;
+        return;
+      }
+
+      const alreadyMigrated = localStorage.getItem(MIGRATION_FLAG);
+
+      // Check if Neon has real data (any entity with non-empty array)
+      const neonHasData = Object.values(remote).some(d =>
+        Array.isArray(d) ? d.length > 0 : (d && typeof d === 'object' && Object.keys(d).length > 0)
+      );
+
+      if (!neonHasData && !alreadyMigrated) {
+        // First run — push localStorage data to Neon
+        console.log('[sync] Neon empty + no migration flag → seeding from localStorage');
+        const localData = {
+          okrs, customers, projects, points,
+          meetingEntries, tasks, milestones,
+          aiOutputs, aiSettings,
+        };
+        const result = await seedAllData(localData);
+        if (result) {
+          localStorage.setItem(MIGRATION_FLAG, new Date().toISOString());
+          console.log('[sync] Seed complete:', result.entitiesSeeded, 'entities');
+        }
+      } else if (neonHasData) {
+        // Neon has data — overwrite local state with remote data
+        if (remote.okrs) setOkrs(migrateOkrs(remote.okrs));
+        if (remote.customers) setCustomers(remote.customers);
+        if (remote.projects) setProjects(remote.projects);
+        if (remote.points) setPoints(remote.points);
+        if (remote.meetingEntries) setMeetingEntries(remote.meetingEntries);
+        if (remote.tasks) setTasks(remote.tasks);
+        if (remote.milestones) setMilestones(remote.milestones);
+        if (remote.aiOutputs) setAiOutputs(remote.aiOutputs);
+        if (remote.aiSettings && Object.keys(remote.aiSettings).length > 0) {
+          setAiSettings(prev => ({
+            prompts: { ...DEFAULT_AI_SETTINGS.prompts, ...remote.aiSettings.prompts },
+            providers: { ...DEFAULT_AI_SETTINGS.providers, ...remote.aiSettings.providers },
+            openaiModel: remote.aiSettings.openaiModel || prev.openaiModel,
+            claudeModel: remote.aiSettings.claudeModel || prev.claudeModel,
+          }));
+        }
+        // Mark as migrated (in case it wasn't yet)
+        if (!alreadyMigrated) {
+          localStorage.setItem(MIGRATION_FLAG, new Date().toISOString());
+        }
+      }
+
+      if (!cancelled) {
+        setSyncStatus('synced');
+        // Enable API save effects now that we've loaded remote data
+        mountedRef.current = true;
+      }
+    }
+
+    init();
+    return () => { cancelled = true; };
+  }, []); // run once on mount
 
   // OKR actions
   const addOkr = useCallback((data) => {
@@ -357,5 +475,6 @@ export function useStore() {
     addAiOutput, getTaskAiOutputs, updateAiOutput,
     aiSettings, updateAiSettings,
     exportData, importData,
+    syncStatus,
   };
 }
