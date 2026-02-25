@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, ChevronRight, Pencil, Trash2, ArrowLeft, Clock, Zap, Calendar, CheckCircle2, PauseCircle, XCircle, LayoutGrid, List, Timer, Square, ListPlus, NotebookPen, Pin, PinOff, Flag, GitCommitHorizontal } from 'lucide-react';
+import { Plus, ChevronLeft, ChevronRight, Pencil, Trash2, ArrowLeft, Clock, Zap, Calendar, CheckCircle2, PauseCircle, XCircle, LayoutGrid, List, Timer, Square, ListPlus, NotebookPen, Pin, PinOff, Flag } from 'lucide-react';
 import { useAppStore } from '../context/StoreContext';
 import { useTimerContext } from '../context/TimerContext';
 import Modal from '../components/Modal';
@@ -196,7 +196,8 @@ function ProjectDetail({ project, onBack }) {
   const [flashMsg, setFlashMsg] = useState(null);
   const [newMeetingModal, setNewMeetingModal] = useState(false);
 
-  // Milestone state (for Timeline tab)
+  // Milestone & calendar state (for Timeline tab)
+  const [calMonth, setCalMonth] = useState(new Date());
   const [showMilestoneForm, setShowMilestoneForm] = useState(false);
   const [milestoneForm, setMilestoneForm] = useState({ title: '', targetDate: '', status: 'upcoming' });
   const [milestoneFormErrors, setMilestoneFormErrors] = useState({});
@@ -230,7 +231,10 @@ function ProjectDetail({ project, onBack }) {
   const projectTasks = getProjectTasks(project.id).sort(
     (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
   );
-  const tasksByStatus = TASK_STATUSES.reduce((acc, s) => {
+  // Active tasks only (open, in-progress, blocked) — done/archived live in Timeline
+  const activeProjectTasks = projectTasks.filter(t => !['done', 'archived'].includes(t.status));
+  const doneProjectTasksCount = projectTasks.filter(t => ['done', 'archived'].includes(t.status)).length;
+  const tasksByStatus = TASK_STATUSES.filter(s => s !== 'done').reduce((acc, s) => {
     acc[s] = projectTasks.filter(t => t.status === s);
     return acc;
   }, {});
@@ -358,9 +362,9 @@ function ProjectDetail({ project, onBack }) {
           className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition-all ${activeTab === 'tasks' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}
         >
           Tasks
-          {projectTasks.length > 0 && (
+          {activeProjectTasks.length > 0 && (
             <span className="ml-0.5 bg-indigo-600/40 text-indigo-300 text-[10px] px-1.5 py-0.5 rounded-full font-semibold">
-              {projectTasks.length}
+              {activeProjectTasks.length}
             </span>
           )}
         </button>
@@ -368,10 +372,10 @@ function ProjectDetail({ project, onBack }) {
           onClick={() => setActiveTab('timeline')}
           className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition-all ${activeTab === 'timeline' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}
         >
-          <Flag size={12} /> Timeline
-          {projectMilestones.length > 0 && (
+          <Calendar size={12} /> Timeline
+          {(projectMilestones.length + doneProjectTasksCount) > 0 && (
             <span className="ml-0.5 bg-indigo-600/40 text-indigo-300 text-[10px] px-1.5 py-0.5 rounded-full font-semibold">
-              {projectMilestones.length}
+              {projectMilestones.length + doneProjectTasksCount}
             </span>
           )}
         </button>
@@ -547,7 +551,14 @@ function ProjectDetail({ project, onBack }) {
       {activeTab === 'tasks' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <p className="text-xs text-gray-500">{projectTasks.length} {projectTasks.length === 1 ? 'task' : 'tasks'}</p>
+            <div className="flex items-center gap-3">
+              <p className="text-xs text-gray-500">{activeProjectTasks.length} active {activeProjectTasks.length === 1 ? 'task' : 'tasks'}</p>
+              {doneProjectTasksCount > 0 && (
+                <button onClick={() => setActiveTab('timeline')} className="text-[10px] text-indigo-400 hover:text-indigo-300 transition-colors">
+                  {doneProjectTasksCount} done → Timeline
+                </button>
+              )}
+            </div>
             <button
               onClick={() => setAddTaskModal(true)}
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold transition-all shadow-lg shadow-indigo-600/30"
@@ -556,10 +567,14 @@ function ProjectDetail({ project, onBack }) {
             </button>
           </div>
 
-          {projectTasks.length === 0 ? (
+          {activeProjectTasks.length === 0 ? (
             <div className="bg-gray-900 border border-gray-800 rounded-2xl px-5 py-14 text-center">
-              <p className="text-gray-500 text-sm">No tasks yet.</p>
-              <p className="text-gray-600 text-xs mt-1">Click "Add Task" to create your first task for this project.</p>
+              <p className="text-gray-500 text-sm">No active tasks.</p>
+              <p className="text-gray-600 text-xs mt-1">
+                {doneProjectTasksCount > 0
+                  ? `${doneProjectTasksCount} completed task${doneProjectTasksCount !== 1 ? 's' : ''} on the Timeline.`
+                  : 'Click "Add Task" to create your first task for this project.'}
+              </p>
             </div>
           ) : (
             <div className="space-y-5">
@@ -617,25 +632,76 @@ function ProjectDetail({ project, onBack }) {
         </div>
       )}
 
-      {/* Timeline tab */}
+      {/* Timeline tab — Calendar layout */}
       {activeTab === 'timeline' && (() => {
-        const MILESTONE_STATUS_STYLES = {
-          upcoming: { badge: 'bg-amber-500/15 text-amber-400 border-amber-500/20', dot: 'bg-amber-400', label: 'Upcoming' },
-          achieved: { badge: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20', dot: 'bg-emerald-400', label: 'Achieved' },
-          missed:   { badge: 'bg-red-500/15 text-red-400 border-red-500/20',         dot: 'bg-red-400',     label: 'Missed'   },
-        };
-        return (
-          <div className="space-y-5">
+        const yr = calMonth.getFullYear();
+        const mo = calMonth.getMonth();
+        const firstOfMonth = new Date(yr, mo, 1);
+        const lastOfMonth = new Date(yr, mo + 1, 0);
 
-            {/* ── Milestones ── */}
+        // Build 6-week grid starting from Sunday before the 1st
+        const gridStart = new Date(firstOfMonth);
+        gridStart.setDate(gridStart.getDate() - gridStart.getDay());
+        const cells = [];
+        const cursor = new Date(gridStart);
+        for (let i = 0; i < 42; i++) {
+          cells.push(new Date(cursor));
+          cursor.setDate(cursor.getDate() + 1);
+        }
+        // Only show 5 rows if the 6th row is entirely next month
+        const showSixRows = cells[35].getMonth() === mo;
+        const displayCells = showSixRows ? cells : cells.slice(0, 35);
+
+        // Closed (done + archived) tasks for this project
+        const closedTasks = projectTasks.filter(t => ['done', 'archived'].includes(t.status));
+
+        // Build events by YYYY-MM-DD key
+        const dk = (d) => {
+          const dt = d instanceof Date ? d : new Date(d);
+          return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+        };
+        const eventsByDate = {};
+        projectMilestones.forEach(m => {
+          const key = m.targetDate;
+          if (!eventsByDate[key]) eventsByDate[key] = [];
+          eventsByDate[key].push({ type: 'milestone', id: m.id, label: m.title, status: m.status, raw: m });
+        });
+        closedTasks.forEach(t => {
+          const d = t.closedAt ? new Date(t.closedAt) : new Date(t.createdAt);
+          const key = dk(d);
+          if (!eventsByDate[key]) eventsByDate[key] = [];
+          eventsByDate[key].push({ type: 'task', id: t.id, label: t.description, status: t.status, raw: t });
+        });
+
+        const todayKey = dk(new Date());
+        const monthLabel = firstOfMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+        return (
+          <div className="space-y-4">
             <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-              <div className="px-5 py-4 border-b border-gray-800 flex items-center justify-between">
+              {/* Header: month nav + add milestone */}
+              <div className="px-5 py-3.5 border-b border-gray-800 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Flag size={14} className="text-indigo-400" />
-                  <h2 className="text-sm font-semibold text-white">Milestones</h2>
-                  {projectMilestones.length > 0 && (
-                    <span className="text-xs text-gray-500">({projectMilestones.length})</span>
-                  )}
+                  <button
+                    onClick={() => setCalMonth(new Date(yr, mo - 1, 1))}
+                    className="p-1.5 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-white transition-colors"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <h2 className="text-sm font-semibold text-white w-40 text-center">{monthLabel}</h2>
+                  <button
+                    onClick={() => setCalMonth(new Date(yr, mo + 1, 1))}
+                    className="p-1.5 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-white transition-colors"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                  <button
+                    onClick={() => setCalMonth(new Date())}
+                    className="ml-1 text-[10px] text-gray-500 hover:text-white px-2.5 py-1 rounded-lg hover:bg-gray-800 transition-colors"
+                  >
+                    Today
+                  </button>
                 </div>
                 <button
                   onClick={openAddMilestoneForm}
@@ -645,7 +711,7 @@ function ProjectDetail({ project, onBack }) {
                 </button>
               </div>
 
-              {/* Inline add / edit form */}
+              {/* Inline milestone add / edit form */}
               {showMilestoneForm && (
                 <div className="px-5 py-4 border-b border-gray-800 bg-gray-800/40 space-y-3">
                   <div className="grid grid-cols-3 gap-2">
@@ -698,111 +764,102 @@ function ProjectDetail({ project, onBack }) {
                 </div>
               )}
 
-              {/* Milestone list */}
-              {projectMilestones.length === 0 && !showMilestoneForm ? (
-                <div className="px-5 py-10 text-center">
-                  <Flag size={24} className="text-gray-700 mx-auto mb-2" />
-                  <p className="text-gray-500 text-sm">No milestones yet.</p>
-                  <p className="text-gray-600 text-xs mt-1">Add one to track key dates for this project.</p>
-                </div>
-              ) : (
-                <div className="divide-y divide-gray-800/60">
-                  {projectMilestones.map(m => {
-                    const style = MILESTONE_STATUS_STYLES[m.status] || MILESTONE_STATUS_STYLES.upcoming;
-                    const formattedDate = m.targetDate
-                      ? new Date(m.targetDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                      : '—';
-                    return (
-                      <div key={m.id} className="px-5 py-3.5 flex items-center gap-4 group hover:bg-gray-800/30 transition-colors">
-                        {/* Status dot */}
-                        <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${style.dot}`} />
-                        {/* Title + date */}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-white font-medium leading-snug">{m.title}</p>
-                          <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
-                            <Calendar size={10} /> {formattedDate}
-                          </p>
-                        </div>
-                        {/* Status badge */}
-                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border flex-shrink-0 ${style.badge}`}>
-                          {style.label}
-                        </span>
-                        {/* Actions — visible on hover */}
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                          <button
-                            onClick={() => openEditMilestoneForm(m)}
-                            className="p-1 rounded text-gray-600 hover:text-indigo-400 transition-colors"
-                            title="Edit milestone"
-                          >
-                            <Pencil size={13} />
-                          </button>
-                          <button
-                            onClick={() => setDeleteMilestoneId(m.id)}
-                            className="p-1 rounded text-gray-600 hover:text-red-400 transition-colors"
-                            title="Delete milestone"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* ── Task Log ── */}
-            {(() => {
-              // Dot colors per task status (TASK_STATUS_COLORS has no .dot property)
-              const TASK_DOT = {
-                'open':        'bg-gray-500',
-                'in-progress': 'bg-indigo-400',
-                'done':        'bg-emerald-400',
-                'blocked':     'bg-red-400',
-                'archived':    'bg-gray-600',
-              };
-              return (
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-              <div className="px-5 py-4 border-b border-gray-800 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <GitCommitHorizontal size={14} className="text-gray-400" />
-                  <h2 className="text-sm font-semibold text-white">Task Log</h2>
-                </div>
-                <span className="text-xs text-gray-500">{projectTasks.length} {projectTasks.length === 1 ? 'task' : 'tasks'}</span>
+              {/* Legend */}
+              <div className="px-5 py-2 border-b border-gray-800/60 flex items-center gap-5 text-[10px] text-gray-500">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 bg-amber-400 rotate-45 inline-block" />
+                  Milestone
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />
+                  Done
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-gray-500 inline-block" />
+                  Archived
+                </span>
               </div>
-              {projectTasks.length === 0 ? (
-                <div className="px-5 py-10 text-center">
-                  <GitCommitHorizontal size={24} className="text-gray-700 mx-auto mb-2" />
-                  <p className="text-gray-500 text-sm">No tasks logged yet.</p>
-                </div>
-              ) : (
-                <div className="divide-y divide-gray-800/60">
-                  {projectTasks.map(task => {
-                    const typeColors = TASK_TYPE_COLORS[task.taskType] || TASK_TYPE_COLORS.mine;
-                    const statusColors = TASK_STATUS_COLORS[task.status] || TASK_STATUS_COLORS.open;
-                    return (
-                      <div key={task.id} className="px-5 py-3 flex items-start gap-3 hover:bg-gray-800/30 transition-colors">
-                        <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${TASK_DOT[task.status] || 'bg-gray-500'}`} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-white leading-snug">{task.description}</p>
-                          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${typeColors.bg} ${typeColors.text} ${typeColors.border}`}>
-                              {TASK_TYPE_LABELS[task.taskType]}
-                            </span>
-                            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${statusColors.bg} ${statusColors.text} ${statusColors.border}`}>
-                              {TASK_STATUS_LABELS[task.status]}
-                            </span>
-                            <span className="text-[10px] text-gray-600">{formatDate(task.createdAt)}</span>
-                          </div>
-                        </div>
+
+              {/* Day-of-week header */}
+              <div className="grid grid-cols-7 border-b border-gray-800/60">
+                {dayNames.map(d => (
+                  <div key={d} className="text-center text-[10px] text-gray-500 font-semibold py-2 uppercase tracking-wider">
+                    {d}
+                  </div>
+                ))}
+              </div>
+
+              {/* Calendar grid */}
+              <div className={`grid grid-cols-7`}>
+                {displayCells.map((cellDate, i) => {
+                  const key = dk(cellDate);
+                  const isCurrentMonth = cellDate.getMonth() === mo;
+                  const isToday = key === todayKey;
+                  const events = eventsByDate[key] || [];
+                  const maxShow = 3;
+                  const overflow = events.length - maxShow;
+
+                  return (
+                    <div
+                      key={i}
+                      className={`min-h-[85px] border-b border-r border-gray-800/30 p-1.5 transition-colors ${
+                        isCurrentMonth ? 'bg-gray-900' : 'bg-gray-950/50'
+                      } ${isToday ? 'ring-1 ring-inset ring-indigo-500/50' : ''}`}
+                    >
+                      {/* Day number */}
+                      <div className={`text-[11px] font-medium mb-1 ${
+                        isToday ? 'text-indigo-400 font-bold' : isCurrentMonth ? 'text-gray-400' : 'text-gray-700'
+                      }`}>
+                        {cellDate.getDate()}
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+
+                      {/* Events */}
+                      {events.slice(0, maxShow).map(ev => (
+                        <div
+                          key={`${ev.type}-${ev.id}`}
+                          className={`flex items-center gap-1 mb-0.5 rounded px-1 py-0.5 cursor-default group/ev ${
+                            ev.type === 'milestone' ? 'hover:bg-gray-800/60' : 'hover:bg-gray-800/40'
+                          }`}
+                          title={ev.type === 'milestone'
+                            ? `${ev.label} (${ev.status})`
+                            : `${ev.label} — ${ev.status === 'done' ? 'Done' : 'Archived'}`
+                          }
+                        >
+                          {ev.type === 'milestone' ? (
+                            <span className={`w-1.5 h-1.5 rotate-45 flex-shrink-0 ${
+                              ev.status === 'achieved' ? 'bg-emerald-400' : ev.status === 'missed' ? 'bg-red-400' : 'bg-amber-400'
+                            }`} />
+                          ) : (
+                            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                              ev.status === 'done' ? 'bg-emerald-400' : 'bg-gray-500'
+                            }`} />
+                          )}
+                          <span className={`text-[10px] truncate leading-tight ${
+                            !isCurrentMonth ? 'text-gray-600' : ev.type === 'milestone' ? 'text-white font-medium' : 'text-gray-400'
+                          }`}>
+                            {ev.label.length > 18 ? ev.label.slice(0, 16) + '…' : ev.label}
+                          </span>
+                          {/* Milestone edit/delete on hover */}
+                          {ev.type === 'milestone' && (
+                            <div className="hidden group-hover/ev:flex items-center gap-0.5 flex-shrink-0 ml-auto">
+                              <button onClick={() => openEditMilestoneForm(ev.raw)} className="text-gray-600 hover:text-indigo-400" title="Edit">
+                                <Pencil size={9} />
+                              </button>
+                              <button onClick={() => setDeleteMilestoneId(ev.id)} className="text-gray-600 hover:text-red-400" title="Delete">
+                                <Trash2 size={9} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      {overflow > 0 && (
+                        <div className="text-[9px] text-gray-600 pl-1">+{overflow} more</div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-              );
-            })()}
 
             {/* Milestone delete confirmation */}
             {deleteMilestoneId && (

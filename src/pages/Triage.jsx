@@ -2002,7 +2002,7 @@ export default function Triage() {
         {/* Active / Closed tab switcher */}
         <div className="flex gap-1 bg-gray-800/50 rounded-xl p-1 mb-3 w-fit">
           <button
-            onClick={() => { setBoardTab('active'); setFilterStatus(''); }}
+            onClick={() => { setBoardTab('active'); setFilterStatus('open'); setFilterCustomerId(''); setFilterProjectId(''); setFilterTaskType(''); }}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
               boardTab === 'active' ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-400 hover:text-white'
             }`}
@@ -2010,7 +2010,7 @@ export default function Triage() {
             Active ({activeTasks.length})
           </button>
           <button
-            onClick={() => { setBoardTab('closed'); setFilterStatus(''); }}
+            onClick={() => { setBoardTab('closed'); setFilterStatus(''); setFilterCustomerId(''); setFilterProjectId(''); setFilterTaskType(''); }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
               boardTab === 'closed' ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-400 hover:text-white'
             }`}

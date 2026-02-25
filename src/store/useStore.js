@@ -200,9 +200,13 @@ export function useStore() {
   // Task actions
   const addTask = useCallback((data) => {
     // data: { projectId, meetingEntryId (optional), description, taskType, assigneeOrTeam, status }
-    const task = { id: uid(), createdAt: new Date().toISOString(), status: 'open', points: 0, ...data };
+    const task = { id: uid(), createdAt: new Date().toISOString(), status: 'open', points: 0, closedAt: null, ...data };
     // Auto-assign points if task is created already in 'done' status
     if (task.status === 'done') task.points = TASK_TYPE_POINTS[task.taskType] || 0;
+    // Stamp closedAt if task is created directly in a closed status
+    if (task.status === 'done' || task.status === 'archived') {
+      task.closedAt = new Date().toISOString();
+    }
     setTasks(prev => [...prev, task]);
     return task;
   }, []);
@@ -211,8 +215,18 @@ export function useStore() {
     setTasks(prev => prev.map(t => {
       if (t.id !== id) return t;
       const next = { ...t, ...data };
-      // Auto-calculate task points on status change
+      // Auto-calculate task points + closedAt on status change
       if ('status' in data) {
+        const wasOpen = !['done', 'archived'].includes(t.status);
+        const nowClosed = ['done', 'archived'].includes(data.status);
+
+        // closedAt: stamp when closing, clear when reopening, preserve on done↔archived
+        if (nowClosed && wasOpen) {
+          next.closedAt = new Date().toISOString();
+        } else if (!nowClosed) {
+          next.closedAt = null;
+        }
+
         if (data.status === 'done') {
           // Completed — award points based on task type
           next.points = TASK_TYPE_POINTS[next.taskType] || 0;
