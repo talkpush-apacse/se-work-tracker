@@ -11,7 +11,7 @@ import Customers from './pages/Customers';
 import Triage from './pages/Triage';
 
 function AppContent() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('triage');
   const [projectTarget, setProjectTarget] = useState(null);
 
   const handleNavigate = (tab, projectId = null) => {

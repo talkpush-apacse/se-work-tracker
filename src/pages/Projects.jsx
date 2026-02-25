@@ -9,7 +9,7 @@ import BulkAddProjectsModal from '../components/BulkAddProjectsModal';
 import BulkAddPointsModal from '../components/BulkAddPointsModal';
 import NewMeetingEntryModal from '../components/NewMeetingEntryModal';
 import AddTaskModal from '../components/AddTaskModal';
-import { CUSTOMER_COLORS, PROJECT_STATUSES, ACTIVITY_TYPES, ACTIVITY_COLORS, TASK_TYPE_LABELS, TASK_TYPE_COLORS, TASK_STATUS_LABELS, TASK_STATUS_COLORS, TASK_STATUSES, TASK_RECIPIENTS } from '../constants';
+import { CUSTOMER_COLORS, PROJECT_STATUSES, ACTIVITY_TYPES, ACTIVITY_COLORS, TASK_TYPES, TASK_TYPE_LABELS, TASK_TYPE_COLORS, TASK_STATUS_LABELS, TASK_STATUS_COLORS, TASK_STATUSES, TASK_RECIPIENTS } from '../constants';
 import { formatDate, formatDateTime, formatRelative } from '../utils/dateHelpers';
 
 const STATUS_ICONS = {
@@ -181,12 +181,129 @@ function EditEntryModal({ entry, onClose }) {
   );
 }
 
+// ─── Inline task edit form (used in Tasks tab) ───────────────────────────────
+function TaskEditForm({ task, onSave, onCancel, onDelete }) {
+  const [form, setForm] = useState({
+    description: task.description || '',
+    taskType: task.taskType || 'comms',
+    assigneeOrTeam: task.assigneeOrTeam || '',
+    status: task.status || 'open',
+    ticketUrl: task.ticketUrl || '',
+  });
+
+  const handleSave = () => {
+    if (!form.description.trim()) return;
+    onSave({
+      description: form.description.trim(),
+      taskType: form.taskType,
+      assigneeOrTeam: form.assigneeOrTeam,
+      status: form.status,
+      ticketUrl: form.ticketUrl.trim(),
+    });
+  };
+
+  const inputCls = 'w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40';
+
+  return (
+    <div className="p-4 space-y-3">
+      {/* Description */}
+      <textarea
+        autoFocus
+        rows={2}
+        value={form.description}
+        onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+        placeholder="Task description..."
+        className={`${inputCls} resize-none`}
+      />
+
+      {/* Type + Status + Assignee — 3 columns */}
+      <div className="grid grid-cols-3 gap-3">
+        <div>
+          <label className="block text-[10px] font-medium text-gray-500 mb-1">Type</label>
+          <select
+            value={form.taskType}
+            onChange={e => setForm(p => ({ ...p, taskType: e.target.value }))}
+            className={inputCls}
+          >
+            {TASK_TYPES.map(t => (
+              <option key={t} value={t}>{TASK_TYPE_LABELS[t]}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-[10px] font-medium text-gray-500 mb-1">Status</label>
+          <select
+            value={form.status}
+            onChange={e => setForm(p => ({ ...p, status: e.target.value }))}
+            className={inputCls}
+          >
+            {TASK_STATUSES.map(s => (
+              <option key={s} value={s}>{TASK_STATUS_LABELS[s]}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-[10px] font-medium text-gray-500 mb-1">Assignee</label>
+          <select
+            value={form.assigneeOrTeam}
+            onChange={e => setForm(p => ({ ...p, assigneeOrTeam: e.target.value }))}
+            className={inputCls}
+          >
+            <option value="">— None —</option>
+            {TASK_RECIPIENTS.map(r => (
+              <option key={r.value} value={r.value}>{r.label}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Ticket URL */}
+      <div>
+        <label className="block text-[10px] font-medium text-gray-500 mb-1">Ticket URL</label>
+        <input
+          value={form.ticketUrl}
+          onChange={e => setForm(p => ({ ...p, ticketUrl: e.target.value }))}
+          placeholder="https://jira.company.com/ticket/123"
+          className={inputCls}
+        />
+      </div>
+
+      {/* Action buttons */}
+      <div className="flex items-center justify-between pt-1">
+        <button
+          onClick={onDelete}
+          className="px-2.5 py-1.5 rounded-lg text-xs text-red-500 hover:text-red-400 hover:bg-red-500/10 border border-red-500/20 transition-all flex items-center gap-1.5"
+        >
+          <Trash2 size={12} /> Delete
+        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onCancel}
+            className="px-3 py-1.5 rounded-lg text-xs text-gray-400 hover:text-white hover:bg-gray-800 transition-all"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={!form.description.trim()}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ProjectDetail({ project, onBack }) {
-  const { points, tasks, customers, okrs, addPoint, deletePoint, updatePoint, updateProject, deleteProject, getProjectMeetingEntries, getProjectTasks, updateTask, getProjectMilestones, addMilestone, updateMilestone, deleteMilestone } = useAppStore();
+  const { points, tasks, customers, okrs, addPoint, deletePoint, updatePoint, updateProject, deleteProject, getProjectMeetingEntries, getProjectTasks, updateTask, deleteTask, getProjectMilestones, addMilestone, updateMilestone, deleteMilestone } = useAppStore();
   const { isRunning, projectId: runningProjectId, startTimer, stopTimer } = useTimerContext();
-  const [activeTab, setActiveTab] = useState('points'); // 'points' | 'meetings' | 'tasks' | 'timeline'
+  const [activeTab, setActiveTab] = useState('tasks'); // 'tasks' | 'timeline' | 'points' | 'meetings'
   const [addModal, setAddModal] = useState(false);
   const [addTaskModal, setAddTaskModal] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState(null);
+  const [deleteTaskTarget, setDeleteTaskTarget] = useState(null);
   const [bulkPointsModal, setBulkPointsModal] = useState(false);
   const [editModal, setEditModal] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
@@ -341,23 +458,6 @@ function ProjectDetail({ project, onBack }) {
       {/* Tab bar */}
       <div className="flex bg-gray-800 rounded-xl p-1 gap-1 w-fit">
         <button
-          onClick={() => setActiveTab('points')}
-          className={`px-4 py-2 rounded-lg text-xs font-medium transition-all ${activeTab === 'points' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}
-        >
-          Points Log
-        </button>
-        <button
-          onClick={() => setActiveTab('meetings')}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition-all ${activeTab === 'meetings' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}
-        >
-          <NotebookPen size={12} /> Meeting Log
-          {meetingEntries.length > 0 && (
-            <span className="ml-0.5 bg-indigo-600/40 text-indigo-300 text-[10px] px-1.5 py-0.5 rounded-full font-semibold">
-              {meetingEntries.length}
-            </span>
-          )}
-        </button>
-        <button
           onClick={() => setActiveTab('tasks')}
           className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition-all ${activeTab === 'tasks' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}
         >
@@ -376,6 +476,23 @@ function ProjectDetail({ project, onBack }) {
           {(projectMilestones.length + doneProjectTasksCount) > 0 && (
             <span className="ml-0.5 bg-indigo-600/40 text-indigo-300 text-[10px] px-1.5 py-0.5 rounded-full font-semibold">
               {projectMilestones.length + doneProjectTasksCount}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab('points')}
+          className={`px-4 py-2 rounded-lg text-xs font-medium transition-all ${activeTab === 'points' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}
+        >
+          Points Log
+        </button>
+        <button
+          onClick={() => setActiveTab('meetings')}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition-all ${activeTab === 'meetings' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}
+        >
+          <NotebookPen size={12} /> Meeting Log
+          {meetingEntries.length > 0 && (
+            <span className="ml-0.5 bg-indigo-600/40 text-indigo-300 text-[10px] px-1.5 py-0.5 rounded-full font-semibold">
+              {meetingEntries.length}
             </span>
           )}
         </button>
@@ -593,33 +710,57 @@ function ProjectDetail({ project, onBack }) {
                     <div className="space-y-2">
                       {group.map(task => {
                         const typeColors = TASK_TYPE_COLORS[task.taskType] || TASK_TYPE_COLORS.mine;
+                        const isEditing = editingTaskId === task.id;
                         return (
-                          <div key={task.id} className="bg-gray-900 border border-gray-800 rounded-xl p-3">
-                            <div className="flex items-start gap-3">
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm text-white leading-snug">{task.description}</p>
-                                <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${typeColors.bg} ${typeColors.text} ${typeColors.border}`}>
-                                    {TASK_TYPE_LABELS[task.taskType]}
-                                  </span>
-                                  {task.assigneeOrTeam && (
-                                    <span className="text-[10px] text-gray-500">→ {TASK_RECIPIENTS.find(r => r.value === task.assigneeOrTeam)?.label || task.assigneeOrTeam}</span>
-                                  )}
+                          <div key={task.id} className={`bg-gray-900 border rounded-xl transition-all ${isEditing ? 'border-indigo-500/40 ring-1 ring-indigo-500/20' : 'border-gray-800'}`}>
+                            {/* Collapsed view */}
+                            {!isEditing ? (
+                              <div className="p-3 flex items-start gap-3">
+                                <div
+                                  className="flex-1 min-w-0 cursor-pointer"
+                                  onClick={() => setEditingTaskId(task.id)}
+                                >
+                                  <p className="text-sm text-white leading-snug">{task.description}</p>
+                                  <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${typeColors.bg} ${typeColors.text} ${typeColors.border}`}>
+                                      {TASK_TYPE_LABELS[task.taskType]}
+                                    </span>
+                                    {task.assigneeOrTeam && (
+                                      <span className="text-[10px] text-gray-500">→ {TASK_RECIPIENTS.find(r => r.value === task.assigneeOrTeam)?.label || task.assigneeOrTeam}</span>
+                                    )}
+                                    {task.ticketUrl && (
+                                      <a href={task.ticketUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-indigo-400/70 hover:text-indigo-300 transition-colors" onClick={e => e.stopPropagation()}>ticket ↗</a>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <select
+                                    value={task.status}
+                                    onChange={e => { e.stopPropagation(); updateTask(task.id, { status: e.target.value }); }}
+                                    className={`text-[10px] font-semibold rounded-lg px-2 py-1 border cursor-pointer focus:outline-none ${statusColors.bg} ${statusColors.text} ${statusColors.border} bg-transparent`}
+                                  >
+                                    {TASK_STATUSES.map(s => (
+                                      <option key={s} value={s} className="bg-gray-800 text-white">{TASK_STATUS_LABELS[s]}</option>
+                                    ))}
+                                  </select>
+                                  <button
+                                    onClick={() => setEditingTaskId(task.id)}
+                                    className="p-1 rounded-lg text-gray-600 hover:text-gray-400 transition-colors"
+                                    title="Edit task"
+                                  >
+                                    <Pencil size={12} />
+                                  </button>
                                 </div>
                               </div>
-                              {/* Inline status dropdown */}
-                              <select
-                                value={task.status}
-                                onChange={e => updateTask(task.id, { status: e.target.value })}
-                                className={`text-[10px] font-semibold rounded-lg px-2 py-1 border cursor-pointer focus:outline-none flex-shrink-0 ${statusColors.bg} ${statusColors.text} ${statusColors.border} bg-transparent`}
-                              >
-                                {TASK_STATUSES.map(s => (
-                                  <option key={s} value={s} className="bg-gray-800 text-white">
-                                    {TASK_STATUS_LABELS[s]}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
+                            ) : (
+                              /* Expanded edit form */
+                              <TaskEditForm
+                                task={task}
+                                onSave={(data) => { updateTask(task.id, data); setEditingTaskId(null); }}
+                                onCancel={() => setEditingTaskId(null)}
+                                onDelete={() => setDeleteTaskTarget(task)}
+                              />
+                            )}
                           </div>
                         );
                       })}
@@ -921,6 +1062,16 @@ function ProjectDetail({ project, onBack }) {
           message={`Delete "${project.name}" and all its point entries? This cannot be undone.`}
           onConfirm={() => { deleteProject(project.id); onBack(); }}
           onCancel={() => setDeleteConfirm(false)}
+        />
+      )}
+
+      {deleteTaskTarget && (
+        <ConfirmDialog
+          title="Delete Task"
+          message={`Permanently delete "${deleteTaskTarget.description}"? This cannot be undone.`}
+          danger={true}
+          onConfirm={() => { deleteTask(deleteTaskTarget.id); setDeleteTaskTarget(null); setEditingTaskId(null); }}
+          onCancel={() => setDeleteTaskTarget(null)}
         />
       )}
 

@@ -1,6 +1,9 @@
-import { LayoutDashboard, FolderKanban, BarChart3, Target, Users, Menu, X, Download, Upload, ListTodo, Cloud, CloudOff, Loader2 } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, BarChart3, Target, Users, Menu, X, Download, Upload, ListTodo, Cloud, CloudOff, Loader2, Timer } from 'lucide-react';
 import { useState, useRef } from 'react';
 import { useAppStore } from '../context/StoreContext';
+import { useTimerContext } from '../context/TimerContext';
+import { format, startOfDay, endOfDay } from 'date-fns';
+import { filterPointsByRange } from '../utils/dateHelpers';
 
 const tabs = [
   { id: 'triage', label: 'Triage', icon: ListTodo },
@@ -13,8 +16,25 @@ const tabs = [
 
 export default function Navigation({ activeTab, onTabChange }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const { exportData, importData, syncStatus } = useAppStore();
+  const { exportData, importData, syncStatus, points, tasks } = useAppStore();
+  const { isRunning, taskId: runningTaskId, elapsedSeconds } = useTimerContext();
   const fileRef = useRef();
+
+  // Today at a glance
+  const now = new Date();
+  const todayPoints = filterPointsByRange(points, startOfDay(now), endOfDay(now))
+    .reduce((sum, p) => sum + p.points, 0);
+  const timerTaskDesc = isRunning && runningTaskId
+    ? tasks.find(t => t.id === runningTaskId)?.description
+    : null;
+  const fmtTimer = (s) => {
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    return h > 0
+      ? `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
+      : `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+  };
 
   const handleImport = (e) => {
     const file = e.target.files[0];
@@ -58,6 +78,26 @@ export default function Navigation({ activeTab, onTabChange }) {
             </button>
           ))}
         </nav>
+
+        {/* Today at a glance — only visible on expanded sidebar (lg) */}
+        <div className="hidden lg:block px-3 py-3 border-t border-gray-800">
+          <p className="text-[10px] font-medium text-gray-600 uppercase tracking-wider mb-2">Today</p>
+          <p className="text-xs text-gray-400 mb-1.5">{format(now, 'EEEE, MMM d')}</p>
+          <p className="text-xs text-gray-500">
+            <span className="text-white font-semibold">{todayPoints}</span> pts logged
+          </p>
+          {isRunning ? (
+            <div className="mt-2 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
+              <span className="text-[10px] text-emerald-400 font-mono">{fmtTimer(elapsedSeconds)}</span>
+              {timerTaskDesc && (
+                <span className="text-[10px] text-gray-500 truncate">{timerTaskDesc}</span>
+              )}
+            </div>
+          ) : (
+            <p className="mt-2 text-[10px] text-gray-600">No timer running</p>
+          )}
+        </div>
 
         <div className="p-2 lg:p-3 border-t border-gray-800 space-y-1">
           {/* Sync status indicator */}

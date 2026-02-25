@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import {
   ChevronDown, Plus, Mic, MicOff, Copy, Save, Check,
   Loader2, ClipboardList, Sparkles, ChevronRight,
-  Calendar, User, Tag, AlertCircle, Archive, ArchiveX,
+  Calendar, User, Tag, AlertCircle, Archive, ArchiveX, Trash2,
   Settings, RotateCcw, Pencil, GripVertical, ExternalLink, ArrowLeft,
   Timer, Square, Pin, CheckSquare,
 } from 'lucide-react';
@@ -1372,11 +1372,6 @@ function SortableTaskRow({ task, project, customer, onOpenDetail, isSelected, on
   const typeColors   = TASK_TYPE_COLORS[task.taskType]   || TASK_TYPE_COLORS.comms;
   const statusColors = TASK_STATUS_COLORS[task.status]   || TASK_STATUS_COLORS.open;
   const ageDays      = Math.floor((Date.now() - new Date(task.createdAt)) / 86_400_000);
-  const ageStyle     = ageDays <= 2
-    ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
-    : ageDays <= 5
-      ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
-      : 'text-red-400 bg-red-500/10 border-red-500/20';
 
   return (
     <div
@@ -1438,10 +1433,10 @@ function SortableTaskRow({ task, project, customer, onOpenDetail, isSelected, on
             {TASK_TYPE_LABELS[task.taskType]}
           </span>
           <span
-            className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${ageStyle}`}
+            className="text-[10px] text-gray-500"
             title={`Created ${ageDays} day${ageDays === 1 ? '' : 's'} ago`}
           >
-            {ageDays}d
+            {ageDays}d old
           </span>
           {task.points > 0 && (
             <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full border bg-teal-500/10 text-teal-400 border-teal-500/20">
@@ -1495,6 +1490,7 @@ function TaskDetailView({ task, project, customer, onBack }) {
   const [notesDraft, setNotesDraft] = useState(task.notes      || '');
   const notesTimerRef = useRef(null);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [showConfirmArchive, setShowConfirmArchive] = useState(false);
   const [timerConflict, setTimerConflict] = useState(false);
 
   // Sync draft when task prop changes (e.g. status updated from outside)
@@ -1550,6 +1546,7 @@ function TaskDetailView({ task, project, customer, onBack }) {
 
         {/* ── Left panel (40%) — task metadata + notes ── */}
         <div className="w-2/5 flex-shrink-0 space-y-4">
+          <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-0">Task Details</h3>
 
           {/* Description */}
           <div>
@@ -1652,11 +1649,7 @@ function TaskDetailView({ task, project, customer, onBack }) {
               <span>
                 {new Date(task.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
               </span>
-              <span className={`font-semibold px-1.5 py-0.5 rounded-full border ${
-                ageDays <= 2 ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
-                : ageDays <= 5 ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
-                : 'text-red-400 bg-red-500/10 border-red-500/20'
-              }`}>{ageDays}d old</span>
+              <span className="text-gray-500">{ageDays}d old</span>
             </div>
 
             <div className="flex items-center gap-2">
@@ -1664,10 +1657,10 @@ function TaskDetailView({ task, project, customer, onBack }) {
               {isRunningForThisTask ? (
                 <button
                   onClick={stopTimer}
-                  className="flex items-center gap-1.5 text-[10px] font-semibold px-2 py-1 rounded-lg bg-red-600/20 hover:bg-red-600/40 text-red-400 border border-red-700/40 transition-all font-mono tabular-nums"
+                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-red-600/20 hover:bg-red-600/40 text-red-400 border border-red-500/50 transition-all animate-pulse font-mono tabular-nums"
                   title="Stop timer"
                 >
-                  <Square size={10} fill="currentColor" />
+                  <Square size={12} fill="currentColor" />
                   {fmtHMS(elapsedSeconds)}
                 </button>
               ) : (
@@ -1679,48 +1672,38 @@ function TaskDetailView({ task, project, customer, onBack }) {
                       startTimer(task.projectId, task.id, task.description);
                     }
                   }}
-                  className="flex items-center gap-1.5 text-[10px] font-semibold px-2 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 border border-emerald-700/40 transition-all"
+                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 border border-emerald-500/50 transition-all shadow-sm shadow-emerald-500/10"
                   title="Start timer for this task"
                 >
-                  <Timer size={10} /> Start Timer
+                  <Timer size={14} /> Start Timer
                 </button>
               )}
 
-              {/* Archive / Delete */}
-              {!showConfirmDelete ? (
-                <button
-                  onClick={() => updateTask(task.id, { status: 'archived' })}
-                  className="flex items-center gap-1 text-[10px] text-gray-600 hover:text-gray-400 transition-colors"
-                >
-                  <Archive size={11} /> Archive
-                </button>
-              ) : null}
-              {!showConfirmDelete ? (
-                <button
-                  onClick={() => setShowConfirmDelete(true)}
-                  className="text-[10px] text-red-600 hover:text-red-400 transition-colors"
-                >
-                  Delete
-                </button>
-              ) : (
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-red-400">Sure?</span>
-                  <button
-                    onClick={() => { deleteTask(task.id); onBack(); }}
-                    className="text-[10px] font-semibold text-red-400 hover:text-red-300"
-                  >Yes</button>
-                  <button
-                    onClick={() => setShowConfirmDelete(false)}
-                    className="text-[10px] text-gray-500 hover:text-gray-300"
-                  >No</button>
-                </div>
-              )}
+              {/* Archive */}
+              <button
+                onClick={() => setShowConfirmArchive(true)}
+                className="px-2.5 py-1.5 rounded-lg text-xs text-gray-400 hover:text-white hover:bg-gray-800 border border-gray-700/50 transition-all flex items-center gap-1.5"
+              >
+                <Archive size={12} /> Archive
+              </button>
+
+              {/* Delete */}
+              <button
+                onClick={() => setShowConfirmDelete(true)}
+                className="px-2.5 py-1.5 rounded-lg text-xs text-red-500 hover:text-red-400 hover:bg-red-500/10 border border-red-500/20 transition-all flex items-center gap-1.5"
+              >
+                <Trash2 size={12} /> Delete
+              </button>
             </div>
           </div>
         </div>
 
+        {/* Vertical divider */}
+        <div className="w-px self-stretch bg-gray-800" />
+
         {/* ── Right panel (60%) — AI Workspace ── */}
         <div className="flex-1 min-w-0">
+          <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">AI Assist</h3>
           <AIWorkspace task={task} project={project} customer={customer} />
         </div>
       </div>
@@ -1733,6 +1716,28 @@ function TaskDetailView({ task, project, customer, onBack }) {
           danger={false}
           onConfirm={() => { stopTimer(); setTimerConflict(false); }}
           onCancel={() => setTimerConflict(false)}
+        />
+      )}
+
+      {/* Archive confirmation dialog */}
+      {showConfirmArchive && (
+        <ConfirmDialog
+          title="Archive Task"
+          message={`Archive "${task.description}"? You can find it later under the Closed tab.`}
+          danger={false}
+          onConfirm={() => { updateTask(task.id, { status: 'archived' }); setShowConfirmArchive(false); onBack(); }}
+          onCancel={() => setShowConfirmArchive(false)}
+        />
+      )}
+
+      {/* Delete confirmation dialog */}
+      {showConfirmDelete && (
+        <ConfirmDialog
+          title="Delete Task"
+          message={`Permanently delete "${task.description}"? This cannot be undone.`}
+          danger={true}
+          onConfirm={() => { deleteTask(task.id); setShowConfirmDelete(false); onBack(); }}
+          onCancel={() => setShowConfirmDelete(false)}
         />
       )}
     </div>

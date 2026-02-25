@@ -109,7 +109,9 @@ export default function Analytics({ onNavigate }) {
     const map = {};
     filteredPoints.forEach(p => {
       const proj = projects.find(pr => pr.id === p.projectId);
-      const okrId = proj?.okrId || '_none';
+      const rawOkrId = proj?.okrId;
+      // Validate that the OKR still exists; otherwise group as unassigned
+      const okrId = (rawOkrId && okrs.some(o => o.id === rawOkrId)) ? rawOkrId : '_none';
       if (!map[okrId]) map[okrId] = { pts: 0, hrs: 0 };
       map[okrId].pts += p.points;
       map[okrId].hrs += p.hours;
@@ -117,7 +119,7 @@ export default function Analytics({ onNavigate }) {
     return Object.entries(map)
       .map(([id, v]) => {
         const okr = okrs.find(o => o.id === id);
-        return { name: okr?.title || 'No OKR', pts: v.pts, hrs: parseFloat(v.hrs.toFixed(1)) };
+        return { name: okr?.title || 'Unassigned', pts: v.pts, hrs: parseFloat(v.hrs.toFixed(1)) };
       })
       .sort((a, b) => b.pts - a.pts);
   }, [filteredPoints, projects, okrs]);
@@ -193,25 +195,31 @@ export default function Analytics({ onNavigate }) {
       <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4">
         <div className="flex flex-wrap items-center gap-3">
           {/* Range */}
-          <div className="flex bg-gray-800 rounded-xl p-1 gap-1">
-            {[['thisWeek', 'This Week'], ['lastWeek', 'Last Week'], ['custom', 'Custom']].map(([v, l]) => (
-              <button key={v} onClick={() => setRangeMode(v)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${rangeMode === v ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}>{l}</button>
-            ))}
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wider">Time Period</span>
+            <div className="flex bg-gray-800 rounded-xl p-1 gap-1">
+              {[['thisWeek', 'This Week'], ['lastWeek', 'Last Week'], ['custom', 'Custom']].map(([v, l]) => (
+                <button key={v} onClick={() => setRangeMode(v)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${rangeMode === v ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}>{l}</button>
+              ))}
+            </div>
           </div>
           {rangeMode === 'custom' && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 self-end">
               <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className={inputClass} />
               <span className="text-gray-500 text-sm">to</span>
               <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className={inputClass} />
             </div>
           )}
           {/* Divider between filter groups */}
-          <div className="w-px h-6 bg-gray-700 flex-shrink-0" />
+          <div className="w-px h-10 bg-gray-700 flex-shrink-0 self-end" />
           {/* Granularity */}
-          <div aria-label="View by" className="flex bg-gray-800 rounded-xl p-1 gap-1">
-            {[['daily', 'Daily'], ['weekly', 'Weekly'], ['monthly', 'Monthly']].map(([v, l]) => (
-              <button key={v} onClick={() => setGranularity(v)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${granularity === v ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}>{l}</button>
-            ))}
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wider">Granularity</span>
+            <div aria-label="View by" className="flex bg-gray-800 rounded-xl p-1 gap-1">
+              {[['daily', 'Daily'], ['weekly', 'Weekly'], ['monthly', 'Monthly']].map(([v, l]) => (
+                <button key={v} onClick={() => setGranularity(v)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${granularity === v ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}>{l}</button>
+              ))}
+            </div>
           </div>
           <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer select-none">
             <input type="checkbox" checked={compareWeeks} onChange={e => setCompareWeeks(e.target.checked)} className="rounded" />

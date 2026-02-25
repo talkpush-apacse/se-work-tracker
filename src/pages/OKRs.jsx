@@ -37,6 +37,7 @@ function OkrForm({ initial = {}, onSubmit, onCancel }) {
     description: initial.description || '',
     quarter: initial.quarter || CURRENT_QUARTER,
     keyResults: initial.keyResults || [],
+    targetPoints: initial.targetPoints ?? null,
   });
   const [errors, setErrors] = useState({});
 
@@ -65,6 +66,7 @@ function OkrForm({ initial = {}, onSubmit, onCancel }) {
       title: form.title.trim(),
       description: form.description.trim(),
       quarter: form.quarter,
+      targetPoints: form.targetPoints,
       keyResults: form.keyResults.filter(kr => kr.text.trim()).map(kr => ({
         ...kr,
         text: kr.text.trim(),
@@ -75,7 +77,7 @@ function OkrForm({ initial = {}, onSubmit, onCancel }) {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {/* Quarter + Title */}
-      <div className="grid grid-cols-[160px_1fr] gap-3">
+      <div className="grid grid-cols-[160px_1fr_120px] gap-3">
         <div>
           <label className="block text-xs font-medium text-gray-400 mb-1.5">Quarter</label>
           <select
@@ -97,6 +99,20 @@ function OkrForm({ initial = {}, onSubmit, onCancel }) {
             className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
           />
           {errors.title && <p className="mt-1 text-xs text-red-400">{errors.title}</p>}
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-400 mb-1.5">Target Pts</label>
+          <input
+            type="number"
+            min={0}
+            value={form.targetPoints ?? ''}
+            onChange={e => setForm(p => ({
+              ...p,
+              targetPoints: e.target.value === '' ? null : Math.max(0, Number(e.target.value)),
+            }))}
+            placeholder="e.g. 50"
+            className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+          />
         </div>
       </div>
 
@@ -245,6 +261,34 @@ function KrProgress({ keyResults }) {
   );
 }
 
+// ─── Points-based progress bar ────────────────────────────────────────────────
+function PointsProgress({ totalPoints, targetPoints, onSetTarget }) {
+  if (!targetPoints) {
+    return (
+      <button
+        onClick={(e) => { e.stopPropagation(); onSetTarget(); }}
+        className="flex items-center gap-1.5 mt-1.5 text-[10px] text-gray-600 hover:text-gray-400 transition-colors"
+      >
+        <Target size={10} /> Set point target to track progress
+      </button>
+    );
+  }
+
+  const pct = Math.min(100, Math.round((totalPoints / targetPoints) * 100));
+
+  return (
+    <div className="flex items-center gap-2 mt-1.5">
+      <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all ${pct >= 100 ? 'bg-emerald-500' : pct >= 50 ? 'bg-teal-500' : 'bg-gray-600'}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <span className="text-[10px] font-semibold text-gray-500">{totalPoints}/{targetPoints} pts ({pct}%)</span>
+    </div>
+  );
+}
+
 // ─── Main OKRs page ───────────────────────────────────────────────────────────
 export default function OKRs() {
   const { okrs, projects, points, tasks, addOkr, updateOkr, deleteOkr } = useAppStore();
@@ -355,6 +399,13 @@ export default function OKRs() {
 
                             {/* KR progress bar */}
                             <KrProgress keyResults={keyResults} />
+
+                            {/* Points-based progress bar */}
+                            <PointsProgress
+                              totalPoints={totalPoints}
+                              targetPoints={okr.targetPoints}
+                              onSetTarget={() => setEditTarget(okr)}
+                            />
 
                             <div className="flex items-center gap-4 mt-2 flex-wrap">
                               <span className="text-xs text-gray-500">{linkedProjects.length} project{linkedProjects.length !== 1 ? 's' : ''}</span>
