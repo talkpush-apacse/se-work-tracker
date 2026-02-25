@@ -248,23 +248,62 @@ export default function Customers() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
-  // Sort: pinned first, then preserve store order within each group
-  const sortedCustomers = [...customers].sort((a, b) => {
-    if (!!a.pinned === !!b.pinned) return 0;
-    return !!b.pinned - !!a.pinned;
-  });
+  // Split into pinned / unpinned while preserving store order within each group
+  const pinnedCustomers = customers.filter(c => !!c.pinned);
+  const unpinnedCustomers = customers.filter(c => !c.pinned);
 
   const handlePin = (id, value) => updateCustomer(id, { pinned: value });
 
-  const handleDragEnd = (event) => {
+  // Helper: compute stats for a customer (avoids duplication across sections)
+  const getCustomerStats = (customer) => {
+    const linkedProjects = projects.filter(p => p.customerId === customer.id);
+    const totalPoints = linkedProjects.reduce((s, proj) =>
+      s + points.filter(pt => pt.projectId === proj.id).reduce((ss, e) => ss + e.points, 0), 0);
+    const totalHours = linkedProjects.reduce((s, proj) =>
+      s + points.filter(pt => pt.projectId === proj.id).reduce((ss, e) => ss + e.hours, 0), 0);
+    const taskPts = linkedProjects.reduce((s, proj) =>
+      s + tasks.filter(t => t.projectId === proj.id).reduce((ss, t) => ss + (t.points || 0), 0), 0);
+    return { linkedProjects, totalPoints, totalHours, taskPts };
+  };
+
+  // Drag handler for pinned section — reorder within pinned, keep unpinned order
+  const handlePinnedDragEnd = (event) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
+    const oldIndex = pinnedCustomers.findIndex(c => c.id === active.id);
+    const newIndex = pinnedCustomers.findIndex(c => c.id === over.id);
+    const reordered = arrayMove(pinnedCustomers, oldIndex, newIndex);
+    reorderCustomers([...reordered.map(c => c.id), ...unpinnedCustomers.map(c => c.id)]);
+  };
 
-    // Determine new order within the full sorted list
-    const oldIndex = sortedCustomers.findIndex(c => c.id === active.id);
-    const newIndex = sortedCustomers.findIndex(c => c.id === over.id);
-    const reordered = arrayMove(sortedCustomers, oldIndex, newIndex);
-    reorderCustomers(reordered.map(c => c.id));
+  // Drag handler for unpinned section — reorder within unpinned, keep pinned order
+  const handleUnpinnedDragEnd = (event) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = unpinnedCustomers.findIndex(c => c.id === active.id);
+    const newIndex = unpinnedCustomers.findIndex(c => c.id === over.id);
+    const reordered = arrayMove(unpinnedCustomers, oldIndex, newIndex);
+    reorderCustomers([...pinnedCustomers.map(c => c.id), ...reordered.map(c => c.id)]);
+  };
+
+  // Render a customer row with stats
+  const renderCustomerRow = (customer) => {
+    const { linkedProjects, totalPoints, totalHours, taskPts } = getCustomerStats(customer);
+    return (
+      <SortableCustomerRow
+        key={customer.id}
+        customer={customer}
+        linkedProjects={linkedProjects}
+        totalPoints={totalPoints}
+        totalHours={totalHours}
+        taskPts={taskPts}
+        okrs={okrs}
+        onEdit={setEditTarget}
+        onDelete={setDeleteTarget}
+        onPin={handlePin}
+        onAddProject={(data) => addProject(data)}
+      />
+    );
   };
 
   return (
@@ -297,39 +336,42 @@ export default function Customers() {
           <button onClick={() => setCreateModal(true)} className="mt-3 text-sm text-indigo-400 hover:text-indigo-300">Add your first customer →</button>
         </div>
       ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={sortedCustomers.map(c => c.id)} strategy={verticalListSortingStrategy}>
-            <div className="flex flex-col gap-3">
-              {sortedCustomers.map(customer => {
-                const linkedProjects = projects.filter(p => p.customerId === customer.id);
-                const totalPoints = linkedProjects.reduce((s, proj) => {
-                  return s + points.filter(pt => pt.projectId === proj.id).reduce((ss, e) => ss + e.points, 0);
-                }, 0);
-                const totalHours = linkedProjects.reduce((s, proj) => {
-                  return s + points.filter(pt => pt.projectId === proj.id).reduce((ss, e) => ss + e.hours, 0);
-                }, 0);
-                const taskPts = linkedProjects.reduce((s, proj) =>
-                  s + tasks.filter(t => t.projectId === proj.id).reduce((ss, t) => ss + (t.points || 0), 0), 0);
-
-                return (
-                  <SortableCustomerRow
-                    key={customer.id}
-                    customer={customer}
-                    linkedProjects={linkedProjects}
-                    totalPoints={totalPoints}
-                    totalHours={totalHours}
-                    taskPts={taskPts}
-                    okrs={okrs}
-                    onEdit={setEditTarget}
-                    onDelete={setDeleteTarget}
-                    onPin={handlePin}
-                    onAddProject={(data) => addProject(data)}
-                  />
-                );
-              })}
+        <div className="space-y-6">
+          {/* Priority section */}
+          {pinnedCustomers.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <Pin size={13} className="text-amber-400" />
+                <span className="text-sm font-semibold text-amber-300">Priority</span>
+                <span className="text-xs text-gray-600">({pinnedCustomers.length})</span>
+              </div>
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handlePinnedDragEnd}>
+                <SortableContext items={pinnedCustomers.map(c => c.id)} strategy={verticalListSortingStrategy}>
+                  <div className="flex flex-col gap-3">
+                    {pinnedCustomers.map(renderCustomerRow)}
+                  </div>
+                </SortableContext>
+              </DndContext>
             </div>
-          </SortableContext>
-        </DndContext>
+          )}
+
+          {/* Non-Priority section */}
+          {unpinnedCustomers.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-sm font-semibold text-gray-400">Non Priority</span>
+                <span className="text-xs text-gray-600">({unpinnedCustomers.length})</span>
+              </div>
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleUnpinnedDragEnd}>
+                <SortableContext items={unpinnedCustomers.map(c => c.id)} strategy={verticalListSortingStrategy}>
+                  <div className="flex flex-col gap-3">
+                    {unpinnedCustomers.map(renderCustomerRow)}
+                  </div>
+                </SortableContext>
+              </DndContext>
+            </div>
+          )}
+        </div>
       )}
 
       {createModal && (

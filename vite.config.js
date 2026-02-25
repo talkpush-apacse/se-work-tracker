@@ -13,7 +13,12 @@ export default defineConfig({
       // Pre-cache all static assets produced by the build
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
-        // No runtime caching — API/Supabase calls intentionally excluded
+        // Ensure old caches are cleaned up on update (fixes stale iOS PWA)
+        cleanupOutdatedCaches: true,
+        // Never intercept API calls — let them go straight to the network
+        navigateFallbackDenylist: [/^\/api\//],
+        skipWaiting: true,
+        clientsClaim: true,
       },
 
       // Web App Manifest

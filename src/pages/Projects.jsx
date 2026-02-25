@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, ChevronLeft, ChevronRight, Pencil, Trash2, ArrowLeft, Clock, Zap, Calendar, CheckCircle2, PauseCircle, XCircle, LayoutGrid, List, Timer, Square, ListPlus, NotebookPen, Pin, PinOff, Flag } from 'lucide-react';
+import { Plus, ChevronLeft, ChevronRight, Pencil, Trash2, ArrowLeft, Clock, Zap, Calendar, CheckCircle2, PauseCircle, XCircle, Timer, Square, ListPlus, NotebookPen, Pin, PinOff } from 'lucide-react';
 import { useAppStore } from '../context/StoreContext';
 import { useTimerContext } from '../context/TimerContext';
 import Modal from '../components/Modal';
@@ -1003,8 +1003,7 @@ export default function Projects({ initialProjectId, onProjectSelect }) {
   const [selectedId, setSelectedId] = useState(initialProjectId || null);
   const [createModal, setCreateModal] = useState(false);
   const [bulkProjectsModal, setBulkProjectsModal] = useState(false);
-  const [groupBy, setGroupBy] = useState('customer'); // 'customer' | 'okr'
-  const [statusFilter, setStatusFilter] = useState('All');
+  const [viewTab, setViewTab] = useState('priority'); // 'priority' | 'non-priority'
 
   const selectedProject = projects.find(p => p.id === selectedId);
 
@@ -1012,30 +1011,9 @@ export default function Projects({ initialProjectId, onProjectSelect }) {
     return <ProjectDetail project={selectedProject} onBack={() => setSelectedId(null)} />;
   }
 
-  const filtered = statusFilter === 'All' ? projects : projects.filter(p => p.status === statusFilter);
-
-  // Pinned projects — shown in the Priority section above all groups
-  const pinnedProjects = filtered.filter(p => !!p.pinned);
-  // Unpinned only go into the group sections
-  const unpinned = filtered.filter(p => !p.pinned);
-
-  // Group projects (unpinned only — pinned ones live in the Priority section)
-  const groups = {};
-  if (groupBy === 'customer') {
-    customers.forEach(c => { groups[c.id] = { label: c.name, color: c.color, items: [] }; });
-    groups['_none'] = { label: 'No Customer', color: '#6b7280', items: [] };
-    unpinned.forEach(p => {
-      const key = customers.find(c => c.id === p.customerId) ? p.customerId : '_none';
-      if (groups[key]) groups[key].items.push(p);
-    });
-  } else {
-    okrs.forEach(o => { groups[o.id] = { label: o.title, color: '#6366f1', items: [] }; });
-    groups['_none'] = { label: 'No OKR', color: '#6b7280', items: [] };
-    unpinned.forEach(p => {
-      const key = okrs.find(o => o.id === p.okrId) ? p.okrId : '_none';
-      if (groups[key]) groups[key].items.push(p);
-    });
-  }
+  const pinnedProjects = projects.filter(p => !!p.pinned);
+  const unpinnedProjects = projects.filter(p => !p.pinned);
+  const displayedProjects = viewTab === 'priority' ? pinnedProjects : unpinnedProjects;
 
   const handlePin = (id, value) => updateProject(id, { pinned: value });
 
@@ -1059,87 +1037,66 @@ export default function Projects({ initialProjectId, onProjectSelect }) {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div aria-label="Group by" className="flex bg-gray-800 rounded-xl p-1 gap-1">
-          {['customer', 'okr'].map(g => (
-            <button
-              key={g}
-              onClick={() => setGroupBy(g)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all capitalize ${groupBy === g ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}
-            >
-              By {g === 'okr' ? 'OKR' : 'Customer'}
-            </button>
-          ))}
-        </div>
-        {/* Divider between filter groups */}
-        <div className="w-px h-6 bg-gray-700 flex-shrink-0" />
-        <div aria-label="Filter by status" className="flex bg-gray-800 rounded-xl p-1 gap-1">
-          {['All', ...PROJECT_STATUSES].map(s => (
-            <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${statusFilter === s ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
+      {/* Priority / Non-Priority tab switcher */}
+      <div className="flex gap-1 bg-gray-800/50 rounded-xl p-1 w-fit">
+        <button
+          onClick={() => setViewTab('priority')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+            viewTab === 'priority' ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-400 hover:text-white'
+          }`}
+        >
+          <Pin size={11} className={viewTab === 'priority' ? 'text-amber-400' : ''} />
+          Priority
+          {pinnedProjects.length > 0 && (
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+              viewTab === 'priority' ? 'bg-amber-500/20 text-amber-400' : 'bg-gray-700 text-gray-400'
+            }`}>
+              {pinnedProjects.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setViewTab('non-priority')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+            viewTab === 'non-priority' ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-400 hover:text-white'
+          }`}
+        >
+          Non Priority
+          {unpinnedProjects.length > 0 && (
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+              viewTab === 'non-priority' ? 'bg-gray-600 text-gray-300' : 'bg-gray-700 text-gray-400'
+            }`}>
+              {unpinnedProjects.length}
+            </span>
+          )}
+        </button>
       </div>
 
-      {/* Priority Projects — pinned items float above all groups */}
-      {pinnedProjects.length > 0 && (
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <Pin size={13} className="text-amber-400" />
-            <span className="text-sm font-semibold text-amber-300">Priority</span>
-            <span className="text-xs text-gray-600">({pinnedProjects.length})</span>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {pinnedProjects.map(project => (
-              <ProjectCard
-                key={project.id}
-                project={project}
-                customers={customers}
-                okrs={okrs}
-                onSelect={setSelectedId}
-                onPin={handlePin}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Groups */}
-      {Object.entries(groups).filter(([, g]) => g.items.length > 0).length === 0 && pinnedProjects.length === 0 ? (
+      {/* Project grid */}
+      {displayedProjects.length === 0 ? (
         <div className="bg-gray-900 border border-gray-800 rounded-2xl py-16 text-center">
-          <p className="text-gray-500 text-sm">No projects found.</p>
-          <button onClick={() => setCreateModal(true)} className="mt-3 text-sm text-indigo-400 hover:text-indigo-300">Create your first project →</button>
+          <p className="text-gray-500 text-sm">
+            {viewTab === 'priority' ? 'No priority projects.' : 'No non-priority projects.'}
+          </p>
+          <p className="text-gray-600 text-xs mt-1">
+            {viewTab === 'priority'
+              ? 'Pin a project to make it priority.'
+              : 'All projects are pinned as priority.'}
+          </p>
         </div>
       ) : (
-        Object.entries(groups)
-          .filter(([, g]) => g.items.length > 0)
-          .map(([key, group]) => (
-            <div key={key}>
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: group.color }} />
-                <span className="text-sm font-semibold text-gray-300 truncate max-w-xs">{group.label}</span>
-                <span className="text-xs text-gray-600">({group.items.length})</span>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {group.items.map(project => (
-                  <ProjectCard
-                    key={project.id}
-                    project={project}
-                    customers={customers}
-                    okrs={okrs}
-                    onSelect={setSelectedId}
-                    onPin={handlePin}
-                  />
-                ))}
-              </div>
-            </div>
-          ))
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {displayedProjects.map(project => (
+            <ProjectCard
+              key={project.id}
+              project={project}
+              customers={customers}
+              okrs={okrs}
+              onSelect={setSelectedId}
+              onPin={handlePin}
+            />
+          ))}
+        </div>
       )}
 
       {createModal && (

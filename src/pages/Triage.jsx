@@ -4,7 +4,7 @@ import {
   Loader2, ClipboardList, Sparkles, ChevronRight,
   Calendar, User, Tag, AlertCircle, Archive, ArchiveX,
   Settings, RotateCcw, Pencil, GripVertical, ExternalLink, ArrowLeft,
-  Timer, Square,
+  Timer, Square, Pin, CheckSquare,
 } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
@@ -1362,7 +1362,7 @@ function QuickAddTaskForm({ projects, customers, onSubmit, onCancel }) {
 }
 
 // ─── Sortable task row (compact queue card with drag handle) ──────────────────
-function SortableTaskRow({ task, project, customer, onOpenDetail }) {
+function SortableTaskRow({ task, project, customer, onOpenDetail, isSelected, onToggleSelect }) {
   const { updateTask } = useAppStore();
   const { isRunning, taskId: runningTaskId } = useTimerContext();
   const isTimerActive = isRunning && runningTaskId === task.id;
@@ -1382,8 +1382,23 @@ function SortableTaskRow({ task, project, customer, onOpenDetail }) {
     <div
       ref={setNodeRef}
       style={style}
-      className="flex items-center gap-2 bg-gray-800/50 border border-gray-700/60 rounded-xl px-3 py-2.5 hover:border-gray-600 transition-all"
+      className={`flex items-center gap-2 rounded-xl px-3 py-2.5 transition-all ${
+        isSelected
+          ? 'bg-indigo-600/10 border border-indigo-500/40'
+          : 'bg-gray-800/50 border border-gray-700/60 hover:border-gray-600'
+      }`}
     >
+      {/* Bulk select checkbox */}
+      {onToggleSelect && (
+        <input
+          type="checkbox"
+          checked={!!isSelected}
+          onChange={() => onToggleSelect(task.id)}
+          onClick={e => e.stopPropagation()}
+          className="w-3.5 h-3.5 rounded border-gray-600 bg-gray-800 text-indigo-500 focus:ring-indigo-500/40 focus:ring-1 flex-shrink-0 cursor-pointer accent-indigo-500"
+        />
+      )}
+
       {/* Drag handle */}
       <button
         {...attributes}
@@ -1739,6 +1754,13 @@ export default function Triage() {
   // 'active' tab: open/in-progress/blocked; 'closed' tab: done + archived
   const [boardTab, setBoardTab] = useState('active');
 
+  // Priority quick-filter toggles
+  const [filterPriorityProjects, setFilterPriorityProjects] = useState(false);
+  const [filterPriorityClients, setFilterPriorityClients] = useState(false);
+
+  // Bulk selection state
+  const [selectedTaskIds, setSelectedTaskIds] = useState(new Set());
+
   // dnd-kit sensors
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -1756,6 +1778,7 @@ export default function Triage() {
   const handleCustomerFilter = (val) => {
     setFilterCustomerId(val);
     setFilterProjectId('');
+    clearSelection();
   };
 
   // Untriaged entries, sorted newest meeting date first
@@ -1784,6 +1807,15 @@ export default function Triage() {
     if (filterProjectId && t.projectId !== filterProjectId) return false;
     if (filterTaskType && t.taskType !== filterTaskType) return false;
     if (filterStatus   && t.status   !== filterStatus)   return false;
+    if (filterPriorityProjects) {
+      const proj = projects.find(p => p.id === t.projectId);
+      if (!proj?.pinned) return false;
+    }
+    if (filterPriorityClients) {
+      const proj = projects.find(p => p.id === t.projectId);
+      const cust = customers.find(c => c.id === proj?.customerId);
+      if (!cust?.pinned) return false;
+    }
     return true;
   });
 
@@ -1796,10 +1828,36 @@ export default function Triage() {
     }
     if (filterProjectId && t.projectId !== filterProjectId) return false;
     if (filterTaskType && t.taskType !== filterTaskType) return false;
+    if (filterPriorityProjects) {
+      const proj = projects.find(p => p.id === t.projectId);
+      if (!proj?.pinned) return false;
+    }
+    if (filterPriorityClients) {
+      const proj = projects.find(p => p.id === t.projectId);
+      const cust = customers.find(c => c.id === proj?.customerId);
+      if (!cust?.pinned) return false;
+    }
     return true;
   });
 
-  const filtersActive = filterCustomerId || filterProjectId || filterTaskType || filterStatus;
+  const filtersActive = filterCustomerId || filterProjectId || filterTaskType || filterStatus || filterPriorityProjects || filterPriorityClients;
+
+  // Bulk action helpers
+  const toggleSelect = (id) => setSelectedTaskIds(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+  const selectAll = () => setSelectedTaskIds(new Set(activeTasks.map(t => t.id)));
+  const clearSelection = () => setSelectedTaskIds(new Set());
+  const handleBulkStatus = (status) => {
+    selectedTaskIds.forEach(id => updateTask(id, { status }));
+    clearSelection();
+  };
+  const handleBulkArchive = () => {
+    selectedTaskIds.forEach(id => updateTask(id, { status: 'archived' }));
+    clearSelection();
+  };
 
   // Task detail open/close
   const handleOpenDetail = (task) => setTaskDetailId(task.id);
@@ -1947,7 +2005,7 @@ export default function Triage() {
           </select>
           <select
             value={filterProjectId}
-            onChange={e => setFilterProjectId(e.target.value)}
+            onChange={e => { setFilterProjectId(e.target.value); clearSelection(); }}
             className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
             disabled={projectsForFilter.length === 0}
           >
@@ -1958,11 +2016,35 @@ export default function Triage() {
           </select>
         </div>
 
+        {/* Priority quick-filter toggles */}
+        <div className="flex gap-2 mb-2">
+          <button
+            onClick={() => { setFilterPriorityProjects(v => !v); clearSelection(); }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+              filterPriorityProjects
+                ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-amber-300 hover:border-amber-500/40'
+            }`}
+          >
+            <Pin size={11} /> Priority Projects
+          </button>
+          <button
+            onClick={() => { setFilterPriorityClients(v => !v); clearSelection(); }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+              filterPriorityClients
+                ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-amber-300 hover:border-amber-500/40'
+            }`}
+          >
+            <Pin size={11} /> Priority Clients
+          </button>
+        </div>
+
         {/* Filter bar — row 2: task type + status + clear */}
         <div className="flex gap-2 mb-3">
           <select
             value={filterTaskType}
-            onChange={e => setFilterTaskType(e.target.value)}
+            onChange={e => { setFilterTaskType(e.target.value); clearSelection(); }}
             className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
           >
             <option value="">All types</option>
@@ -1974,7 +2056,7 @@ export default function Triage() {
           {boardTab === 'active' && (
             <select
               value={filterStatus}
-              onChange={e => setFilterStatus(e.target.value)}
+              onChange={e => { setFilterStatus(e.target.value); clearSelection(); }}
               className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
             >
               <option value="">All statuses</option>
@@ -1990,6 +2072,9 @@ export default function Triage() {
                 setFilterProjectId('');
                 setFilterTaskType('');
                 setFilterStatus('');
+                setFilterPriorityProjects(false);
+                setFilterPriorityClients(false);
+                clearSelection();
               }}
               className="px-2.5 py-2 rounded-xl bg-gray-800 border border-gray-700 text-[10px] text-gray-400 hover:text-white hover:border-gray-600 transition-colors flex-shrink-0"
               title="Clear all filters"
@@ -2002,7 +2087,7 @@ export default function Triage() {
         {/* Active / Closed tab switcher */}
         <div className="flex gap-1 bg-gray-800/50 rounded-xl p-1 mb-3 w-fit">
           <button
-            onClick={() => { setBoardTab('active'); setFilterStatus('open'); setFilterCustomerId(''); setFilterProjectId(''); setFilterTaskType(''); }}
+            onClick={() => { setBoardTab('active'); setFilterStatus('open'); setFilterCustomerId(''); setFilterProjectId(''); setFilterTaskType(''); setFilterPriorityProjects(false); setFilterPriorityClients(false); clearSelection(); }}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
               boardTab === 'active' ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-400 hover:text-white'
             }`}
@@ -2010,7 +2095,7 @@ export default function Triage() {
             Active ({activeTasks.length})
           </button>
           <button
-            onClick={() => { setBoardTab('closed'); setFilterStatus(''); setFilterCustomerId(''); setFilterProjectId(''); setFilterTaskType(''); }}
+            onClick={() => { setBoardTab('closed'); setFilterStatus(''); setFilterCustomerId(''); setFilterProjectId(''); setFilterTaskType(''); setFilterPriorityProjects(false); setFilterPriorityClients(false); clearSelection(); }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
               boardTab === 'closed' ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-400 hover:text-white'
             }`}
@@ -2025,6 +2110,46 @@ export default function Triage() {
             )}
           </button>
         </div>
+
+        {/* Bulk action bar — shown when tasks are selected */}
+        {boardTab === 'active' && selectedTaskIds.size > 0 && (
+          <div className="flex items-center gap-3 bg-indigo-600/10 border border-indigo-500/30 rounded-xl px-4 py-2.5 mb-3 flex-wrap">
+            <div className="flex items-center gap-1.5">
+              <CheckSquare size={13} className="text-indigo-400" />
+              <span className="text-xs font-semibold text-indigo-300">{selectedTaskIds.size} selected</span>
+            </div>
+            <div className="flex items-center gap-2 ml-auto">
+              <button
+                onClick={selectAll}
+                className="px-2.5 py-1 rounded-lg bg-gray-800 border border-gray-700 text-[10px] font-medium text-gray-400 hover:text-white hover:border-gray-600 transition-colors"
+              >
+                Select All
+              </button>
+              <button
+                onClick={clearSelection}
+                className="px-2.5 py-1 rounded-lg bg-gray-800 border border-gray-700 text-[10px] font-medium text-gray-400 hover:text-white hover:border-gray-600 transition-colors"
+              >
+                Clear
+              </button>
+              <select
+                onChange={e => { if (e.target.value) handleBulkStatus(e.target.value); e.target.value = ''; }}
+                className="bg-gray-800 border border-gray-700 rounded-lg px-2.5 py-1 text-[10px] font-medium text-gray-300 focus:outline-none focus:border-indigo-500 cursor-pointer"
+                defaultValue=""
+              >
+                <option value="" disabled>Set Status…</option>
+                {TASK_STATUSES.map(s => (
+                  <option key={s} value={s} className="bg-gray-800 text-white">{TASK_STATUS_LABELS[s]}</option>
+                ))}
+              </select>
+              <button
+                onClick={handleBulkArchive}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gray-800 border border-gray-700 text-[10px] font-medium text-gray-400 hover:text-amber-400 hover:border-amber-500/40 transition-colors"
+              >
+                <Archive size={11} /> Archive
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Active tab — draggable task list */}
         {boardTab === 'active' && (
@@ -2050,6 +2175,8 @@ export default function Triage() {
                         project={project}
                         customer={customer}
                         onOpenDetail={handleOpenDetail}
+                        isSelected={selectedTaskIds.has(task.id)}
+                        onToggleSelect={toggleSelect}
                       />
                     );
                   })}
