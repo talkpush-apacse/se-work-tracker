@@ -4,7 +4,7 @@ import {
   Loader2, ClipboardList, Sparkles, ChevronRight,
   Calendar, User, Tag, AlertCircle, Archive, ArchiveX, Trash2,
   Settings, RotateCcw, Pencil, GripVertical, ExternalLink, ArrowLeft,
-  Timer, Square, Pin, CheckSquare,
+  Timer, Square, Pin, CheckSquare, Paperclip,
 } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
@@ -12,6 +12,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { useAppStore } from '../context/StoreContext';
 import { useTimerContext } from '../context/TimerContext';
 import ConfirmDialog from '../components/ConfirmDialog';
+import FileAttachments from '../components/FileAttachments';
 import {
   TASK_TYPES, TASK_TYPE_LABELS, TASK_TYPE_COLORS,
   TASK_STATUSES, TASK_STATUS_LABELS, TASK_STATUS_COLORS,
@@ -1640,6 +1641,17 @@ function TaskDetailView({ task, project, customer, onBack }) {
               rows={12}
               className="w-full bg-gray-800/60 border border-gray-700/50 rounded-xl px-3 py-2.5 text-sm text-gray-300 placeholder:text-gray-600 resize-y focus:outline-none focus:border-gray-600"
             />
+
+            {/* File Attachments */}
+            <div className="mt-3">
+              <label className="text-xs font-medium text-gray-400 mb-1.5 flex items-center gap-1">
+                <Paperclip size={11} /> Attachments
+              </label>
+              <FileAttachments
+                attachments={task.attachments || []}
+                onUpdate={(att) => updateTask(task.id, { attachments: att })}
+              />
+            </div>
           </div>
 
           {/* Footer: meta info + timer + archive */}
