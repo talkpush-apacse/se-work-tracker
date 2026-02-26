@@ -1365,7 +1365,7 @@ function QuickAddTaskForm({ projects, customers, onSubmit, onCancel }) {
 }
 
 // ─── Sortable task row (compact queue card with drag handle) ──────────────────
-function SortableTaskRow({ task, project, customer, onOpenDetail, isSelected, onToggleSelect }) {
+function SortableTaskRow({ task, project, customer, onOpenDetail, isSelected, onToggleSelect, onStatusChange }) {
   const { updateTask } = useAppStore();
   const { isRunning, taskId: runningTaskId } = useTimerContext();
   const isTimerActive = isRunning && runningTaskId === task.id;
@@ -1458,7 +1458,10 @@ function SortableTaskRow({ task, project, customer, onOpenDetail, isSelected, on
       <div onClick={e => e.stopPropagation()} className="flex-shrink-0">
         <select
           value={task.status}
-          onChange={e => updateTask(task.id, { status: e.target.value })}
+          onChange={e => {
+            updateTask(task.id, { status: e.target.value });
+            onStatusChange?.(e.target.value);
+          }}
           className={`text-[10px] font-semibold rounded-lg px-2 py-1 border cursor-pointer focus:outline-none ${statusColors.bg} ${statusColors.text} ${statusColors.border} bg-transparent`}
         >
           {TASK_STATUSES.map(s => (
@@ -1866,10 +1869,26 @@ export default function Triage() {
   const handleBulkStatus = (status) => {
     selectedTaskIds.forEach(id => updateTask(id, { status }));
     clearSelection();
+    if (status === 'done' || status === 'archived') {
+      setBoardTab('closed');
+      setFilterStatus('');
+      setFilterCustomerId('');
+      setFilterProjectId('');
+      setFilterTaskType('');
+      setFilterPriorityProjects(false);
+      setFilterPriorityClients(false);
+    }
   };
   const handleBulkArchive = () => {
     selectedTaskIds.forEach(id => updateTask(id, { status: 'archived' }));
     clearSelection();
+    setBoardTab('closed');
+    setFilterStatus('');
+    setFilterCustomerId('');
+    setFilterProjectId('');
+    setFilterTaskType('');
+    setFilterPriorityProjects(false);
+    setFilterPriorityClients(false);
   };
 
   // ── Auto-timer: start on task open, stop + auto-save points on close ───
@@ -1900,6 +1919,18 @@ export default function Triage() {
     // Auto-stop timer if running for the current task
     if (isRunning && runningTaskId === taskDetailId) {
       autoSaveSession(stopTimer({ silent: true }));
+    }
+    // If the task was marked done/archived while in the detail view, switch to Closed tab
+    const closedTask = tasks.find(t => t.id === taskDetailId);
+    if (closedTask && (closedTask.status === 'done' || closedTask.status === 'archived')) {
+      setBoardTab('closed');
+      setFilterStatus('');
+      setFilterCustomerId('');
+      setFilterProjectId('');
+      setFilterTaskType('');
+      setFilterPriorityProjects(false);
+      setFilterPriorityClients(false);
+      clearSelection();
     }
     setTaskDetailId(null);
   };
@@ -2218,6 +2249,18 @@ export default function Triage() {
                         onOpenDetail={handleOpenDetail}
                         isSelected={selectedTaskIds.has(task.id)}
                         onToggleSelect={toggleSelect}
+                        onStatusChange={(newStatus) => {
+                          if (newStatus === 'done' || newStatus === 'archived') {
+                            setBoardTab('closed');
+                            setFilterStatus('');
+                            setFilterCustomerId('');
+                            setFilterProjectId('');
+                            setFilterTaskType('');
+                            setFilterPriorityProjects(false);
+                            setFilterPriorityClients(false);
+                            clearSelection();
+                          }
+                        }}
                       />
                     );
                   })}
@@ -2238,7 +2281,7 @@ export default function Triage() {
           ) : (
             <div className="space-y-2">
               {closedTasks
-                .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+                .sort((a, b) => new Date(b.closedAt || b.createdAt) - new Date(a.closedAt || a.createdAt))
                 .map(task => {
                   const project  = projects.find(p => p.id === task.projectId);
                   const customer = customers.find(c => c.id === project?.customerId);
