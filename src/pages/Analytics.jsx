@@ -175,9 +175,12 @@ export default function Analytics({ onNavigate }) {
     });
   }, [filteredPoints, lastWeekPoints, projects, start, end, granularity, compareWeeks]);
 
-  const projectLines = [...new Set(filteredPoints.map(p => p.projectId))].map((pid, i) => ({
-    pid, name: projects.find(p => p.id === pid)?.name || pid, color: CHART_COLORS[i % CHART_COLORS.length],
-  }));
+  const projectLines = useMemo(
+    () => [...new Set(filteredPoints.map(p => p.projectId))].map((pid, i) => ({
+      pid, name: projects.find(p => p.id === pid)?.name || pid, color: CHART_COLORS[i % CHART_COLORS.length],
+    })),
+    [filteredPoints, projects]
+  );
 
   // 4F: Hours scatter
   const hoursScatter = useMemo(() => {

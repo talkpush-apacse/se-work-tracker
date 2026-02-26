@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useCallback, memo, useRef, useEffect } from 'react';
 import {
   ChevronDown, Plus, Mic, MicOff, Copy, Save, Check,
   Loader2, ClipboardList, Sparkles, ChevronRight,
@@ -1365,7 +1365,7 @@ function QuickAddTaskForm({ projects, customers, onSubmit, onCancel }) {
 }
 
 // ─── Sortable task row (compact queue card with drag handle) ──────────────────
-function SortableTaskRow({ task, project, customer, onOpenDetail, isSelected, onToggleSelect, onStatusChange }) {
+const SortableTaskRow = memo(function SortableTaskRow({ task, project, customer, onOpenDetail, isSelected, onToggleSelect, onStatusChange }) {
   const { updateTask } = useAppStore();
   const { isRunning, taskId: runningTaskId } = useTimerContext();
   const isTimerActive = isRunning && runningTaskId === task.id;
@@ -1374,7 +1374,11 @@ function SortableTaskRow({ task, project, customer, onOpenDetail, isSelected, on
 
   const typeColors   = TASK_TYPE_COLORS[task.taskType]   || TASK_TYPE_COLORS.comms;
   const statusColors = TASK_STATUS_COLORS[task.status]   || TASK_STATUS_COLORS.open;
-  const ageDays      = Math.floor((Date.now() - new Date(task.createdAt)) / 86_400_000);
+  // Only recompute age when the task's creation timestamp changes (not on every parent render)
+  const ageDays = useMemo(
+    () => Math.floor((Date.now() - new Date(task.createdAt)) / 86_400_000),
+    [task.createdAt]
+  );
 
   return (
     <div
@@ -1471,7 +1475,7 @@ function SortableTaskRow({ task, project, customer, onOpenDetail, isSelected, on
       </div>
     </div>
   );
-}
+});
 
 // ─── Task detail view (full-width page: metadata + notes + AI Workspace) ───────
 // Format seconds → HH:MM:SS
@@ -1887,13 +1891,13 @@ export default function Triage() {
   const filtersActive = filterCustomerId || filterProjectId || filterTaskType || filterStatus || filterPriorityProjects || filterPriorityClients;
 
   // Bulk action helpers
-  const toggleSelect = (id) => setSelectedTaskIds(prev => {
+  const toggleSelect = useCallback((id) => setSelectedTaskIds(prev => {
     const next = new Set(prev);
     next.has(id) ? next.delete(id) : next.add(id);
     return next;
-  });
+  }), []);
   const selectAll = () => setSelectedTaskIds(new Set(activeTasks.map(t => t.id)));
-  const clearSelection = () => setSelectedTaskIds(new Set());
+  const clearSelection = useCallback(() => setSelectedTaskIds(new Set()), []);
   const handleBulkStatus = (status) => {
     selectedTaskIds.forEach(id => updateTask(id, { status }));
     clearSelection();
@@ -1933,7 +1937,7 @@ export default function Triage() {
     });
   };
 
-  const handleOpenDetail = (task) => {
+  const handleOpenDetail = useCallback((task) => {
     // Auto-stop previous timer if running for a different task
     if (isRunning && runningTaskId && runningTaskId !== task.id) {
       autoSaveSession(stopTimer({ silent: true }));
@@ -1941,7 +1945,22 @@ export default function Triage() {
     // Always attempt start — startTimer's internal localStorage guard prevents double-start
     startTimer(task.projectId, task.id, task.description);
     setTaskDetailId(task.id);
-  };
+  }, [isRunning, runningTaskId, autoSaveSession, stopTimer, startTimer]);
+
+  // Stable handler passed to every SortableTaskRow — useCallback prevents rows from
+  // re-rendering just because the parent re-rendered (works in tandem with memo())
+  const handleTaskStatusChange = useCallback((newStatus) => {
+    if (newStatus === 'done' || newStatus === 'archived') {
+      setBoardTab('closed');
+      setFilterStatus('');
+      setFilterCustomerId('');
+      setFilterProjectId('');
+      setFilterTaskType('');
+      setFilterPriorityProjects(false);
+      setFilterPriorityClients(false);
+      clearSelection();
+    }
+  }, [clearSelection]);
 
   const handleCloseDetail = () => {
     // Auto-stop timer if running for the current task
@@ -2277,18 +2296,7 @@ export default function Triage() {
                         onOpenDetail={handleOpenDetail}
                         isSelected={selectedTaskIds.has(task.id)}
                         onToggleSelect={toggleSelect}
-                        onStatusChange={(newStatus) => {
-                          if (newStatus === 'done' || newStatus === 'archived') {
-                            setBoardTab('closed');
-                            setFilterStatus('');
-                            setFilterCustomerId('');
-                            setFilterProjectId('');
-                            setFilterTaskType('');
-                            setFilterPriorityProjects(false);
-                            setFilterPriorityClients(false);
-                            clearSelection();
-                          }
-                        }}
+                        onStatusChange={handleTaskStatusChange}
                       />
                     );
                   })}

@@ -85,14 +85,18 @@ function uid() {
 }
 
 // ─── Debounce helper for API saves ───────────────────────────────
-// One timer per entity so rapid changes to the same entity collapse,
-// but changes to different entities can fire independently.
-function createDebouncedSaver() {
-  const timers = {};
+// Single shared timer with a dirty-entity Map.
+// Multiple entity changes within the 500ms window share one timer — all dirty entities
+// are saved together when it fires. Prevents timer proliferation during bulk operations.
+function createBatchedSaver() {
+  let timer = null;
+  const dirty = new Map(); // entity name → latest data snapshot
   return (entity, data) => {
-    clearTimeout(timers[entity]);
-    timers[entity] = setTimeout(() => {
-      saveEntity(entity, data);
+    dirty.set(entity, data);   // mark entity dirty; overwrites any earlier snapshot
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      dirty.forEach((d, e) => saveEntity(e, d)); // save all dirty entities at once
+      dirty.clear();
     }, 500);
   };
 }
@@ -121,8 +125,8 @@ export function useStore() {
   // Sync status: 'loading' | 'synced' | 'saving' | 'offline' | 'error'
   const [syncStatus, setSyncStatus] = useState('loading');
 
-  // Stable debounced saver — created once per component lifetime
-  const debouncedSave = useRef(createDebouncedSaver()).current;
+  // Stable batched saver — created once per component lifetime
+  const debouncedSave = useRef(createBatchedSaver()).current;
 
   // Track whether initial Neon fetch has completed.
   // We suppress API saves until mount-fetch is done to avoid echoing
@@ -141,15 +145,20 @@ export function useStore() {
   useEffect(() => { save(KEYS.aiSettings, aiSettings); }, [aiSettings]);
 
   // ─── Neon save effects (debounced 500ms, only after mount-fetch) ──────────
-  useEffect(() => { if (mountedRef.current) { debouncedSave('okrs', okrs); setSyncStatus('saving'); } }, [okrs]);
-  useEffect(() => { if (mountedRef.current) { debouncedSave('customers', customers); setSyncStatus('saving'); } }, [customers]);
-  useEffect(() => { if (mountedRef.current) { debouncedSave('projects', projects); setSyncStatus('saving'); } }, [projects]);
-  useEffect(() => { if (mountedRef.current) { debouncedSave('points', points); setSyncStatus('saving'); } }, [points]);
-  useEffect(() => { if (mountedRef.current) { debouncedSave('meetingEntries', meetingEntries); setSyncStatus('saving'); } }, [meetingEntries]);
-  useEffect(() => { if (mountedRef.current) { debouncedSave('tasks', tasks); setSyncStatus('saving'); } }, [tasks]);
-  useEffect(() => { if (mountedRef.current) { debouncedSave('milestones', milestones); setSyncStatus('saving'); } }, [milestones]);
-  useEffect(() => { if (mountedRef.current) { debouncedSave('aiOutputs', aiOutputs); setSyncStatus('saving'); } }, [aiOutputs]);
-  useEffect(() => { if (mountedRef.current) { debouncedSave('aiSettings', aiSettings); setSyncStatus('saving'); } }, [aiSettings]);
+  useEffect(() => { if (mountedRef.current) { debouncedSave('okrs', okrs); } }, [okrs]);
+  useEffect(() => { if (mountedRef.current) { debouncedSave('customers', customers); } }, [customers]);
+  useEffect(() => { if (mountedRef.current) { debouncedSave('projects', projects); } }, [projects]);
+  useEffect(() => { if (mountedRef.current) { debouncedSave('points', points); } }, [points]);
+  useEffect(() => { if (mountedRef.current) { debouncedSave('meetingEntries', meetingEntries); } }, [meetingEntries]);
+  useEffect(() => { if (mountedRef.current) { debouncedSave('tasks', tasks); } }, [tasks]);
+  useEffect(() => { if (mountedRef.current) { debouncedSave('milestones', milestones); } }, [milestones]);
+  useEffect(() => { if (mountedRef.current) { debouncedSave('aiOutputs', aiOutputs); } }, [aiOutputs]);
+  useEffect(() => { if (mountedRef.current) { debouncedSave('aiSettings', aiSettings); } }, [aiSettings]);
+
+  // Single consolidated sync-status effect — fires once whenever ANY entity changes,
+  // avoiding up to 9 separate setSyncStatus('saving') calls per bulk operation.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (mountedRef.current) setSyncStatus('saving'); }, [okrs, customers, projects, points, meetingEntries, tasks, milestones, aiOutputs, aiSettings]);
 
   // Update syncStatus back to 'synced' after the debounce window
   useEffect(() => {
