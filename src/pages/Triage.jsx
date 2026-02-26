@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import {
   ChevronDown, Plus, Mic, MicOff, Copy, Save, Check,
   Loader2, ClipboardList, Sparkles, ChevronRight,
@@ -10,7 +10,7 @@ import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from 
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useAppStore } from '../context/StoreContext';
-import { useTimerContext } from '../context/TimerContext';
+import { useTimerContext, useTimerDisplay } from '../context/TimerContext';
 import ConfirmDialog from '../components/ConfirmDialog';
 import FileAttachments from '../components/FileAttachments';
 import {
@@ -1484,7 +1484,8 @@ function fmtHMS(totalSeconds) {
 
 function TaskDetailView({ task, project, customer, onBack }) {
   const { updateTask, deleteTask, projects, customers, addTask } = useAppStore();
-  const { isRunning, projectId: runningProjectId, taskId: runningTaskId, elapsedSeconds, startTimer, stopTimer } = useTimerContext();
+  const { isRunning, projectId: runningProjectId, taskId: runningTaskId, startTimer, stopTimer } = useTimerContext();
+  const elapsedSeconds = useTimerDisplay();
 
   // Timer computed flags
   const isRunningForThisTask = isRunning && runningTaskId === task.id;
@@ -1787,20 +1788,35 @@ export default function Triage() {
   // dnd-kit sensors
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
-  // O(1) lookup maps — avoids repeated .find() in filter loops
-  const projectMap = new Map(projects.map(p => [p.id, p]));
-  const customerMap = new Map(customers.map(c => [c.id, c]));
-  const projectIdsWithTasks = new Set(tasks.map(t => t.projectId));
+  // O(1) lookup maps — memoized to avoid recreation every render
+  const projectMap = useMemo(
+    () => new Map(projects.map(p => [p.id, p])),
+    [projects]
+  );
+  const customerMap = useMemo(
+    () => new Map(customers.map(c => [c.id, c])),
+    [customers]
+  );
+  const projectIdsWithTasks = useMemo(
+    () => new Set(tasks.map(t => t.projectId)),
+    [tasks]
+  );
 
   // Derived customer list for filter dropdown (only customers that have tasks)
-  const customersWithTasks = customers.filter(c =>
-    projects.some(p => p.customerId === c.id && projectIdsWithTasks.has(p.id))
+  const customersWithTasks = useMemo(
+    () => customers.filter(c =>
+      projects.some(p => p.customerId === c.id && projectIdsWithTasks.has(p.id))
+    ),
+    [customers, projects, projectIdsWithTasks]
   );
 
   // Derived project list filtered by selected customer
-  const projectsForFilter = filterCustomerId
-    ? projects.filter(p => p.customerId === filterCustomerId && projectIdsWithTasks.has(p.id))
-    : projects.filter(p => projectIdsWithTasks.has(p.id));
+  const projectsForFilter = useMemo(
+    () => filterCustomerId
+      ? projects.filter(p => p.customerId === filterCustomerId && projectIdsWithTasks.has(p.id))
+      : projects.filter(p => projectIdsWithTasks.has(p.id)),
+    [projects, projectIdsWithTasks, filterCustomerId]
+  );
 
   // Reset project filter when customer filter changes
   const handleCustomerFilter = (val) => {
@@ -1810,51 +1826,63 @@ export default function Triage() {
   };
 
   // Untriaged entries, sorted newest meeting date first
-  const untriagedEntries = meetingEntries
-    .filter(m => !m.isTriaged)
-    .sort((a, b) => b.meetingDate.localeCompare(a.meetingDate));
+  const untriagedEntries = useMemo(
+    () => meetingEntries
+      .filter(m => !m.isTriaged)
+      .sort((a, b) => b.meetingDate.localeCompare(a.meetingDate)),
+    [meetingEntries]
+  );
 
   // Group untriaged entries by customer
-  const untriagedByCustomer = untriagedEntries.reduce((acc, entry) => {
-    const project = projectMap.get(entry.projectId);
-    if (!project) return acc;
-    const customer = customerMap.get(project.customerId);
-    const key = customer?.id || '_none';
-    if (!acc[key]) acc[key] = { customer, entries: [] };
-    acc[key].entries.push({ entry, project, customer });
-    return acc;
-  }, {});
+  const untriagedByCustomer = useMemo(
+    () => untriagedEntries.reduce((acc, entry) => {
+      const project = projectMap.get(entry.projectId);
+      if (!project) return acc;
+      const customer = customerMap.get(project.customerId);
+      const key = customer?.id || '_none';
+      if (!acc[key]) acc[key] = { customer, entries: [] };
+      acc[key].entries.push({ entry, project, customer });
+      return acc;
+    }, {}),
+    [untriagedEntries, projectMap, customerMap]
+  );
 
   // Active tasks: open, in-progress, blocked (excludes done and archived)
-  const activeTasks = tasks.filter(t => {
-    if (t.status === 'done' || t.status === 'archived') return false;
-    const proj = projectMap.get(t.projectId);
-    if (filterCustomerId && (!proj || proj.customerId !== filterCustomerId)) return false;
-    if (filterProjectId && t.projectId !== filterProjectId) return false;
-    if (filterTaskType && t.taskType !== filterTaskType) return false;
-    if (filterStatus   && t.status   !== filterStatus)   return false;
-    if (filterPriorityProjects && !proj?.pinned) return false;
-    if (filterPriorityClients) {
-      const cust = customerMap.get(proj?.customerId);
-      if (!cust?.pinned) return false;
-    }
-    return true;
-  });
+  const activeTasks = useMemo(
+    () => tasks.filter(t => {
+      if (t.status === 'done' || t.status === 'archived') return false;
+      const proj = projectMap.get(t.projectId);
+      if (filterCustomerId && (!proj || proj.customerId !== filterCustomerId)) return false;
+      if (filterProjectId && t.projectId !== filterProjectId) return false;
+      if (filterTaskType && t.taskType !== filterTaskType) return false;
+      if (filterStatus   && t.status   !== filterStatus)   return false;
+      if (filterPriorityProjects && !proj?.pinned) return false;
+      if (filterPriorityClients) {
+        const cust = customerMap.get(proj?.customerId);
+        if (!cust?.pinned) return false;
+      }
+      return true;
+    }),
+    [tasks, projectMap, customerMap, filterCustomerId, filterProjectId, filterTaskType, filterStatus, filterPriorityProjects, filterPriorityClients]
+  );
 
-  // Closed tasks: done + archived
-  const closedTasks = tasks.filter(t => {
-    if (t.status !== 'done' && t.status !== 'archived') return false;
-    const proj = projectMap.get(t.projectId);
-    if (filterCustomerId && (!proj || proj.customerId !== filterCustomerId)) return false;
-    if (filterProjectId && t.projectId !== filterProjectId) return false;
-    if (filterTaskType && t.taskType !== filterTaskType) return false;
-    if (filterPriorityProjects && !proj?.pinned) return false;
-    if (filterPriorityClients) {
-      const cust = customerMap.get(proj?.customerId);
-      if (!cust?.pinned) return false;
-    }
-    return true;
-  });
+  // Closed tasks: done + archived, sorted by closedAt DESC
+  const closedTasks = useMemo(
+    () => tasks.filter(t => {
+      if (t.status !== 'done' && t.status !== 'archived') return false;
+      const proj = projectMap.get(t.projectId);
+      if (filterCustomerId && (!proj || proj.customerId !== filterCustomerId)) return false;
+      if (filterProjectId && t.projectId !== filterProjectId) return false;
+      if (filterTaskType && t.taskType !== filterTaskType) return false;
+      if (filterPriorityProjects && !proj?.pinned) return false;
+      if (filterPriorityClients) {
+        const cust = customerMap.get(proj?.customerId);
+        if (!cust?.pinned) return false;
+      }
+      return true;
+    }).sort((a, b) => new Date(b.closedAt || b.createdAt) - new Date(a.closedAt || a.createdAt)),
+    [tasks, projectMap, customerMap, filterCustomerId, filterProjectId, filterTaskType, filterPriorityProjects, filterPriorityClients]
+  );
 
   const filtersActive = filterCustomerId || filterProjectId || filterTaskType || filterStatus || filterPriorityProjects || filterPriorityClients;
 
@@ -2238,8 +2266,8 @@ export default function Triage() {
               <SortableContext items={activeTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
                 <div className="space-y-2">
                   {activeTasks.map(task => {
-                    const project  = projects.find(p => p.id === task.projectId);
-                    const customer = customers.find(c => c.id === project?.customerId);
+                    const project  = projectMap.get(task.projectId);
+                    const customer = customerMap.get(project?.customerId);
                     return (
                       <SortableTaskRow
                         key={task.id}
@@ -2281,10 +2309,9 @@ export default function Triage() {
           ) : (
             <div className="space-y-2">
               {closedTasks
-                .sort((a, b) => new Date(b.closedAt || b.createdAt) - new Date(a.closedAt || a.createdAt))
                 .map(task => {
-                  const project  = projects.find(p => p.id === task.projectId);
-                  const customer = customers.find(c => c.id === project?.customerId);
+                  const project  = projectMap.get(task.projectId);
+                  const customer = customerMap.get(project?.customerId);
                   return (
                     <SortableTaskRow
                       key={task.id}

@@ -1,7 +1,7 @@
 import { LayoutDashboard, FolderKanban, BarChart3, Target, Users, Menu, X, Download, Upload, ListTodo, Cloud, CloudOff, Loader2, Timer } from 'lucide-react';
 import { useState, useRef } from 'react';
 import { useAppStore } from '../context/StoreContext';
-import { useTimerContext } from '../context/TimerContext';
+import { useTimerContext, useTimerDisplay } from '../context/TimerContext';
 import { format, startOfDay, endOfDay } from 'date-fns';
 import { filterPointsByRange } from '../utils/dateHelpers';
 
@@ -17,7 +17,8 @@ const tabs = [
 export default function Navigation({ activeTab, onTabChange }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const { exportData, importData, syncStatus, points, tasks } = useAppStore();
-  const { isRunning, taskId: runningTaskId, elapsedSeconds } = useTimerContext();
+  const { isRunning, taskId: runningTaskId } = useTimerContext();
+  const elapsedSeconds = useTimerDisplay();
   const fileRef = useRef();
 
   // Today at a glance

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Timer, Square } from 'lucide-react';
-import { useTimerContext } from '../context/TimerContext';
+import { useTimerContext, useTimerDisplay } from '../context/TimerContext';
 import { useAppStore } from '../context/StoreContext';
 import SaveSessionModal from './SaveSessionModal';
 
@@ -15,11 +15,11 @@ export default function TimerWidget() {
   const {
     isRunning,
     projectId,
-    elapsedSeconds,
     stoppedSession,
     clearStoppedSession,
     stopTimer,
   } = useTimerContext();
+  const elapsedSeconds = useTimerDisplay();
   const { projects, customers } = useAppStore();
   const [showSave, setShowSave] = useState(false);
 

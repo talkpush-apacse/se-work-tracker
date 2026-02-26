@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { Trophy, Zap, Clock, Flame, Activity, TrendingUp, Star, Plus, Timer } from 'lucide-react';
 import { useAppStore } from '../context/StoreContext';
 import { useTimerContext } from '../context/TimerContext';
@@ -48,56 +48,72 @@ export default function Dashboard({ onNavigate }) {
   const [flashId, setFlashId] = useState(null);
   const flashRef = useRef({});
 
-  const { start, end } = getThisWeekRange();
-  const weekPoints = filterPointsByRange(points, start, end);
-  const totalPts = weekPoints.reduce((s, p) => s + p.points, 0);
-  const totalHrs = weekPoints.reduce((s, p) => s + p.hours, 0);
+  // Week stats — only recompute when points array changes
+  const { weekPoints, totalPts, totalHrs, topProject, topActivity, streak } = useMemo(() => {
+    const { start, end } = getThisWeekRange();
+    const wp = filterPointsByRange(points, start, end);
+    const pts = wp.reduce((s, p) => s + p.points, 0);
+    const hrs = wp.reduce((s, p) => s + p.hours, 0);
 
-  // Most active project this week
-  const projectWeekPoints = {};
-  weekPoints.forEach(p => { projectWeekPoints[p.projectId] = (projectWeekPoints[p.projectId] || 0) + p.points; });
-  const topProjectId = Object.entries(projectWeekPoints).sort((a, b) => b[1] - a[1])[0]?.[0];
-  const topProject = projects.find(p => p.id === topProjectId);
+    // Most active project this week
+    const projectWeekPoints = {};
+    wp.forEach(p => { projectWeekPoints[p.projectId] = (projectWeekPoints[p.projectId] || 0) + p.points; });
+    const topProjectId = Object.entries(projectWeekPoints).sort((a, b) => b[1] - a[1])[0]?.[0];
+    const topProj = projects.find(p => p.id === topProjectId);
 
-  // Most common activity this week
-  const actCounts = {};
-  weekPoints.forEach(p => { const key = p.activityType || 'General'; actCounts[key] = (actCounts[key] || 0) + p.points; });
-  const topActivity = Object.entries(actCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
+    // Most common activity this week
+    const actCounts = {};
+    wp.forEach(p => { const key = p.activityType || 'General'; actCounts[key] = (actCounts[key] || 0) + p.points; });
+    const topAct = Object.entries(actCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
 
-  const streak = getStreakDays(points);
-  const activeProjects = projects.filter(p => p.status === 'Active');
+    return { weekPoints: wp, totalPts: pts, totalHrs: hrs, topProject: topProj, topActivity: topAct, streak: getStreakDays(points) };
+  }, [points, projects]);
 
-  // Leaderboard: active projects sorted by total points
-  const leaderboard = activeProjects.map(project => {
-    const entries = points.filter(pt => pt.projectId === project.id);
-    const totalPoints = entries.reduce((s, e) => s + e.points, 0);
-    const totalHours = entries.reduce((s, e) => s + e.hours, 0);
-    const lastActivity = entries.length ? entries.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0].timestamp : null;
-    return { ...project, totalPoints, totalHours, lastActivity };
-  }).sort((a, b) => b.totalPoints - a.totalPoints);
+  const activeProjects = useMemo(
+    () => projects.filter(p => p.status === 'Active'),
+    [projects]
+  );
+
+  // Leaderboard: active projects sorted by total points — O(N_projects × M_points)
+  const leaderboard = useMemo(
+    () => activeProjects.map(project => {
+      const entries = points.filter(pt => pt.projectId === project.id);
+      const totalPoints = entries.reduce((s, e) => s + e.points, 0);
+      const totalHours = entries.reduce((s, e) => s + e.hours, 0);
+      const lastActivity = entries.length ? entries.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0].timestamp : null;
+      return { ...project, totalPoints, totalHours, lastActivity };
+    }).sort((a, b) => b.totalPoints - a.totalPoints),
+    [activeProjects, points]
+  );
 
   const maxPoints = leaderboard[0]?.totalPoints || 1;
 
-  // OKR health
-  const okrHealth = okrs.map(okr => {
-    const okrProjects = projects.filter(p => p.okrId === okr.id);
-    const okrPoints = okrProjects.reduce((s, proj) => {
-      return s + points.filter(pt => pt.projectId === proj.id).reduce((ss, e) => ss + e.points, 0);
-    }, 0);
-    const okrHours = okrProjects.reduce((s, proj) => {
-      return s + points.filter(pt => pt.projectId === proj.id).reduce((ss, e) => ss + e.hours, 0);
-    }, 0);
-    return { ...okr, projectCount: okrProjects.length, totalPoints: okrPoints, totalHours: okrHours };
-  }).sort((a, b) => b.totalPoints - a.totalPoints);
+  // OKR health — O(N_OKRs × N_projects × M_points)
+  const okrHealth = useMemo(
+    () => okrs.map(okr => {
+      const okrProjects = projects.filter(p => p.okrId === okr.id);
+      const okrPoints = okrProjects.reduce((s, proj) => {
+        return s + points.filter(pt => pt.projectId === proj.id).reduce((ss, e) => ss + e.points, 0);
+      }, 0);
+      const okrHours = okrProjects.reduce((s, proj) => {
+        return s + points.filter(pt => pt.projectId === proj.id).reduce((ss, e) => ss + e.hours, 0);
+      }, 0);
+      return { ...okr, projectCount: okrProjects.length, totalPoints: okrPoints, totalHours: okrHours };
+    }).sort((a, b) => b.totalPoints - a.totalPoints),
+    [okrs, projects, points]
+  );
 
-  // Recent activity feed
-  const recentActivity = [...points]
-    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-    .slice(0, 15)
-    .map(entry => {
-      const project = projects.find(p => p.id === entry.projectId);
-      return { ...entry, project };
-    });
+  // Recent activity feed — sort+slice only when points changes
+  const recentActivity = useMemo(
+    () => [...points]
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+      .slice(0, 15)
+      .map(entry => {
+        const project = projects.find(p => p.id === entry.projectId);
+        return { ...entry, project };
+      }),
+    [points, projects]
+  );
 
   const handlePointSuccess = (entry) => {
     setFlashId(entry.projectId);
