@@ -13,6 +13,7 @@ import { useAppStore } from '../context/StoreContext';
 import { useTimerContext, useTimerDisplay } from '../context/TimerContext';
 import ConfirmDialog from '../components/ConfirmDialog';
 import FileAttachments from '../components/FileAttachments';
+import RichTextEditor from '../components/ui/RichTextEditor';
 import {
   TASK_TYPES, TASK_TYPE_LABELS, TASK_TYPE_COLORS,
   TASK_STATUSES, TASK_STATUS_LABELS, TASK_STATUS_COLORS,
@@ -23,6 +24,11 @@ import {
   AUTO_TRACK_RATE,
   AUTO_TRACK_MIN_SECONDS,
 } from '../constants';
+
+// ─── Helper: strip HTML tags for compact plain-text previews ──────────────────
+function stripHtml(html) {
+  return (html || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+}
 
 // ─── Helper: resolve recipient label from value key ───────────────────────────
 function recipientLabel(value) {
@@ -107,21 +113,21 @@ function InlineProjectCreate({ localCustomers, onCustomerCreated, onProjectCreat
   };
 
   return (
-    <div className="mt-2 p-2.5 bg-gray-800 border border-gray-700 rounded-xl space-y-2">
-      <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">New Project</p>
+    <div className="mt-2 p-2.5 bg-secondary border border-border rounded-xl space-y-2">
+      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">New Project</p>
       <input
         value={newProject.name}
         onChange={e => setNewProject(p => ({ ...p, name: e.target.value }))}
         placeholder="Project name *"
-        className="w-full bg-gray-900 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+        className="w-full bg-card border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
       />
       <div>
         <div className="flex items-center justify-between mb-1">
-          <span className="text-[10px] text-gray-500">Customer <span className="text-gray-600">(optional)</span></span>
+          <span className="text-[10px] text-muted-foreground">Customer <span className="text-muted-foreground/70">(optional)</span></span>
           <button
             type="button"
             onClick={() => setShowNewCustomer(v => !v)}
-            className="text-[10px] font-semibold text-indigo-400 hover:text-indigo-300 transition-colors"
+            className="text-[10px] font-semibold text-brand-lavender hover:text-brand-lavender/80 transition-colors"
           >
             {showNewCustomer ? '✕ Cancel' : '+ New Customer'}
           </button>
@@ -129,7 +135,7 @@ function InlineProjectCreate({ localCustomers, onCustomerCreated, onProjectCreat
         <select
           value={newProject.customerId}
           onChange={e => setNewProject(p => ({ ...p, customerId: e.target.value }))}
-          className="w-full bg-gray-900 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+          className="w-full bg-card border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
         >
           <option value="">— No customer —</option>
           {localCustomers.map(c => (
@@ -138,13 +144,13 @@ function InlineProjectCreate({ localCustomers, onCustomerCreated, onProjectCreat
         </select>
       </div>
       {showNewCustomer && (
-        <div className="p-2 bg-gray-900 border border-gray-700 rounded-lg space-y-2">
-          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">New Customer</p>
+        <div className="p-2 bg-card border border-border rounded-lg space-y-2">
+          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">New Customer</p>
           <input
             value={newCustomer.name}
             onChange={e => setNewCustomer(p => ({ ...p, name: e.target.value }))}
             placeholder="Customer name *"
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+            className="w-full bg-secondary border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
           />
           <div className="flex flex-wrap gap-1.5">
             {CUSTOMER_COLORS.map(({ name, value }) => (
@@ -162,7 +168,7 @@ function InlineProjectCreate({ localCustomers, onCustomerCreated, onProjectCreat
             type="button"
             disabled={!newCustomer.name.trim()}
             onClick={handleCreateCustomer}
-            className="w-full py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-white transition-colors"
+            className="w-full py-1.5 rounded-lg bg-brand-lavender hover:bg-brand-lavender/80 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-foreground transition-colors"
           >
             Create Customer
           </button>
@@ -172,7 +178,7 @@ function InlineProjectCreate({ localCustomers, onCustomerCreated, onProjectCreat
         type="button"
         disabled={!newProject.name.trim()}
         onClick={handleCreateProject}
-        className="w-full py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-white transition-colors"
+        className="w-full py-1.5 rounded-lg bg-brand-lavender hover:bg-brand-lavender/80 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-foreground transition-colors"
       >
         Create Project
       </button>
@@ -212,22 +218,22 @@ function TriageForm({ entry, project, customer, projects, customers, onSubmit, o
     : null;
 
   return (
-    <div className="mt-3 border-t border-gray-700/60 pt-3 space-y-3">
+    <div className="mt-3 border-t border-border/60 pt-3 space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Convert to Task</p>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Convert to Task</p>
         {loggedOn && (
-          <p className="text-[10px] text-gray-500">Logged on {loggedOn}</p>
+          <p className="text-[10px] text-muted-foreground">Logged on {loggedOn}</p>
         )}
       </div>
 
       {/* Project selector with inline creation */}
       <div>
         <div className="flex items-center justify-between mb-1">
-          <label className="text-xs text-gray-400">Project *</label>
+          <label className="text-xs text-muted-foreground">Project *</label>
           <button
             type="button"
             onClick={() => setShowInlineCreate(v => !v)}
-            className="text-[10px] font-semibold text-indigo-400 hover:text-indigo-300 transition-colors"
+            className="text-[10px] font-semibold text-brand-lavender hover:text-brand-lavender/80 transition-colors"
           >
             {showInlineCreate ? '✕ Cancel' : '+ New Project'}
           </button>
@@ -235,7 +241,7 @@ function TriageForm({ entry, project, customer, projects, customers, onSubmit, o
         <select
           value={form.projectId}
           onChange={e => setForm(p => ({ ...p, projectId: e.target.value }))}
-          className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+          className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
         >
           <option value="">— Select project —</option>
           {projectOptions.map(p => (
@@ -256,22 +262,22 @@ function TriageForm({ entry, project, customer, projects, customers, onSubmit, o
       </div>
 
       <div>
-        <label className="block text-xs text-gray-400 mb-1">Task Description *</label>
+        <label className="block text-xs text-muted-foreground mb-1">Task Description *</label>
         <textarea
           rows={2}
           value={form.description}
           onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
-          className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40 resize-none"
+          className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40 resize-none"
         />
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs text-gray-400 mb-1">Task Type</label>
+          <label className="block text-xs text-muted-foreground mb-1">Task Type</label>
           <select
             value={form.taskType}
             onChange={e => setForm(p => ({ ...p, taskType: e.target.value }))}
-            className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+            className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
           >
             {TASK_TYPES.map(t => (
               <option key={t} value={t}>{TASK_TYPE_LABELS[t]}</option>
@@ -279,11 +285,11 @@ function TriageForm({ entry, project, customer, projects, customers, onSubmit, o
           </select>
         </div>
         <div>
-          <label className="block text-xs text-gray-400 mb-1">Status</label>
+          <label className="block text-xs text-muted-foreground mb-1">Status</label>
           <select
             value={form.status}
             onChange={e => setForm(p => ({ ...p, status: e.target.value }))}
-            className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+            className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
           >
             {TASK_STATUSES.map(s => (
               <option key={s} value={s}>{TASK_STATUS_LABELS[s]}</option>
@@ -293,11 +299,11 @@ function TriageForm({ entry, project, customer, projects, customers, onSubmit, o
       </div>
 
       <div>
-        <label className="block text-xs text-gray-400 mb-1">Recipient <span className="text-gray-600">(optional)</span></label>
+        <label className="block text-xs text-muted-foreground mb-1">Recipient <span className="text-muted-foreground/70">(optional)</span></label>
         <select
           value={form.assigneeOrTeam}
           onChange={e => setForm(p => ({ ...p, assigneeOrTeam: e.target.value }))}
-          className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+          className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
         >
           <option value="">— Select recipient —</option>
           {TASK_RECIPIENTS.map(r => (
@@ -310,7 +316,7 @@ function TriageForm({ entry, project, customer, projects, customers, onSubmit, o
         <button
           type="button"
           onClick={onCancel}
-          className="flex-1 py-2 rounded-xl bg-gray-700 hover:bg-gray-600 text-xs font-medium transition-colors"
+          className="flex-1 py-2 rounded-xl bg-muted hover:bg-gray-600 text-xs font-medium transition-colors"
         >
           Cancel
         </button>
@@ -318,7 +324,7 @@ function TriageForm({ entry, project, customer, projects, customers, onSubmit, o
           type="button"
           disabled={!canSubmit}
           onClick={() => onSubmit({ ...form, description: form.description.trim() })}
-          className="flex-1 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-white transition-colors"
+          className="flex-1 py-2 rounded-xl bg-brand-lavender hover:bg-brand-lavender/80 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-foreground transition-colors"
         >
           Create Task
         </button>
@@ -350,7 +356,7 @@ function TriageEntryCard({ entry, project, customer, onTriaged }) {
   const hasMore = entry.rawNotes.split('\n').length > 3;
 
   return (
-    <div className="bg-gray-800/50 border border-gray-700/60 rounded-xl p-3">
+    <div className="bg-secondary/50 border border-border/60 rounded-xl p-3">
       {/* Entry meta */}
       <div className="flex items-start gap-2 mb-2">
         <div className="flex-1 min-w-0">
@@ -363,26 +369,26 @@ function TriageEntryCard({ entry, project, customer, onTriaged }) {
                 {customer.name}
               </span>
             )}
-            <span className="text-[10px] text-gray-400 font-medium truncate">{project.name}</span>
+            <span className="text-[10px] text-muted-foreground font-medium truncate">{project.name}</span>
           </div>
-          <div className="flex items-center gap-1 text-[10px] text-gray-500">
+          <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
             <Calendar size={10} />
             {new Date(entry.meetingDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
           </div>
         </div>
-        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20 flex-shrink-0">
+        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-brand-amber border border-amber-500/20 flex-shrink-0">
           Untriaged
         </span>
       </div>
 
       {/* Notes preview */}
-      <p className="text-xs text-gray-300 whitespace-pre-wrap leading-relaxed">
+      <p className="text-xs text-foreground/80 whitespace-pre-wrap leading-relaxed">
         {expanded ? entry.rawNotes : previewLines}
       </p>
       {hasMore && !expanded && (
         <button
           onClick={() => setExpanded(true)}
-          className="text-[10px] text-indigo-400 hover:text-indigo-300 mt-1"
+          className="text-[10px] text-brand-lavender hover:text-brand-lavender/80 mt-1"
         >
           Show more…
         </button>
@@ -392,7 +398,7 @@ function TriageEntryCard({ entry, project, customer, onTriaged }) {
       {!showForm && (
         <button
           onClick={() => setShowForm(true)}
-          className="mt-3 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-400 text-xs font-semibold border border-indigo-500/20 transition-all"
+          className="mt-3 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-brand-lavender/20 hover:bg-brand-lavender/40 text-brand-lavender text-xs font-semibold border border-indigo-500/20 transition-all"
         >
           <Plus size={12} /> Convert to Task
         </button>
@@ -423,24 +429,13 @@ function TaskCard({ task, project, customer, isSelected, onSelect, onStatusChang
   // Aging — days since task creation (client-side, no DB needed)
   const ageDays = Math.floor((Date.now() - new Date(task.createdAt)) / 86_400_000);
   const ageStyle = ageDays <= 2
-    ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+    ? 'text-brand-sage bg-brand-sage/10 border-brand-sage/20'
     : ageDays <= 5
-      ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
-      : 'text-red-400 bg-red-500/10 border-red-500/20';
+      ? 'text-brand-amber bg-amber-500/10 border-amber-500/20'
+      : 'text-destructive bg-destructive/10 border-destructive/20';
   const [isEditing, setIsEditing] = useState(false);
   const [draftDesc, setDraftDesc] = useState(task.description);
   const editRef = useRef(null);
-
-  // Notes — freeform field for links, artifacts, context
-  const [notesDraft, setNotesDraft] = useState(task.notes || '');
-  const notesTimerRef = useRef(null);
-  const handleNotesChange = (val) => {
-    setNotesDraft(val);
-    clearTimeout(notesTimerRef.current);
-    notesTimerRef.current = setTimeout(() => {
-      updateTask(task.id, { notes: val });
-    }, 500);
-  };
 
   const commitEdit = () => {
     const trimmed = draftDesc.trim();
@@ -457,10 +452,10 @@ function TaskCard({ task, project, customer, isSelected, onSelect, onStatusChang
       onClick={() => !isArchived && onSelect(task)}
       className={`p-3 rounded-xl border transition-all ${
         isArchived
-          ? 'bg-gray-900/40 border-gray-800/60 opacity-60'
+          ? 'bg-card/40 border-border/60 opacity-60'
           : isSelected
-            ? 'bg-indigo-600/15 border-indigo-500/40 shadow-lg shadow-indigo-500/10 cursor-pointer'
-            : 'bg-gray-800/50 border-gray-700/60 hover:border-gray-600 cursor-pointer'
+            ? 'bg-brand-lavender/15 border-indigo-500/40 shadow-lg shadow-indigo-500/10 cursor-pointer'
+            : 'bg-secondary/50 border-border/60 hover:border-border cursor-pointer'
       }`}
     >
       <div className="flex items-start gap-2 mb-2">
@@ -486,22 +481,22 @@ function TaskCard({ task, project, customer, isSelected, onSelect, onStatusChang
               autoFocus
               rows={2}
               onClick={e => e.stopPropagation()}
-              className="w-full bg-gray-700/60 border border-indigo-500/50 rounded-lg px-2 py-1 text-xs text-white resize-none focus:outline-none focus:border-indigo-400 leading-snug"
+              className="w-full bg-muted/60 border border-indigo-500/50 rounded-lg px-2 py-1 text-xs text-foreground resize-none focus:outline-none focus:border-indigo-400 leading-snug"
             />
           ) : (
             <div
               className="group/desc flex items-start gap-1"
               onClick={e => { if (!isArchived) { e.stopPropagation(); setIsEditing(true); } }}
             >
-              <p className={`flex-1 text-xs font-medium leading-snug line-clamp-2 ${isArchived ? 'text-gray-500 line-through' : 'text-white group-hover/desc:text-indigo-200 cursor-text'}`}>
+              <p className={`flex-1 text-xs font-medium leading-snug line-clamp-2 ${isArchived ? 'text-muted-foreground line-through' : 'text-foreground group-hover/desc:text-indigo-200 cursor-text'}`}>
                 {task.description}
               </p>
               {!isArchived && (
-                <Pencil size={10} className="flex-shrink-0 mt-0.5 text-gray-600 opacity-0 group-hover/desc:opacity-100 transition-opacity" />
+                <Pencil size={10} className="flex-shrink-0 mt-0.5 text-muted-foreground/70 opacity-0 group-hover/desc:opacity-100 transition-opacity" />
               )}
             </div>
           )}
-          {project && <p className="text-[10px] text-gray-500 mt-0.5 truncate">{project.name}</p>}
+          {project && <p className="text-[10px] text-muted-foreground mt-0.5 truncate">{project.name}</p>}
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
           {/* Archive / Unarchive button */}
@@ -510,14 +505,14 @@ function TaskCard({ task, project, customer, isSelected, onSelect, onStatusChang
             title={isArchived ? 'Restore task' : 'Archive task'}
             className={`p-1 rounded transition-colors ${
               isArchived
-                ? 'text-gray-500 hover:text-emerald-400'
-                : 'text-gray-600 hover:text-gray-400'
+                ? 'text-muted-foreground hover:text-brand-sage'
+                : 'text-muted-foreground/70 hover:text-muted-foreground'
             }`}
           >
             {isArchived ? <ArchiveX size={12} /> : <Archive size={12} />}
           </button>
           {!isArchived && (
-            <ChevronRight size={13} className={`transition-colors ${isSelected ? 'text-indigo-400' : 'text-gray-600'}`} />
+            <ChevronRight size={13} className={`transition-colors ${isSelected ? 'text-brand-lavender' : 'text-muted-foreground/70'}`} />
           )}
         </div>
       </div>
@@ -535,7 +530,7 @@ function TaskCard({ task, project, customer, isSelected, onSelect, onStatusChang
           </span>
         )}
         {task.assigneeOrTeam && (
-          <span className="flex items-center gap-0.5 text-[10px] text-gray-500">
+          <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
             <User size={9} /> {recipientLabel(task.assigneeOrTeam)}
           </span>
         )}
@@ -558,7 +553,7 @@ function TaskCard({ task, project, customer, isSelected, onSelect, onStatusChang
             className={`w-full text-[10px] font-semibold rounded-lg px-2 py-1 border cursor-pointer focus:outline-none ${statusColors.bg} ${statusColors.text} ${statusColors.border} bg-transparent`}
           >
             {TASK_STATUSES.map(s => (
-              <option key={s} value={s} className="bg-gray-800 text-white">
+              <option key={s} value={s} className="bg-secondary text-foreground">
                 {TASK_STATUS_LABELS[s]}
               </option>
             ))}
@@ -566,25 +561,21 @@ function TaskCard({ task, project, customer, isSelected, onSelect, onStatusChang
         </div>
       )}
 
-      {/* Notes textarea — for links, artifacts, context */}
-      {!isArchived && (
-        <div className="mt-2" onClick={e => e.stopPropagation()}>
-          <textarea
-            value={notesDraft}
-            onChange={e => handleNotesChange(e.target.value)}
-            placeholder="Notes, links, artifacts…"
-            rows={2}
-            className="w-full bg-gray-800/60 border border-gray-700/50 rounded-lg px-2 py-1.5 text-[10px] text-gray-300 placeholder:text-gray-600 resize-none focus:outline-none focus:border-gray-600"
-          />
+      {/* Notes preview — read-only plain-text snippet; edit in detail view */}
+      {!isArchived && task.notes && (
+        <div className="mt-2">
+          <p className="text-[10px] text-muted-foreground/80 line-clamp-2 leading-relaxed">
+            {stripHtml(task.notes)}
+          </p>
         </div>
       )}
 
       {isArchived && (
         <div>
           {task.notes && (
-            <p className="mt-1 text-[10px] text-gray-500 line-clamp-2">{task.notes}</p>
+            <p className="mt-1 text-[10px] text-muted-foreground line-clamp-2">{stripHtml(task.notes)}</p>
           )}
-          <p className="mt-1 text-[10px] text-gray-600 italic">Archived</p>
+          <p className="mt-1 text-[10px] text-muted-foreground/70 italic">Archived</p>
         </div>
       )}
     </div>
@@ -611,28 +602,28 @@ function HistoryItem({ h }) {
   };
 
   return (
-    <details className="bg-gray-900 border border-gray-800 rounded-xl">
+    <details className="bg-card border border-border rounded-xl">
       <summary className="flex items-center justify-between px-4 py-3 cursor-pointer list-none">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-gray-400">
+          <span className="text-xs font-medium text-muted-foreground">
             {AI_OUTPUT_TYPE_LABELS[h.outputType]}
           </span>
           {h.provider && (
             <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${
               h.provider === 'claude'
-                ? 'bg-amber-500/15 text-amber-400 border-amber-500/20'
-                : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20'
+                ? 'bg-amber-500/15 text-brand-amber border-amber-500/20'
+                : 'bg-brand-sage/15 text-brand-sage border-brand-sage/20'
             }`}>
               {h.provider === 'claude' ? 'Claude' : 'ChatGPT'}
             </span>
           )}
-          <span className="text-[10px] text-gray-600">
+          <span className="text-[10px] text-muted-foreground/70">
             {new Date(h.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
             {' '}
             {new Date(h.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
           </span>
         </div>
-        <ChevronDown size={13} className="text-gray-600 flex-shrink-0" />
+        <ChevronDown size={13} className="text-muted-foreground/70 flex-shrink-0" />
       </summary>
 
       <div className="px-4 pb-4 space-y-2">
@@ -641,33 +632,33 @@ function HistoryItem({ h }) {
           value={draft}
           onChange={e => setDraft(e.target.value)}
           rows={Math.max(5, draft.split('\n').length + 1)}
-          className="w-full bg-transparent text-xs text-gray-300 leading-relaxed resize-none focus:outline-none"
+          className="w-full bg-transparent text-xs text-foreground/80 leading-relaxed resize-none focus:outline-none"
         />
 
         {/* Edited indicator */}
         {draft !== h.outputText && (
-          <p className="text-[10px] text-indigo-400/60 flex items-center gap-1">
+          <p className="text-[10px] text-brand-lavender/60 flex items-center gap-1">
             ✎ Edited — save to persist
           </p>
         )}
 
         {/* Action buttons */}
-        <div className="flex gap-1.5 border-t border-gray-800 pt-2">
+        <div className="flex gap-1.5 border-t border-border pt-2">
           <button
             onClick={handleCopy}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs text-gray-400 hover:text-white transition-all border border-gray-700"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-secondary hover:bg-muted text-xs text-muted-foreground hover:text-foreground transition-all border border-border"
           >
             {copied
-              ? <><Check size={11} className="text-emerald-400" /> Copied!</>
+              ? <><Check size={11} className="text-brand-sage" /> Copied!</>
               : <><Copy size={11} /> Copy</>}
           </button>
           <button
             onClick={handleSave}
             disabled={draft === h.outputText}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs text-gray-400 hover:text-white transition-all border border-gray-700 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-secondary hover:bg-muted text-xs text-muted-foreground hover:text-foreground transition-all border border-border disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {saved
-              ? <><Check size={11} className="text-emerald-400" /> Saved!</>
+              ? <><Check size={11} className="text-brand-sage" /> Saved!</>
               : <><Save size={11} /> Save</>}
           </button>
         </div>
@@ -889,7 +880,7 @@ function AIWorkspace({ task, project, customer }) {
   return (
     <div className="space-y-4">
       {/* Task header */}
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4">
+      <div className="bg-card border border-border rounded-2xl p-4">
         <div className="flex items-start gap-3 flex-wrap mb-2">
           {customer && (
             <span
@@ -906,10 +897,10 @@ function AIWorkspace({ task, project, customer }) {
             {TASK_STATUS_LABELS[task.status]}
           </span>
         </div>
-        <p className="text-sm font-semibold text-white leading-snug">{task.description}</p>
-        {project && <p className="text-xs text-gray-500 mt-1">{project.name}</p>}
+        <p className="text-sm font-semibold text-foreground leading-snug">{task.description}</p>
+        {project && <p className="text-xs text-muted-foreground mt-1">{project.name}</p>}
         {recipientText && (
-          <p className="flex items-center gap-1 text-xs text-gray-500 mt-1">
+          <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
             <User size={11} /> {recipientText}
           </p>
         )}
@@ -917,7 +908,7 @@ function AIWorkspace({ task, project, customer }) {
 
       {/* Output type selector */}
       <div>
-        <p className="text-xs font-medium text-gray-400 mb-2">Output Type</p>
+        <p className="text-xs font-medium text-muted-foreground mb-2">Output Type</p>
         <div className="flex flex-wrap gap-1.5">
           {AI_OUTPUT_TYPES.map(type => (
             <button
@@ -925,8 +916,8 @@ function AIWorkspace({ task, project, customer }) {
               onClick={() => setOutputType(type)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
                 outputType === type
-                  ? 'bg-indigo-600 border-indigo-500 text-white'
-                  : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-white hover:border-gray-600'
+                  ? 'bg-brand-lavender border-indigo-500 text-foreground'
+                  : 'bg-secondary border-border text-muted-foreground hover:text-foreground hover:border-border'
               }`}
             >
               {AI_OUTPUT_TYPE_LABELS[type]}
@@ -936,11 +927,11 @@ function AIWorkspace({ task, project, customer }) {
         {/* Recipient selector — visible for output types that use it */}
         {['message-draft', 'meeting-summary'].includes(outputType) && (
           <div className="mt-2.5 flex items-center gap-2">
-            <User size={11} className="text-gray-500 flex-shrink-0" />
+            <User size={11} className="text-muted-foreground flex-shrink-0" />
             <select
               value={recipientOverride}
               onChange={e => setRecipientOverride(e.target.value)}
-              className="flex-1 bg-gray-800/60 border border-gray-700/60 rounded-lg px-2.5 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+              className="flex-1 bg-secondary/60 border border-border/60 rounded-lg px-2.5 py-1.5 text-xs text-foreground/80 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
             >
               <option value="">— No recipient —</option>
               {TASK_RECIPIENTS.map(r => (
@@ -948,7 +939,7 @@ function AIWorkspace({ task, project, customer }) {
               ))}
             </select>
             {recipientText && (
-              <span className="text-[10px] text-indigo-400/70 whitespace-nowrap">
+              <span className="text-[10px] text-brand-lavender/70 whitespace-nowrap">
                 tailored for <span className="font-semibold">{recipientText}</span>
               </span>
             )}
@@ -959,11 +950,11 @@ function AIWorkspace({ task, project, customer }) {
       {/* Email nature sub-selector — only for Message Draft */}
       {outputType === 'message-draft' && (
         <div>
-          <p className="text-xs font-medium text-gray-400 mb-2">Message Nature</p>
+          <p className="text-xs font-medium text-muted-foreground mb-2">Message Nature</p>
           <select
             value={emailNature}
             onChange={e => setEmailNature(e.target.value)}
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+            className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-xs text-foreground/90 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
           >
             {EMAIL_NATURES.map(n => (
               <option key={n.value} value={n.value}>{n.label}</option>
@@ -973,20 +964,20 @@ function AIWorkspace({ task, project, customer }) {
       )}
 
       {/* ── Customize Panel ───────────────────────────────────────────────────── */}
-      <div className="border border-gray-700/60 rounded-xl overflow-hidden">
+      <div className="border border-border/60 rounded-xl overflow-hidden">
         {/* Collapse toggle */}
         <button
           onClick={() => setShowCustomize(v => !v)}
-          className="w-full flex items-center justify-between px-3 py-2.5 bg-gray-800/50 hover:bg-gray-800 transition-colors text-left"
+          className="w-full flex items-center justify-between px-3 py-2.5 bg-secondary/50 hover:bg-secondary transition-colors text-left"
         >
           <div className="flex items-center gap-2">
-            <Settings size={12} className="text-gray-500" />
-            <span className="text-xs font-medium text-gray-400">Model settings</span>
+            <Settings size={12} className="text-muted-foreground" />
+            <span className="text-xs font-medium text-muted-foreground">Model settings</span>
             {/* Indicators: provider badge + custom prompt dot */}
             <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${
               currentProvider === 'claude'
-                ? 'bg-amber-500/15 text-amber-400 border-amber-500/20'
-                : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20'
+                ? 'bg-amber-500/15 text-brand-amber border-amber-500/20'
+                : 'bg-brand-sage/15 text-brand-sage border-brand-sage/20'
             }`}>
               {currentProvider === 'claude' ? 'Claude' : 'ChatGPT'}
             </span>
@@ -994,15 +985,15 @@ function AIWorkspace({ task, project, customer }) {
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" title="Custom prompt active" />
             )}
           </div>
-          <ChevronDown size={16} className={`text-gray-600 transition-transform ${showCustomize ? 'rotate-180' : ''}`} />
+          <ChevronDown size={16} className={`text-muted-foreground/70 transition-transform ${showCustomize ? 'rotate-180' : ''}`} />
         </button>
 
         {showCustomize && (
-          <div className="p-3 space-y-3 bg-gray-900/40 border-t border-gray-700/60">
+          <div className="p-3 space-y-3 bg-card/40 border-t border-border/60">
 
             {/* Provider toggle */}
             <div>
-              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">AI Provider</p>
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">AI Provider</p>
               <div className="flex gap-1.5">
                 {[
                   { value: 'openai', label: 'OpenAI', desc: 'GPT models' },
@@ -1015,8 +1006,8 @@ function AIWorkspace({ task, project, customer }) {
                       currentProvider === opt.value
                         ? opt.value === 'claude'
                           ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
-                          : 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
-                        : 'bg-gray-800 border-gray-700 text-gray-500 hover:text-gray-300 hover:border-gray-600'
+                          : 'bg-brand-sage/20 border-brand-sage/40 text-emerald-300'
+                        : 'bg-secondary border-border text-muted-foreground hover:text-foreground/80 hover:border-border'
                     }`}
                   >
                     {opt.label}
@@ -1029,7 +1020,7 @@ function AIWorkspace({ task, project, customer }) {
             {/* OpenAI model selector — only shown when provider is OpenAI */}
             {currentProvider === 'openai' && (
               <div>
-                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">OpenAI Model</p>
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">OpenAI Model</p>
                 <div className="flex gap-1.5">
                   {[
                     { value: 'gpt-4o', label: 'GPT-4o' },
@@ -1041,8 +1032,8 @@ function AIWorkspace({ task, project, customer }) {
                       onClick={() => updateAiSettings({ openaiModel: model.value })}
                       className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-all ${
                         (aiSettings.openaiModel || 'gpt-4o') === model.value
-                          ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
-                          : 'bg-gray-800 border-gray-700 text-gray-500 hover:text-gray-300 hover:border-gray-600'
+                          ? 'bg-brand-sage/20 border-brand-sage/40 text-emerald-300'
+                          : 'bg-secondary border-border text-muted-foreground hover:text-foreground/80 hover:border-border'
                       }`}
                     >
                       {model.label}
@@ -1055,7 +1046,7 @@ function AIWorkspace({ task, project, customer }) {
             {/* Claude model selector — only shown when provider is Claude */}
             {currentProvider === 'claude' && (
               <div>
-                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Claude Model</p>
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Claude Model</p>
                 <div className="flex gap-1.5">
                   {[
                     { value: 'claude-sonnet-4-5', label: 'Sonnet 4.5' },
@@ -1068,7 +1059,7 @@ function AIWorkspace({ task, project, customer }) {
                       className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-all ${
                         (aiSettings.claudeModel || 'claude-sonnet-4-6') === model.value
                           ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
-                          : 'bg-gray-800 border-gray-700 text-gray-500 hover:text-gray-300 hover:border-gray-600'
+                          : 'bg-secondary border-border text-muted-foreground hover:text-foreground/80 hover:border-border'
                       }`}
                     >
                       {model.label}
@@ -1081,13 +1072,13 @@ function AIWorkspace({ task, project, customer }) {
             {/* Custom system prompt */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
                   System Prompt
                 </p>
                 {customPrompt.trim() && (
                   <button
                     onClick={() => updateAiSettings({ prompts: { [outputType]: '' } })}
-                    className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-gray-300 transition-colors"
+                    className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground/80 transition-colors"
                     title="Reset to default"
                   >
                     <RotateCcw size={9} /> Reset to default
@@ -1099,9 +1090,9 @@ function AIWorkspace({ task, project, customer }) {
                 value={customPrompt}
                 onChange={e => updateAiSettings({ prompts: { [outputType]: e.target.value } })}
                 placeholder={`Leave blank to use the built-in default prompt for "${AI_OUTPUT_TYPE_LABELS[outputType]}".`}
-                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-xs text-gray-200 placeholder-gray-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40 resize-none font-mono leading-relaxed"
+                className="w-full bg-secondary border border-border rounded-xl px-3 py-2.5 text-xs text-foreground/90 placeholder-gray-600 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40 resize-none font-mono leading-relaxed"
               />
-              <p className="mt-1 text-[10px] text-gray-600">
+              <p className="mt-1 text-[10px] text-muted-foreground/70">
                 {customPrompt.trim()
                   ? 'Using your custom prompt. Task description and recipient are included automatically by the built-in prompts — in custom prompts you control everything.'
                   : 'Using built-in default. Customize to change tone, format, or add standing instructions.'}
@@ -1114,17 +1105,17 @@ function AIWorkspace({ task, project, customer }) {
       {/* Voice + text input */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <p className="text-xs font-medium text-gray-400">Context / Notes</p>
+          <p className="text-xs font-medium text-muted-foreground">Context / Notes</p>
           <button
             onClick={toggleListening}
             disabled={isTranscribing}
             title={isListening ? 'Stop recording' : 'Record voice input (Whisper)'}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all border ${
               isListening
-                ? 'bg-red-600/20 border-red-500/40 text-red-400 animate-pulse'
+                ? 'bg-destructive/20 border-destructive/40 text-destructive animate-pulse'
                 : isTranscribing
-                  ? 'bg-gray-800 border-gray-700 text-gray-400 cursor-not-allowed opacity-60'
-                  : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-white'
+                  ? 'bg-secondary border-border text-muted-foreground cursor-not-allowed opacity-60'
+                  : 'bg-secondary border-border text-muted-foreground hover:text-foreground'
             }`}
           >
             {isTranscribing
@@ -1139,13 +1130,13 @@ function AIWorkspace({ task, project, customer }) {
           value={userInput}
           onChange={e => setUserInput(e.target.value)}
           placeholder="Describe the situation, add context, or speak using the mic button above…"
-          className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40 resize-none"
+          className="w-full bg-secondary border border-border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40 resize-none"
         />
       </div>
 
       {/* Error */}
       {error && (
-        <div className="flex items-start gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+        <div className="flex items-start gap-2 p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs">
           <AlertCircle size={13} className="flex-shrink-0 mt-0.5" />
           {error}
         </div>
@@ -1155,7 +1146,7 @@ function AIWorkspace({ task, project, customer }) {
       <button
         onClick={handleGenerate}
         disabled={isGenerating || !userInput.trim()}
-        className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-sm transition-all shadow-lg shadow-indigo-600/30"
+        className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-brand-lavender hover:bg-brand-lavender/80 disabled:opacity-40 disabled:cursor-not-allowed text-foreground font-bold text-sm transition-all shadow-lg shadow-indigo-600/30"
       >
         {isGenerating
           ? <><Loader2 size={16} className="animate-spin" /> Generating…</>
@@ -1165,17 +1156,17 @@ function AIWorkspace({ task, project, customer }) {
 
       {/* Current output */}
       {currentOutput && (
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-3">
+        <div className="bg-card border border-border rounded-2xl p-4 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                 {AI_OUTPUT_TYPE_LABELS[currentOutput.outputType]}
               </p>
               {currentOutput.provider && (
                 <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${
                   currentOutput.provider === 'claude'
-                    ? 'bg-amber-500/15 text-amber-400 border-amber-500/20'
-                    : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20'
+                    ? 'bg-amber-500/15 text-brand-amber border-amber-500/20'
+                    : 'bg-brand-sage/15 text-brand-sage border-brand-sage/20'
                 }`}>
                   {currentOutput.provider === 'claude' ? 'Claude' : 'GPT-4o'}
                 </span>
@@ -1184,15 +1175,15 @@ function AIWorkspace({ task, project, customer }) {
             <div className="flex gap-1.5">
               <button
                 onClick={handleCopy}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs text-gray-400 hover:text-white transition-all border border-gray-700"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-secondary hover:bg-muted text-xs text-muted-foreground hover:text-foreground transition-all border border-border"
               >
-                {copied ? <><Check size={12} className="text-emerald-400" /> Copied!</> : <><Copy size={12} /> Copy</>}
+                {copied ? <><Check size={12} className="text-brand-sage" /> Copied!</> : <><Copy size={12} /> Copy</>}
               </button>
               <button
                 onClick={handleSave}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs text-gray-400 hover:text-white transition-all border border-gray-700"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-secondary hover:bg-muted text-xs text-muted-foreground hover:text-foreground transition-all border border-border"
               >
-                {savedMsg ? <><Check size={12} className="text-emerald-400" /> Saved!</> : <><Save size={12} /> Save</>}
+                {savedMsg ? <><Check size={12} className="text-brand-sage" /> Saved!</> : <><Save size={12} /> Save</>}
               </button>
             </div>
           </div>
@@ -1200,11 +1191,11 @@ function AIWorkspace({ task, project, customer }) {
             value={editedText}
             onChange={e => setEditedText(e.target.value)}
             rows={Math.max(6, editedText.split('\n').length + 1)}
-            className="w-full bg-transparent text-sm text-gray-200 leading-relaxed resize-none focus:outline-none placeholder-gray-600"
+            className="w-full bg-transparent text-sm text-foreground/90 leading-relaxed resize-none focus:outline-none placeholder-gray-600"
             placeholder="Output will appear here…"
           />
           {editedText !== currentOutput.outputText && (
-            <p className="text-[10px] text-indigo-400/60 flex items-center gap-1">
+            <p className="text-[10px] text-brand-lavender/60 flex items-center gap-1">
               ✎ Edited — copy or save to use your version
             </p>
           )}
@@ -1214,7 +1205,7 @@ function AIWorkspace({ task, project, customer }) {
       {/* Output history */}
       {history.length > 0 && (
         <div>
-          <p className="text-xs font-medium text-gray-500 mb-2">Previous Outputs ({history.length})</p>
+          <p className="text-xs font-medium text-muted-foreground mb-2">Previous Outputs ({history.length})</p>
           <div className="space-y-2">
             {history.map(h => (
               <HistoryItem key={h.id} h={h} />
@@ -1252,17 +1243,17 @@ function QuickAddTaskForm({ projects, customers, onSubmit, onCancel }) {
   const canSubmit = form.projectId && form.description.trim();
 
   return (
-    <div className="bg-gray-800/60 border border-indigo-500/30 rounded-xl p-3 space-y-3">
-      <p className="text-xs font-semibold text-indigo-300 uppercase tracking-wide">New Task</p>
+    <div className="bg-secondary/60 border border-indigo-500/30 rounded-xl p-3 space-y-3">
+      <p className="text-xs font-semibold text-brand-lavender/80 uppercase tracking-wide">New Task</p>
 
       {/* Project selector */}
       <div>
         <div className="flex items-center justify-between mb-1">
-          <label className="text-xs text-gray-400">Project *</label>
+          <label className="text-xs text-muted-foreground">Project *</label>
           <button
             type="button"
             onClick={() => setShowInlineCreate(v => !v)}
-            className="text-[10px] font-semibold text-indigo-400 hover:text-indigo-300 transition-colors"
+            className="text-[10px] font-semibold text-brand-lavender hover:text-brand-lavender/80 transition-colors"
           >
             {showInlineCreate ? '✕ Cancel' : '+ New Project'}
           </button>
@@ -1270,7 +1261,7 @@ function QuickAddTaskForm({ projects, customers, onSubmit, onCancel }) {
         <select
           value={form.projectId}
           onChange={e => setForm(p => ({ ...p, projectId: e.target.value }))}
-          className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+          className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
         >
           <option value="">— Select project —</option>
           {projectOptions.map(p => (
@@ -1292,23 +1283,23 @@ function QuickAddTaskForm({ projects, customers, onSubmit, onCancel }) {
 
       {/* Description */}
       <div>
-        <label className="block text-xs text-gray-400 mb-1">Task Description *</label>
+        <label className="block text-xs text-muted-foreground mb-1">Task Description *</label>
         <textarea
           rows={2}
           value={form.description}
           onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
           placeholder="What needs to be done?"
-          className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40 resize-none"
+          className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40 resize-none"
         />
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs text-gray-400 mb-1">Task Type</label>
+          <label className="block text-xs text-muted-foreground mb-1">Task Type</label>
           <select
             value={form.taskType}
             onChange={e => setForm(p => ({ ...p, taskType: e.target.value }))}
-            className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+            className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
           >
             {TASK_TYPES.map(t => (
               <option key={t} value={t}>{TASK_TYPE_LABELS[t]}</option>
@@ -1316,11 +1307,11 @@ function QuickAddTaskForm({ projects, customers, onSubmit, onCancel }) {
           </select>
         </div>
         <div>
-          <label className="block text-xs text-gray-400 mb-1">Status</label>
+          <label className="block text-xs text-muted-foreground mb-1">Status</label>
           <select
             value={form.status}
             onChange={e => setForm(p => ({ ...p, status: e.target.value }))}
-            className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+            className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
           >
             {TASK_STATUSES.map(s => (
               <option key={s} value={s}>{TASK_STATUS_LABELS[s]}</option>
@@ -1330,11 +1321,11 @@ function QuickAddTaskForm({ projects, customers, onSubmit, onCancel }) {
       </div>
 
       <div>
-        <label className="block text-xs text-gray-400 mb-1">Recipient <span className="text-gray-600">(optional)</span></label>
+        <label className="block text-xs text-muted-foreground mb-1">Recipient <span className="text-muted-foreground/70">(optional)</span></label>
         <select
           value={form.assigneeOrTeam}
           onChange={e => setForm(p => ({ ...p, assigneeOrTeam: e.target.value }))}
-          className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+          className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
         >
           <option value="">— Select recipient —</option>
           {TASK_RECIPIENTS.map(r => (
@@ -1347,7 +1338,7 @@ function QuickAddTaskForm({ projects, customers, onSubmit, onCancel }) {
         <button
           type="button"
           onClick={onCancel}
-          className="flex-1 py-2 rounded-xl bg-gray-700 hover:bg-gray-600 text-xs font-medium transition-colors"
+          className="flex-1 py-2 rounded-xl bg-muted hover:bg-gray-600 text-xs font-medium transition-colors"
         >
           Cancel
         </button>
@@ -1355,7 +1346,7 @@ function QuickAddTaskForm({ projects, customers, onSubmit, onCancel }) {
           type="button"
           disabled={!canSubmit}
           onClick={() => onSubmit({ ...form, description: form.description.trim() })}
-          className="flex-1 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-white transition-colors"
+          className="flex-1 py-2 rounded-xl bg-brand-lavender hover:bg-brand-lavender/80 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-foreground transition-colors"
         >
           Create Task
         </button>
@@ -1386,8 +1377,8 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, project, customer,
       style={style}
       className={`flex items-center gap-2 rounded-xl px-3 py-2.5 transition-all ${
         isSelected
-          ? 'bg-indigo-600/10 border border-indigo-500/40'
-          : 'bg-gray-800/50 border border-gray-700/60 hover:border-gray-600'
+          ? 'bg-brand-lavender/10 border border-indigo-500/40'
+          : 'bg-secondary/50 border border-border/60 hover:border-border'
       }`}
     >
       {/* Bulk select checkbox */}
@@ -1397,7 +1388,7 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, project, customer,
           checked={!!isSelected}
           onChange={() => onToggleSelect(task.id)}
           onClick={e => e.stopPropagation()}
-          className="w-3.5 h-3.5 rounded border-gray-600 bg-gray-800 text-indigo-500 focus:ring-indigo-500/40 focus:ring-1 flex-shrink-0 cursor-pointer accent-indigo-500"
+          className="w-3.5 h-3.5 rounded border-border bg-secondary text-indigo-500 focus:ring-ring/40 focus:ring-1 flex-shrink-0 cursor-pointer accent-indigo-500"
         />
       )}
 
@@ -1405,7 +1396,7 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, project, customer,
       <button
         {...attributes}
         {...listeners}
-        className="cursor-grab active:cursor-grabbing text-gray-600 hover:text-gray-400 flex-shrink-0 touch-none p-0.5"
+        className="cursor-grab active:cursor-grabbing text-muted-foreground/70 hover:text-muted-foreground flex-shrink-0 touch-none p-0.5"
         onClick={e => e.stopPropagation()}
         aria-label="Drag to reorder"
       >
@@ -1430,17 +1421,17 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, project, customer,
               {customer.name}
             </span>
           )}
-          <span className="text-sm text-gray-200 truncate">{task.description}</span>
+          <span className="text-sm text-foreground/90 truncate">{task.description}</span>
         </div>
         {project && (
-          <p className="text-[10px] text-gray-500 mt-0.5 truncate">{project.name}</p>
+          <p className="text-[10px] text-muted-foreground mt-0.5 truncate">{project.name}</p>
         )}
         <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
           <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${typeColors.bg} ${typeColors.text} ${typeColors.border}`}>
             {TASK_TYPE_LABELS[task.taskType]}
           </span>
           <span
-            className="text-[10px] text-gray-500"
+            className="text-[10px] text-muted-foreground"
             title={`Created ${ageDays} day${ageDays === 1 ? '' : 's'} ago`}
           >
             {ageDays}d old
@@ -1451,7 +1442,7 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, project, customer,
             </span>
           )}
           {task.ticketUrl && (
-            <span className="text-[10px] text-indigo-400/70 flex items-center gap-0.5">
+            <span className="text-[10px] text-brand-lavender/70 flex items-center gap-0.5">
               <ExternalLink size={9} /> ticket
             </span>
           )}
@@ -1469,7 +1460,7 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, project, customer,
           className={`text-[10px] font-semibold rounded-lg px-2 py-1 border cursor-pointer focus:outline-none ${statusColors.bg} ${statusColors.text} ${statusColors.border} bg-transparent`}
         >
           {TASK_STATUSES.map(s => (
-            <option key={s} value={s} className="bg-gray-800 text-white">{TASK_STATUS_LABELS[s]}</option>
+            <option key={s} value={s} className="bg-secondary text-foreground">{TASK_STATUS_LABELS[s]}</option>
           ))}
         </select>
       </div>
@@ -1527,7 +1518,7 @@ function TaskDetailView({ task, project, customer, onBack }) {
 
   const ageDays = Math.floor((Date.now() - new Date(task.createdAt)) / 86_400_000);
 
-  const selectClass = 'w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40';
+  const selectClass = 'w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground/90 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40';
 
   return (
     <div>
@@ -1535,7 +1526,7 @@ function TaskDetailView({ task, project, customer, onBack }) {
       <div className="flex items-center gap-3 mb-6">
         <button
           onClick={onBack}
-          className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-white transition-colors"
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft size={16} /> Back to Queue
         </button>
@@ -1548,7 +1539,7 @@ function TaskDetailView({ task, project, customer, onBack }) {
           </span>
         )}
         {project && (
-          <span className="text-xs text-gray-500">{project.name}</span>
+          <span className="text-xs text-muted-foreground">{project.name}</span>
         )}
       </div>
 
@@ -1557,43 +1548,43 @@ function TaskDetailView({ task, project, customer, onBack }) {
 
         {/* ── Left panel (40%) — task metadata + notes ── */}
         <div className="w-2/5 flex-shrink-0 space-y-4">
-          <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-0">Task Details</h3>
+          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-0">Task Details</h3>
 
           {/* Description */}
           <div>
-            <label className="text-xs font-medium text-gray-400 mb-1 block">Task</label>
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">Task</label>
             <textarea
               value={descDraft}
               onChange={e => setDescDraft(e.target.value)}
               onBlur={saveDesc}
               rows={2}
-              className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-gray-200 resize-none focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+              className="w-full bg-secondary border border-border rounded-xl px-3 py-2.5 text-sm text-foreground/90 resize-none focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
             />
           </div>
 
           {/* Status + Type */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-medium text-gray-400 mb-1 block">Status</label>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Status</label>
               <select
                 value={task.status}
                 onChange={e => updateTask(task.id, { status: e.target.value })}
                 className={selectClass}
               >
                 {TASK_STATUSES.map(s => (
-                  <option key={s} value={s} className="bg-gray-800">{TASK_STATUS_LABELS[s]}</option>
+                  <option key={s} value={s} className="bg-secondary">{TASK_STATUS_LABELS[s]}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-400 mb-1 block">Type</label>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Type</label>
               <select
                 value={task.taskType}
                 onChange={e => updateTask(task.id, { taskType: e.target.value })}
                 className={selectClass}
               >
                 {TASK_TYPES.map(t => (
-                  <option key={t} value={t} className="bg-gray-800">{TASK_TYPE_LABELS[t]}</option>
+                  <option key={t} value={t} className="bg-secondary">{TASK_TYPE_LABELS[t]}</option>
                 ))}
               </select>
             </div>
@@ -1601,22 +1592,22 @@ function TaskDetailView({ task, project, customer, onBack }) {
 
           {/* Assignee / Recipient */}
           <div>
-            <label className="text-xs font-medium text-gray-400 mb-1 block">Recipient / Assignee</label>
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">Recipient / Assignee</label>
             <select
               value={task.assigneeOrTeam || ''}
               onChange={e => updateTask(task.id, { assigneeOrTeam: e.target.value })}
               className={selectClass}
             >
-              <option value="" className="bg-gray-800">— None —</option>
+              <option value="" className="bg-secondary">— None —</option>
               {TASK_RECIPIENTS.map(r => (
-                <option key={r.value} value={r.value} className="bg-gray-800">{r.label}</option>
+                <option key={r.value} value={r.value} className="bg-secondary">{r.label}</option>
               ))}
             </select>
           </div>
 
           {/* Ticket URL */}
           <div>
-            <label className="text-xs font-medium text-gray-400 mb-1 flex items-center gap-1">
+            <label className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1">
               <ExternalLink size={11} /> Ticket / Link
             </label>
             <div className="flex gap-2">
@@ -1626,14 +1617,14 @@ function TaskDetailView({ task, project, customer, onBack }) {
                 onChange={e => setTicketUrl(e.target.value)}
                 onBlur={saveTicket}
                 placeholder="https://jira.company.com/ticket/123"
-                className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-gray-200 placeholder:text-gray-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+                className="flex-1 bg-secondary border border-border rounded-xl px-3 py-2 text-xs text-foreground/90 placeholder:text-muted-foreground/70 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
               />
               {ticketUrl && (
                 <a
                   href={ticketUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center px-3 py-2 bg-gray-800 border border-gray-700 rounded-xl text-indigo-400 hover:text-indigo-300 hover:border-gray-600 transition-colors"
+                  className="flex items-center px-3 py-2 bg-secondary border border-border rounded-xl text-brand-lavender hover:text-brand-lavender/80 hover:border-border transition-colors"
                 >
                   <ExternalLink size={13} />
                 </a>
@@ -1643,18 +1634,17 @@ function TaskDetailView({ task, project, customer, onBack }) {
 
           {/* Notes & Artifacts */}
           <div className="flex flex-col">
-            <label className="text-xs font-medium text-gray-400 mb-1 block">Notes & Artifacts</label>
-            <textarea
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">Notes & Artifacts</label>
+            <RichTextEditor
               value={notesDraft}
-              onChange={e => handleNotesChange(e.target.value)}
+              onChange={handleNotesChange}
               placeholder="Paste links, screenshots, context, artifacts, email threads…"
-              rows={12}
-              className="w-full bg-gray-800/60 border border-gray-700/50 rounded-xl px-3 py-2.5 text-sm text-gray-300 placeholder:text-gray-600 resize-y focus:outline-none focus:border-gray-600"
+              minHeight="300px"
             />
 
             {/* File Attachments */}
             <div className="mt-3">
-              <label className="text-xs font-medium text-gray-400 mb-1.5 flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 flex items-center gap-1">
                 <Paperclip size={11} /> Attachments
               </label>
               <FileAttachments
@@ -1665,13 +1655,13 @@ function TaskDetailView({ task, project, customer, onBack }) {
           </div>
 
           {/* Footer: meta info + timer + archive */}
-          <div className="flex items-center justify-between pt-2 border-t border-gray-800 gap-2 flex-wrap">
-            <div className="flex items-center gap-2 text-[10px] text-gray-600">
+          <div className="flex items-center justify-between pt-2 border-t border-border gap-2 flex-wrap">
+            <div className="flex items-center gap-2 text-[10px] text-muted-foreground/70">
               <Calendar size={10} />
               <span>
                 {new Date(task.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
               </span>
-              <span className="text-gray-500">{ageDays}d old</span>
+              <span className="text-muted-foreground">{ageDays}d old</span>
             </div>
 
             <div className="flex items-center gap-2">
@@ -1679,7 +1669,7 @@ function TaskDetailView({ task, project, customer, onBack }) {
               {isRunningForThisTask ? (
                 <button
                   onClick={stopTimer}
-                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-red-600/20 hover:bg-red-600/40 text-red-400 border border-red-500/50 transition-all animate-pulse font-mono tabular-nums"
+                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-destructive/20 hover:bg-destructive/40 text-destructive border border-destructive/50 transition-all animate-pulse font-mono tabular-nums"
                   title="Stop timer"
                 >
                   <Square size={12} fill="currentColor" />
@@ -1694,7 +1684,7 @@ function TaskDetailView({ task, project, customer, onBack }) {
                       startTimer(task.projectId, task.id, task.description);
                     }
                   }}
-                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 border border-emerald-500/50 transition-all shadow-sm shadow-emerald-500/10"
+                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-brand-sage/20 hover:bg-brand-sage/40 text-brand-sage border border-brand-sage/50 transition-all shadow-sm shadow-emerald-500/10"
                   title="Start timer for this task"
                 >
                   <Timer size={14} /> Start Timer
@@ -1704,7 +1694,7 @@ function TaskDetailView({ task, project, customer, onBack }) {
               {/* Archive */}
               <button
                 onClick={() => setShowConfirmArchive(true)}
-                className="px-2.5 py-1.5 rounded-lg text-xs text-gray-400 hover:text-white hover:bg-gray-800 border border-gray-700/50 transition-all flex items-center gap-1.5"
+                className="px-2.5 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-secondary border border-border/50 transition-all flex items-center gap-1.5"
               >
                 <Archive size={12} /> Archive
               </button>
@@ -1712,7 +1702,7 @@ function TaskDetailView({ task, project, customer, onBack }) {
               {/* Delete */}
               <button
                 onClick={() => setShowConfirmDelete(true)}
-                className="px-2.5 py-1.5 rounded-lg text-xs text-red-500 hover:text-red-400 hover:bg-red-500/10 border border-red-500/20 transition-all flex items-center gap-1.5"
+                className="px-2.5 py-1.5 rounded-lg text-xs text-destructive hover:text-destructive hover:bg-destructive/10 border border-destructive/20 transition-all flex items-center gap-1.5"
               >
                 <Trash2 size={12} /> Delete
               </button>
@@ -1721,11 +1711,11 @@ function TaskDetailView({ task, project, customer, onBack }) {
         </div>
 
         {/* Vertical divider */}
-        <div className="w-px self-stretch bg-gray-800" />
+        <div className="w-px self-stretch bg-secondary" />
 
         {/* ── Right panel (60%) — AI Workspace ── */}
         <div className="flex-1 min-w-0">
-          <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">AI Assist</h3>
+          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">AI Assist</h3>
           <AIWorkspace task={task} project={project} customer={customer} />
         </div>
       </div>
@@ -2009,10 +1999,10 @@ export default function Triage() {
       <div>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <ClipboardList size={15} className="text-amber-400" />
-            <h2 className="text-sm font-semibold text-white">Triage Queue</h2>
+            <ClipboardList size={15} className="text-brand-amber" />
+            <h2 className="text-sm font-semibold text-foreground">Triage Queue</h2>
             {untriagedEntries.length > 0 && (
-              <span className="bg-amber-500/20 text-amber-400 border border-amber-500/20 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+              <span className="bg-amber-500/20 text-brand-amber border border-amber-500/20 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
                 {untriagedEntries.length}
               </span>
             )}
@@ -2020,10 +2010,10 @@ export default function Triage() {
         </div>
 
         {untriagedEntries.length === 0 ? (
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl px-5 py-10 text-center">
-            <ClipboardList size={24} className="text-gray-700 mx-auto mb-2" />
-            <p className="text-gray-500 text-sm">Queue is clear!</p>
-            <p className="text-gray-600 text-xs mt-1">All meeting entries have been triaged.</p>
+          <div className="bg-card border border-border rounded-2xl px-5 py-10 text-center">
+            <ClipboardList size={24} className="text-muted-foreground/60 mx-auto mb-2" />
+            <p className="text-muted-foreground text-sm">Queue is clear!</p>
+            <p className="text-muted-foreground/70 text-xs mt-1">All meeting entries have been triaged.</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -2033,10 +2023,10 @@ export default function Triage() {
                   {customer && (
                     <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: customer.color || '#6366f1' }} />
                   )}
-                  <span className="text-xs font-semibold text-gray-400">
+                  <span className="text-xs font-semibold text-muted-foreground">
                     {customer?.name || 'No Customer'}
                   </span>
-                  <span className="text-xs text-gray-600">({customerEntries.length})</span>
+                  <span className="text-xs text-muted-foreground/70">({customerEntries.length})</span>
                 </div>
                 <div className="space-y-2">
                   {customerEntries.map(({ entry, project, customer: c }) => (
@@ -2059,15 +2049,15 @@ export default function Triage() {
       <div>
         {/* Board header */}
         <div className="flex items-center gap-2 mb-3">
-          <Tag size={15} className="text-indigo-400" />
-          <h2 className="text-sm font-semibold text-white">Task Board</h2>
+          <Tag size={15} className="text-brand-lavender" />
+          <h2 className="text-sm font-semibold text-foreground">Task Board</h2>
           {boardTab === 'active' && activeTasks.length > 0 && (
-            <span className="bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+            <span className="bg-brand-lavender/20 text-brand-lavender border border-indigo-500/20 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
               {activeTasks.length} active
             </span>
           )}
           {boardTab === 'closed' && closedTasks.length > 0 && (
-            <span className="bg-gray-500/20 text-gray-400 border border-gray-500/20 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+            <span className="bg-gray-500/20 text-muted-foreground border border-gray-500/20 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
               {closedTasks.length} closed
             </span>
           )}
@@ -2080,8 +2070,8 @@ export default function Triage() {
             onClick={() => setShowQuickAdd(v => !v)}
             className={`ml-auto flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
               showQuickAdd
-                ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300'
-                : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-indigo-300 hover:border-indigo-500/40'
+                ? 'bg-brand-lavender/20 border-indigo-500/40 text-brand-lavender/80'
+                : 'bg-secondary border-border text-muted-foreground hover:text-brand-lavender/80 hover:border-indigo-500/40'
             }`}
           >
             <Plus size={12} />
@@ -2115,7 +2105,7 @@ export default function Triage() {
           <select
             value={filterCustomerId}
             onChange={e => handleCustomerFilter(e.target.value)}
-            className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+            className="flex-1 bg-secondary border border-border rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
           >
             <option value="">All clients</option>
             {customersWithTasks.map(c => (
@@ -2125,7 +2115,7 @@ export default function Triage() {
           <select
             value={filterProjectId}
             onChange={e => { setFilterProjectId(e.target.value); clearSelection(); }}
-            className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+            className="flex-1 bg-secondary border border-border rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
             disabled={projectsForFilter.length === 0}
           >
             <option value="">All projects</option>
@@ -2142,7 +2132,7 @@ export default function Triage() {
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
               filterPriorityProjects
                 ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
-                : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-amber-300 hover:border-amber-500/40'
+                : 'bg-secondary border-border text-muted-foreground hover:text-amber-300 hover:border-amber-500/40'
             }`}
           >
             <Pin size={11} /> Priority Projects
@@ -2152,7 +2142,7 @@ export default function Triage() {
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
               filterPriorityClients
                 ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
-                : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-amber-300 hover:border-amber-500/40'
+                : 'bg-secondary border-border text-muted-foreground hover:text-amber-300 hover:border-amber-500/40'
             }`}
           >
             <Pin size={11} /> Priority Clients
@@ -2164,7 +2154,7 @@ export default function Triage() {
           <select
             value={filterTaskType}
             onChange={e => { setFilterTaskType(e.target.value); clearSelection(); }}
-            className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+            className="flex-1 bg-secondary border border-border rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
           >
             <option value="">All types</option>
             {TASK_TYPES.map(t => (
@@ -2176,7 +2166,7 @@ export default function Triage() {
             <select
               value={filterStatus}
               onChange={e => { setFilterStatus(e.target.value); clearSelection(); }}
-              className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+              className="flex-1 bg-secondary border border-border rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
             >
               <option value="">All statuses</option>
               {TASK_STATUSES.filter(s => !['done', 'archived'].includes(s)).map(s => (
@@ -2195,7 +2185,7 @@ export default function Triage() {
                 setFilterPriorityClients(false);
                 clearSelection();
               }}
-              className="px-2.5 py-2 rounded-xl bg-gray-800 border border-gray-700 text-[10px] text-gray-400 hover:text-white hover:border-gray-600 transition-colors flex-shrink-0"
+              className="px-2.5 py-2 rounded-xl bg-secondary border border-border text-[10px] text-muted-foreground hover:text-foreground hover:border-border transition-colors flex-shrink-0"
               title="Clear all filters"
             >
               ✕
@@ -2204,11 +2194,11 @@ export default function Triage() {
         </div>
 
         {/* Active / Closed tab switcher */}
-        <div className="flex gap-1 bg-gray-800/50 rounded-xl p-1 mb-3 w-fit">
+        <div className="flex gap-1 bg-secondary/50 rounded-xl p-1 mb-3 w-fit">
           <button
             onClick={() => { setBoardTab('active'); setFilterStatus('open'); setFilterCustomerId(''); setFilterProjectId(''); setFilterTaskType(''); setFilterPriorityProjects(false); setFilterPriorityClients(false); clearSelection(); }}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              boardTab === 'active' ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-400 hover:text-white'
+              boardTab === 'active' ? 'bg-muted text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             Active ({activeTasks.length})
@@ -2216,13 +2206,13 @@ export default function Triage() {
           <button
             onClick={() => { setBoardTab('closed'); setFilterStatus(''); setFilterCustomerId(''); setFilterProjectId(''); setFilterTaskType(''); setFilterPriorityProjects(false); setFilterPriorityClients(false); clearSelection(); }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              boardTab === 'closed' ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-400 hover:text-white'
+              boardTab === 'closed' ? 'bg-muted text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             Closed
             {closedTasks.length > 0 && (
               <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-                boardTab === 'closed' ? 'bg-gray-600 text-gray-300' : 'bg-gray-700 text-gray-400'
+                boardTab === 'closed' ? 'bg-gray-600 text-foreground/80' : 'bg-muted text-muted-foreground'
               }`}>
                 {closedTasks.length}
               </span>
@@ -2232,37 +2222,37 @@ export default function Triage() {
 
         {/* Bulk action bar — shown when tasks are selected */}
         {boardTab === 'active' && selectedTaskIds.size > 0 && (
-          <div className="flex items-center gap-3 bg-indigo-600/10 border border-indigo-500/30 rounded-xl px-4 py-2.5 mb-3 flex-wrap">
+          <div className="flex items-center gap-3 bg-brand-lavender/10 border border-indigo-500/30 rounded-xl px-4 py-2.5 mb-3 flex-wrap">
             <div className="flex items-center gap-1.5">
-              <CheckSquare size={13} className="text-indigo-400" />
-              <span className="text-xs font-semibold text-indigo-300">{selectedTaskIds.size} selected</span>
+              <CheckSquare size={13} className="text-brand-lavender" />
+              <span className="text-xs font-semibold text-brand-lavender/80">{selectedTaskIds.size} selected</span>
             </div>
             <div className="flex items-center gap-2 ml-auto">
               <button
                 onClick={selectAll}
-                className="px-2.5 py-1 rounded-lg bg-gray-800 border border-gray-700 text-[10px] font-medium text-gray-400 hover:text-white hover:border-gray-600 transition-colors"
+                className="px-2.5 py-1 rounded-lg bg-secondary border border-border text-[10px] font-medium text-muted-foreground hover:text-foreground hover:border-border transition-colors"
               >
                 Select All
               </button>
               <button
                 onClick={clearSelection}
-                className="px-2.5 py-1 rounded-lg bg-gray-800 border border-gray-700 text-[10px] font-medium text-gray-400 hover:text-white hover:border-gray-600 transition-colors"
+                className="px-2.5 py-1 rounded-lg bg-secondary border border-border text-[10px] font-medium text-muted-foreground hover:text-foreground hover:border-border transition-colors"
               >
                 Clear
               </button>
               <select
                 onChange={e => { if (e.target.value) handleBulkStatus(e.target.value); e.target.value = ''; }}
-                className="bg-gray-800 border border-gray-700 rounded-lg px-2.5 py-1 text-[10px] font-medium text-gray-300 focus:outline-none focus:border-indigo-500 cursor-pointer"
+                className="bg-secondary border border-border rounded-lg px-2.5 py-1 text-[10px] font-medium text-foreground/80 focus:outline-none focus:border-ring cursor-pointer"
                 defaultValue=""
               >
                 <option value="" disabled>Set Status…</option>
                 {TASK_STATUSES.map(s => (
-                  <option key={s} value={s} className="bg-gray-800 text-white">{TASK_STATUS_LABELS[s]}</option>
+                  <option key={s} value={s} className="bg-secondary text-foreground">{TASK_STATUS_LABELS[s]}</option>
                 ))}
               </select>
               <button
                 onClick={handleBulkArchive}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gray-800 border border-gray-700 text-[10px] font-medium text-gray-400 hover:text-amber-400 hover:border-amber-500/40 transition-colors"
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-secondary border border-border text-[10px] font-medium text-muted-foreground hover:text-brand-amber hover:border-amber-500/40 transition-colors"
               >
                 <Archive size={11} /> Archive
               </button>
@@ -2273,10 +2263,10 @@ export default function Triage() {
         {/* Active tab — draggable task list */}
         {boardTab === 'active' && (
           activeTasks.length === 0 ? (
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl px-5 py-10 text-center">
-              <Tag size={24} className="text-gray-700 mx-auto mb-2" />
-              <p className="text-gray-500 text-sm">{filtersActive ? 'No tasks match this filter.' : 'No active tasks.'}</p>
-              <p className="text-gray-600 text-xs mt-1">
+            <div className="bg-card border border-border rounded-2xl px-5 py-10 text-center">
+              <Tag size={24} className="text-muted-foreground/60 mx-auto mb-2" />
+              <p className="text-muted-foreground text-sm">{filtersActive ? 'No tasks match this filter.' : 'No active tasks.'}</p>
+              <p className="text-muted-foreground/70 text-xs mt-1">
                 {filtersActive ? 'Try a different filter.' : 'Convert a meeting entry above or add a task to get started.'}
               </p>
             </div>
@@ -2309,10 +2299,10 @@ export default function Triage() {
         {/* Closed tab — done + archived tasks, non-draggable */}
         {boardTab === 'closed' && (
           closedTasks.length === 0 ? (
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl px-5 py-10 text-center">
-              <Archive size={24} className="text-gray-700 mx-auto mb-2" />
-              <p className="text-gray-500 text-sm">{filtersActive ? 'No closed tasks match this filter.' : 'No closed tickets yet.'}</p>
-              <p className="text-gray-600 text-xs mt-1">Tasks marked done or archived will appear here.</p>
+            <div className="bg-card border border-border rounded-2xl px-5 py-10 text-center">
+              <Archive size={24} className="text-muted-foreground/60 mx-auto mb-2" />
+              <p className="text-muted-foreground text-sm">{filtersActive ? 'No closed tasks match this filter.' : 'No closed tickets yet.'}</p>
+              <p className="text-muted-foreground/70 text-xs mt-1">Tasks marked done or archived will appear here.</p>
             </div>
           ) : (
             <div className="space-y-2">

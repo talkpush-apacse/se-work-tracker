@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { FolderKanban } from 'lucide-react';
 import Modal from './Modal';
 import { useAppStore } from '../context/StoreContext';
+import { Button } from './ui/button';
 
 export default function BulkAddProjectsModal({ onClose }) {
   const { projects, customers, okrs, addProject } = useAppStore();
@@ -64,16 +65,14 @@ export default function BulkAddProjectsModal({ onClose }) {
     return (
       <Modal title="Bulk Add Projects" onClose={onClose} size="sm">
         <div className="text-center py-4 space-y-3">
-          <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto">
-            <FolderKanban size={22} className="text-emerald-400" />
+          <div className="w-12 h-12 rounded-full bg-brand-sage/10 flex items-center justify-center mx-auto">
+            <FolderKanban size={22} className="text-brand-sage" />
           </div>
-          <p className="text-white font-semibold">{result.added} project{result.added !== 1 ? 's' : ''} added!</p>
+          <p className="text-foreground font-semibold">{result.added} project{result.added !== 1 ? 's' : ''} added!</p>
           {result.skipped > 0 && (
-            <p className="text-xs text-amber-400">{result.skipped} skipped — already exist or duplicates in batch</p>
+            <p className="text-xs text-brand-amber">{result.skipped} skipped — already exist or duplicates in batch</p>
           )}
-          <button onClick={onClose} className="mt-4 w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm font-bold text-white transition-colors">
-            Done
-          </button>
+          <Button onClick={onClose} size="sm" className="mt-4 w-full">Done</Button>
         </div>
       </Modal>
     );
@@ -85,36 +84,36 @@ export default function BulkAddProjectsModal({ onClose }) {
         {/* Shared Customer + OKR selectors */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-gray-400 mb-1.5">Customer (applies to all) *</label>
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5">Customer (applies to all) *</label>
             <select
               value={selectedCustomerId}
               onChange={e => { setSelectedCustomerId(e.target.value); setErrors(prev => ({ ...prev, customer: undefined })); }}
-              className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+              className="w-full h-10 bg-card border border-border rounded-md px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
             >
               <option value="">Select customer...</option>
               {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
-            {errors.customer && <p className="mt-1 text-xs text-red-400">{errors.customer}</p>}
-            {customers.length === 0 && <p className="mt-1 text-xs text-gray-500">No customers yet — add one first.</p>}
+            {errors.customer && <p className="mt-1 text-xs text-destructive">{errors.customer}</p>}
+            {customers.length === 0 && <p className="mt-1 text-xs text-muted-foreground">No customers yet — add one first.</p>}
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-400 mb-1.5">OKR (applies to all) *</label>
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5">OKR (applies to all) *</label>
             <select
               value={selectedOkrId}
               onChange={e => { setSelectedOkrId(e.target.value); setErrors(prev => ({ ...prev, okr: undefined })); }}
-              className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+              className="w-full h-10 bg-card border border-border rounded-md px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
             >
               <option value="">Select OKR...</option>
               {okrs.map(o => <option key={o.id} value={o.id}>{o.title}</option>)}
             </select>
-            {errors.okr && <p className="mt-1 text-xs text-red-400">{errors.okr}</p>}
-            {okrs.length === 0 && <p className="mt-1 text-xs text-gray-500">No OKRs yet — add one first.</p>}
+            {errors.okr && <p className="mt-1 text-xs text-destructive">{errors.okr}</p>}
+            {okrs.length === 0 && <p className="mt-1 text-xs text-muted-foreground">No OKRs yet — add one first.</p>}
           </div>
         </div>
 
         {/* Shared settings info */}
         {(selectedCustomer || selectedOkr) && (
-          <div className="rounded-xl bg-indigo-950/40 border border-indigo-700/30 px-3 py-2.5 text-xs text-indigo-300">
+          <div className="rounded-xl bg-brand-lavender/10 border border-brand-lavender/20 px-3 py-2.5 text-xs text-brand-lavender">
             All projects will be: <span className="font-semibold">Active</span>
             {selectedCustomer && <> · <span className="font-semibold">{selectedCustomer.name}</span></>}
             {selectedOkr && <> · <span className="font-semibold truncate inline-block max-w-[180px] align-bottom">{selectedOkr.title}</span></>}
@@ -123,7 +122,7 @@ export default function BulkAddProjectsModal({ onClose }) {
 
         {/* Project names textarea */}
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1.5">
+          <label className="block text-xs font-medium text-muted-foreground mb-1.5">
             Project names — one per line
           </label>
           <textarea
@@ -132,45 +131,46 @@ export default function BulkAddProjectsModal({ onClose }) {
             placeholder={"TaskUs Onboarding Revamp\nAccenture Integration Phase 2\nInspiro QA Automation"}
             rows={5}
             autoFocus
-            className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40 resize-none font-mono"
+            className="w-full bg-card border border-border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40 resize-none font-mono"
           />
-          {errors.names && <p className="mt-1 text-xs text-red-400">{errors.names}</p>}
-          <p className="mt-1 text-xs text-gray-500">Blank lines are ignored. Existing project names are skipped.</p>
+          {errors.names && <p className="mt-1 text-xs text-destructive">{errors.names}</p>}
+          <p className="mt-1 text-xs text-muted-foreground">Blank lines are ignored. Existing project names are skipped.</p>
         </div>
 
         {/* Preview */}
         {parsed.length > 0 && (
-          <div className="border border-gray-700 rounded-xl overflow-hidden max-h-44 overflow-y-auto scrollbar-thin">
-            <div className="px-3 py-2 bg-gray-800/60 border-b border-gray-700 flex items-center justify-between">
-              <span className="text-xs font-medium text-gray-300">Preview</span>
-              <span className="text-xs text-gray-500">
+          <div className="border border-border rounded-xl overflow-hidden max-h-44 overflow-y-auto scrollbar-thin">
+            <div className="px-3 py-2 bg-secondary/60 border-b border-border flex items-center justify-between">
+              <span className="text-xs font-medium text-foreground/80">Preview</span>
+              <span className="text-xs text-muted-foreground">
                 {toAdd.length} to add{skipped.length > 0 ? `, ${skipped.length} skipped` : ''}
               </span>
             </div>
             {parsed.map((item, i) => (
               <div
                 key={i}
-                className={`flex items-center gap-3 px-3 py-2 border-b border-gray-800/60 last:border-0 ${item.skip ? 'opacity-40' : ''}`}
+                className={`flex items-center gap-3 px-3 py-2 border-b border-secondary/60 last:border-0 ${item.skip ? 'opacity-40' : ''}`}
               >
-                <FolderKanban size={13} className={item.skip ? 'text-gray-600' : 'text-indigo-400'} />
-                <span className={`text-sm flex-1 ${item.skip ? 'line-through text-gray-500' : 'text-white'}`}>{item.name}</span>
-                {item.skip && <span className="text-[10px] text-amber-500 flex-shrink-0">{item.reason}</span>}
+                <FolderKanban size={13} className={item.skip ? 'text-muted-foreground/40' : 'text-brand-lavender'} />
+                <span className={`text-sm flex-1 ${item.skip ? 'line-through text-muted-foreground' : 'text-foreground'}`}>{item.name}</span>
+                {item.skip && <span className="text-[10px] text-brand-amber flex-shrink-0">{item.reason}</span>}
               </div>
             ))}
           </div>
         )}
 
         <div className="flex gap-3 pt-1">
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl bg-gray-700 hover:bg-gray-600 text-sm font-medium transition-colors">
+          <Button variant="secondary" size="sm" onClick={onClose} className="flex-1">
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
+            size="sm"
             onClick={handleConfirm}
             disabled={toAdd.length === 0}
-            className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-bold text-white transition-colors"
+            className="flex-1"
           >
             Add {toAdd.length > 0 ? `${toAdd.length} ` : ''}Project{toAdd.length !== 1 ? 's' : ''}
-          </button>
+          </Button>
         </div>
       </div>
     </Modal>

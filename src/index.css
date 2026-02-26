@@ -2,39 +2,229 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─────────────────────────────────────────────
+   Design System Color Tokens
+   Light mode (fallback) + dark mode (default)
+───────────────────────────────────────────── */
 @layer base {
+  :root {
+    /* Light mode values */
+    --background:    60 100% 98%;
+    --foreground:    240 10% 8%;
+    --card:          0 0% 100%;
+    --card-foreground: 240 10% 8%;
+    --popover:       0 0% 100%;
+    --popover-foreground: 240 10% 8%;
+    --primary:       240 10% 8%;
+    --primary-foreground: 50 30% 92%;
+    --secondary:     60 30% 95%;
+    --secondary-foreground: 240 10% 8%;
+    --muted:         60 20% 93%;
+    --muted-foreground: 240 5% 45%;
+    --accent:        298 72% 85%;
+    --accent-foreground: 240 10% 8%;
+    --destructive:   0 65% 60%;
+    --destructive-foreground: 50 30% 92%;
+    --border:        240 5% 85%;
+    --input:         240 5% 75%;
+    --ring:          240 10% 8%;
+
+    /* Sidebar light */
+    --sidebar-background:        240 6% 11%;
+    --sidebar-foreground:        0 0% 95%;
+    --sidebar-accent:            240 5% 17%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border:            240 5% 17%;
+
+    /* Border radius base */
+    --radius: 0.375rem;
+
+    /* Brand palette — light values */
+    --brand-sage:          139 28% 74%;
+    --brand-sage-lightest: 139 25% 88%;
+    --brand-sage-lighter:  139 28% 80%;
+    --brand-sage-darker:   139 30% 58%;
+
+    --brand-lavender:          223 64% 84%;
+    --brand-lavender-lightest: 223 55% 92%;
+    --brand-lavender-lighter:  223 60% 88%;
+    --brand-lavender-darker:   223 45% 68%;
+
+    --brand-pink:          298 72% 85%;
+    --brand-pink-lightest: 298 60% 92%;
+    --brand-pink-lighter:  298 65% 88%;
+    --brand-pink-darker:   298 50% 70%;
+
+    --brand-amber:          36 86% 64%;
+    --brand-amber-lightest: 36 75% 82%;
+    --brand-amber-lighter:  36 80% 74%;
+    --brand-amber-darker:   36 80% 52%;
+  }
+
+  .dark {
+    /* Dark mode values (active by default) */
+    --background:    240 8% 9%;
+    --foreground:    50 30% 92%;
+    --card:          240 6% 13%;
+    --card-foreground: 50 30% 92%;
+    --popover:       240 6% 13%;
+    --popover-foreground: 50 30% 92%;
+    --primary:       50 30% 92%;
+    --primary-foreground: 240 10% 8%;
+    --secondary:     240 5% 18%;
+    --secondary-foreground: 50 30% 92%;
+    --muted:         240 5% 18%;
+    --muted-foreground: 240 5% 55%;
+    --accent:        298 50% 65%;
+    --accent-foreground: 50 30% 92%;
+    --destructive:   0 55% 55%;
+    --destructive-foreground: 50 30% 92%;
+    --border:        240 3% 35%;
+    --input:         240 3% 35%;
+    --ring:          50 30% 92%;
+
+    /* Sidebar dark */
+    --sidebar-background:        240 6% 11%;
+    --sidebar-foreground:        0 0% 95%;
+    --sidebar-accent:            240 5% 17%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border:            240 5% 17%;
+
+    /* Brand palette — dark adjusted (hue preserved, lightness adjusted) */
+    --brand-sage:          139 25% 62%;
+    --brand-sage-lightest: 139 20% 30%;
+    --brand-sage-lighter:  139 22% 36%;
+    --brand-sage-darker:   139 30% 72%;
+
+    --brand-lavender:          223 50% 70%;
+    --brand-lavender-lightest: 223 30% 28%;
+    --brand-lavender-lighter:  223 35% 34%;
+    --brand-lavender-darker:   223 55% 78%;
+
+    --brand-pink:          298 40% 65%;
+    --brand-pink-lightest: 298 25% 26%;
+    --brand-pink-lighter:  298 30% 32%;
+    --brand-pink-darker:   298 45% 72%;
+
+    --brand-amber:          36 70% 58%;
+    --brand-amber-lightest: 36 45% 26%;
+    --brand-amber-lighter:  36 50% 32%;
+    --brand-amber-darker:   36 75% 65%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
   body {
-    @apply bg-gray-950 text-gray-100 font-sans;
+    @apply bg-background text-foreground font-sans;
     margin: 0;
     min-width: 320px;
     min-height: 100vh;
   }
 }
 
+/* ─────────────────────────────────────────────
+   Utilities
+───────────────────────────────────────────── */
 @layer utilities {
   .scrollbar-thin {
     scrollbar-width: thin;
-    scrollbar-color: #374151 transparent;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
   }
   .scrollbar-thin::-webkit-scrollbar {
-    width: 4px;
+    width: 6px;
+    height: 6px;
   }
   .scrollbar-thin::-webkit-scrollbar-track {
     background: transparent;
   }
   .scrollbar-thin::-webkit-scrollbar-thumb {
-    background-color: #374151;
-    border-radius: 2px;
+    background-color: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 3px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--muted-foreground) / 0.5);
+  }
+
+  .brand-gradient-strip {
+    background: linear-gradient(to right, #F2B457, #F1C1F3, #BBCAF0, #ACCDB5);
   }
 }
 
+/* ─────────────────────────────────────────────
+   Rich text editor (TipTap ProseMirror)
+───────────────────────────────────────────── */
+.rich-text-editor-content .ProseMirror {
+  outline: none;
+}
+.rich-text-editor-content .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: hsl(var(--muted-foreground) / 0.7);
+  pointer-events: none;
+  float: left;
+  height: 0;
+}
+.rich-text-editor-content .ProseMirror h2 { font-size: 1.05em; font-weight: 700; margin: 0.75em 0 0.25em; }
+.rich-text-editor-content .ProseMirror h3 { font-size: 0.95em; font-weight: 600; margin: 0.6em 0 0.2em; }
+.rich-text-editor-content .ProseMirror p { margin-bottom: 0.4em; }
+.rich-text-editor-content .ProseMirror ul { list-style: disc; padding-left: 1.4em; margin-bottom: 0.4em; }
+.rich-text-editor-content .ProseMirror ol { list-style: decimal; padding-left: 1.4em; margin-bottom: 0.4em; }
+.rich-text-editor-content .ProseMirror li { margin-bottom: 0.1em; }
+.rich-text-editor-content .ProseMirror blockquote {
+  border-left: 3px solid hsl(var(--border));
+  padding-left: 0.9em;
+  color: hsl(var(--muted-foreground));
+  margin: 0.4em 0;
+}
+.rich-text-editor-content .ProseMirror strong { font-weight: 600; }
+.rich-text-editor-content .ProseMirror em { font-style: italic; }
+.rich-text-editor-content .ProseMirror u { text-decoration: underline; }
+.rich-text-editor-content .ProseMirror a {
+  color: hsl(var(--brand-lavender));
+  text-decoration: underline;
+  cursor: pointer;
+}
+.rich-text-editor-content .ProseMirror img {
+  max-width: 100%;
+  border-radius: 0.5rem;
+  margin: 0.5em 0;
+  display: block;
+}
+.rich-text-editor-content .ProseMirror hr {
+  border: none;
+  border-top: 1px solid hsl(var(--border));
+  margin: 0.75em 0;
+}
+
+/* Read-only rich text display (meeting log, archived snippets) */
+.rich-text-display p { margin-bottom: 0.4em; }
+.rich-text-display ul { list-style: disc; padding-left: 1.4em; }
+.rich-text-display ol { list-style: decimal; padding-left: 1.4em; }
+.rich-text-display strong { font-weight: 600; }
+.rich-text-display em { font-style: italic; }
+.rich-text-display u { text-decoration: underline; }
+.rich-text-display h2 { font-size: 1em; font-weight: 700; margin-bottom: 0.25em; }
+.rich-text-display h3 { font-size: 0.9em; font-weight: 600; margin-bottom: 0.2em; }
+.rich-text-display a { color: hsl(var(--brand-lavender)); text-decoration: underline; }
+.rich-text-display img { max-width: 100%; border-radius: 0.5rem; margin: 0.5em 0; }
+.rich-text-display blockquote {
+  border-left: 3px solid hsl(var(--border));
+  padding-left: 0.9em;
+  color: hsl(var(--muted-foreground));
+}
+.rich-text-display hr { border: none; border-top: 1px solid hsl(var(--border)); margin: 0.5em 0; }
+
+/* ─────────────────────────────────────────────
+   Legacy animations (kept for existing features)
+───────────────────────────────────────────── */
 .point-flash {
   animation: pointFlash 0.9s ease-out forwards;
   pointer-events: none;
 }
 
 @keyframes pointFlash {
-  0% { opacity: 1; transform: translateY(0) scale(1); }
-  40% { opacity: 1; transform: translateY(-28px) scale(1.4); }
+  0%   { opacity: 1; transform: translateY(0) scale(1); }
+  40%  { opacity: 1; transform: translateY(-28px) scale(1.4); }
   100% { opacity: 0; transform: translateY(-56px) scale(0.9); }
 }

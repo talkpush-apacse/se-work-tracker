@@ -13,9 +13,9 @@ const CHART_COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#f
 
 function Section({ title, children }) {
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-      <div className="px-5 py-4 border-b border-gray-800">
-        <h2 className="font-semibold text-white">{title}</h2>
+    <div className="bg-card border border-border rounded-2xl overflow-hidden">
+      <div className="px-5 py-4 border-b border-border">
+        <h2 className="font-semibold text-foreground">{title}</h2>
       </div>
       <div className="p-5">{children}</div>
     </div>
@@ -25,8 +25,8 @@ function Section({ title, children }) {
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs shadow-xl">
-      {label && <p className="text-gray-400 mb-1">{label}</p>}
+    <div className="bg-secondary border border-border rounded-xl px-3 py-2 text-xs shadow-xl">
+      {label && <p className="text-muted-foreground mb-1">{label}</p>}
       {payload.map((p, i) => (
         <p key={i} style={{ color: p.color || p.fill }}>{p.name}: <strong>{typeof p.value === 'number' ? p.value.toFixed(p.name?.includes('hrs') ? 1 : 0) : p.value}</strong></p>
       ))}
@@ -187,45 +187,45 @@ export default function Analytics({ onNavigate }) {
     return byProject.map(p => ({ ...p, x: p.hrs, y: p.pts, z: 10 }));
   }, [byProject]);
 
-  const inputClass = "bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500";
+  const inputClass = "bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-ring";
 
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between flex-wrap gap-3">
-        <h1 className="text-2xl font-bold text-white">Analytics</h1>
+        <h1 className="text-2xl font-bold text-foreground">Analytics</h1>
       </div>
 
       {/* Filters */}
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4">
+      <div className="bg-card border border-border rounded-2xl p-4">
         <div className="flex flex-wrap items-center gap-3">
           {/* Range */}
           <div className="flex flex-col gap-1">
-            <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wider">Time Period</span>
-            <div className="flex bg-gray-800 rounded-xl p-1 gap-1">
+            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Time Period</span>
+            <div className="flex bg-secondary rounded-xl p-1 gap-1">
               {[['thisWeek', 'This Week'], ['lastWeek', 'Last Week'], ['custom', 'Custom']].map(([v, l]) => (
-                <button key={v} onClick={() => setRangeMode(v)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${rangeMode === v ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}>{l}</button>
+                <button key={v} onClick={() => setRangeMode(v)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${rangeMode === v ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>{l}</button>
               ))}
             </div>
           </div>
           {rangeMode === 'custom' && (
             <div className="flex items-center gap-2 self-end">
               <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className={inputClass} />
-              <span className="text-gray-500 text-sm">to</span>
+              <span className="text-muted-foreground text-sm">to</span>
               <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className={inputClass} />
             </div>
           )}
           {/* Divider between filter groups */}
-          <div className="w-px h-10 bg-gray-700 flex-shrink-0 self-end" />
+          <div className="w-px h-10 bg-muted flex-shrink-0 self-end" />
           {/* Granularity */}
           <div className="flex flex-col gap-1">
-            <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wider">Granularity</span>
-            <div aria-label="View by" className="flex bg-gray-800 rounded-xl p-1 gap-1">
+            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Granularity</span>
+            <div aria-label="View by" className="flex bg-secondary rounded-xl p-1 gap-1">
               {[['daily', 'Daily'], ['weekly', 'Weekly'], ['monthly', 'Monthly']].map(([v, l]) => (
-                <button key={v} onClick={() => setGranularity(v)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${granularity === v ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}>{l}</button>
+                <button key={v} onClick={() => setGranularity(v)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${granularity === v ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>{l}</button>
               ))}
             </div>
           </div>
-          <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer select-none">
+          <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
             <input type="checkbox" checked={compareWeeks} onChange={e => setCompareWeeks(e.target.checked)} className="rounded" />
             Compare to last week
           </label>
@@ -233,14 +233,14 @@ export default function Analytics({ onNavigate }) {
       </div>
 
       {filteredPoints.length === 0 ? (
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl py-20 text-center">
-          <BarChart3 size={36} className="text-gray-700 mx-auto mb-4" />
-          <p className="text-base font-semibold text-gray-400 mb-2">No data yet</p>
-          <p className="text-sm text-gray-600 mb-6">Start logging points on your projects to see your activity here.</p>
+        <div className="bg-card border border-border rounded-2xl py-20 text-center">
+          <BarChart3 size={36} className="text-muted-foreground/60 mx-auto mb-4" />
+          <p className="text-base font-semibold text-muted-foreground mb-2">No data yet</p>
+          <p className="text-sm text-muted-foreground/70 mb-6">Start logging points on your projects to see your activity here.</p>
           {onNavigate && (
             <button
               onClick={() => onNavigate('projects')}
-              className="inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-400 hover:text-indigo-300 transition-colors"
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-lavender hover:text-brand-lavender/80 transition-colors"
             >
               Go to Projects →
             </button>
@@ -296,9 +296,9 @@ export default function Analytics({ onNavigate }) {
                   {byActivity.map((a, i) => (
                     <div key={i} className="flex items-center gap-2">
                       <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: a.color }} />
-                      <span className="text-xs text-gray-300 flex-1 truncate">{a.name}</span>
-                      <span className="text-xs font-bold text-white">{a.pts} pts</span>
-                      <span className="text-xs text-gray-500 w-8 text-right">{a.pct}%</span>
+                      <span className="text-xs text-foreground/80 flex-1 truncate">{a.name}</span>
+                      <span className="text-xs font-bold text-foreground">{a.pts} pts</span>
+                      <span className="text-xs text-muted-foreground w-8 text-right">{a.pct}%</span>
                     </div>
                   ))}
                 </div>
@@ -367,9 +367,9 @@ export default function Analytics({ onNavigate }) {
                     if (!active || !payload?.length) return null;
                     const d = payload[0]?.payload;
                     return (
-                      <div className="bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs shadow-xl">
-                        <p className="text-white font-medium">{d.name}</p>
-                        <p className="text-gray-400">{d.y} pts · {d.x}h</p>
+                      <div className="bg-secondary border border-border rounded-xl px-3 py-2 text-xs shadow-xl">
+                        <p className="text-foreground font-medium">{d.name}</p>
+                        <p className="text-muted-foreground">{d.y} pts · {d.x}h</p>
                       </div>
                     );
                   }} />
@@ -378,7 +378,7 @@ export default function Analytics({ onNavigate }) {
                   </Scatter>
                 </ScatterChart>
               </ResponsiveContainer>
-              <p className="text-xs text-gray-600 mt-2 text-center">High points + low hours = efficient wins. High hours + low points = time sinks.</p>
+              <p className="text-xs text-muted-foreground/70 mt-2 text-center">High points + low hours = efficient wins. High hours + low points = time sinks.</p>
             </Section>
           </div>
         </>

@@ -22,20 +22,20 @@ function CustomerBadge({ customerId, customers, size = 'sm' }) {
 
 function StatCard({ icon: Icon, label, value, sub, color = 'indigo' }) {
   const colors = {
-    indigo: 'text-indigo-400 bg-indigo-500/10',
+    indigo: 'text-brand-lavender bg-brand-lavender/10',
     violet: 'text-violet-400 bg-violet-500/10',
-    amber: 'text-amber-400 bg-amber-500/10',
-    emerald: 'text-emerald-400 bg-emerald-500/10',
+    amber: 'text-brand-amber bg-amber-500/10',
+    emerald: 'text-brand-sage bg-brand-sage/10',
     rose: 'text-rose-400 bg-rose-500/10',
   };
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4">
+    <div className="bg-card border border-border rounded-2xl p-4">
       <div className={`inline-flex p-2 rounded-xl mb-3 ${colors[color]}`}>
         <Icon size={18} className={colors[color].split(' ')[0]} />
       </div>
-      <p className="text-2xl font-bold text-white">{value}</p>
-      <p className="text-sm text-gray-400 mt-0.5">{label}</p>
-      {sub && <p className="text-xs text-gray-600 mt-0.5">{sub}</p>}
+      <p className="text-2xl font-bold text-foreground">{value}</p>
+      <p className="text-sm text-muted-foreground mt-0.5">{label}</p>
+      {sub && <p className="text-xs text-muted-foreground/70 mt-0.5">{sub}</p>}
     </div>
   );
 }
@@ -122,9 +122,9 @@ export default function Dashboard({ onNavigate }) {
 
   const rankIcon = (i) => {
     if (i === 0) return <Trophy size={16} className="text-yellow-400" />;
-    if (i === 1) return <span className="text-gray-400 font-bold text-sm">2</span>;
+    if (i === 1) return <span className="text-muted-foreground font-bold text-sm">2</span>;
     if (i === 2) return <span className="text-orange-400 font-bold text-sm">3</span>;
-    return <span className="text-gray-600 text-sm font-medium">{i + 1}</span>;
+    return <span className="text-muted-foreground/70 text-sm font-medium">{i + 1}</span>;
   };
 
   return (
@@ -132,9 +132,9 @@ export default function Dashboard({ onNavigate }) {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            This week: <span className={totalPts > 0 ? 'text-indigo-400 font-semibold' : 'text-gray-400'}>{totalPts} pts</span> across <span className={weekPoints.length > 0 ? 'text-indigo-400 font-semibold' : 'text-gray-400'}>{weekPoints.length}</span> entries
+          <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            This week: <span className={totalPts > 0 ? 'text-brand-lavender font-semibold' : 'text-muted-foreground'}>{totalPts} pts</span> across <span className={weekPoints.length > 0 ? 'text-brand-lavender font-semibold' : 'text-muted-foreground'}>{weekPoints.length}</span> entries
           </p>
         </div>
         {streak > 0 && (
@@ -158,26 +158,26 @@ export default function Dashboard({ onNavigate }) {
       {totalPts > 0 && (
         <div className="bg-gradient-to-r from-indigo-900/50 to-violet-900/30 border border-indigo-700/40 rounded-2xl p-4">
           <p className="text-sm text-indigo-200">
-            <span className="font-bold text-white">Weekly Summary:</span> You've invested{' '}
+            <span className="font-bold text-foreground">Weekly Summary:</span> You've invested{' '}
             <span className="text-yellow-400 font-bold">{totalPts} points</span> and{' '}
-            <span className="text-emerald-400 font-bold">{totalHrs.toFixed(1)}h</span> across{' '}
+            <span className="text-brand-sage font-bold">{totalHrs.toFixed(1)}h</span> across{' '}
             {new Set(weekPoints.map(p => p.projectId)).size} projects.
-            {topProject && <> Top focus: <span className="text-indigo-300 font-semibold">{topProject.name}</span>.</>}
+            {topProject && <> Top focus: <span className="text-brand-lavender/80 font-semibold">{topProject.name}</span>.</>}
           </p>
         </div>
       )}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Leaderboard */}
-        <div className="xl:col-span-2 bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-800 flex items-center justify-between">
-            <h2 className="font-semibold text-white flex items-center gap-2"><Trophy size={16} className="text-yellow-400" /> Project Leaderboard</h2>
-            <span className="text-xs text-gray-500">Active projects</span>
+        <div className="xl:col-span-2 bg-card border border-border rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+            <h2 className="font-semibold text-foreground flex items-center gap-2"><Trophy size={16} className="text-yellow-400" /> Project Leaderboard</h2>
+            <span className="text-xs text-muted-foreground">Active projects</span>
           </div>
           {leaderboard.length === 0 ? (
             <div className="px-5 py-12 text-center">
-              <p className="text-gray-500 text-sm">No active projects yet.</p>
-              <button onClick={() => onNavigate('projects')} className="mt-3 text-sm text-indigo-400 hover:text-indigo-300">Create your first project →</button>
+              <p className="text-muted-foreground text-sm">No active projects yet.</p>
+              <button onClick={() => onNavigate('projects')} className="mt-3 text-sm text-brand-lavender hover:text-brand-lavender/80">Create your first project →</button>
             </div>
           ) : (
             <div className="divide-y divide-gray-800/60">
@@ -190,14 +190,14 @@ export default function Dashboard({ onNavigate }) {
                 return (
                   <div
                     key={project.id}
-                    className={`px-5 py-3.5 hover:bg-gray-800/50 transition-colors cursor-pointer ${i === 0 ? 'bg-yellow-500/5' : ''}`}
+                    className={`px-5 py-3.5 hover:bg-secondary/50 transition-colors cursor-pointer ${i === 0 ? 'bg-yellow-500/5' : ''}`}
                     onClick={() => onNavigate('projects', project.id)}
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-7 flex items-center justify-center flex-shrink-0">{rankIcon(i)}</div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`font-semibold text-sm ${i === 0 ? 'text-yellow-100' : 'text-white'}`}>{project.name}</span>
+                          <span className={`font-semibold text-sm ${i === 0 ? 'text-yellow-100' : 'text-foreground'}`}>{project.name}</span>
                           {customer && (
                             <span
                               className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold"
@@ -207,8 +207,8 @@ export default function Dashboard({ onNavigate }) {
                             </span>
                           )}
                         </div>
-                        {okr && <p className="text-[11px] text-gray-500 mt-0.5 truncate">{okr.title}</p>}
-                        <div className="mt-1.5 h-1 bg-gray-800 rounded-full overflow-hidden">
+                        {okr && <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{okr.title}</p>}
+                        <div className="mt-1.5 h-1 bg-secondary rounded-full overflow-hidden">
                           <div
                             className="h-full rounded-full transition-all duration-700"
                             style={{ width: `${pct}%`, backgroundColor: customer?.color || '#6366f1' }}
@@ -217,12 +217,12 @@ export default function Dashboard({ onNavigate }) {
                       </div>
                       <div className="text-right flex-shrink-0">
                         <div className="relative">
-                          <p className={`font-bold text-sm ${i === 0 ? 'text-yellow-400' : 'text-white'}`}>{project.totalPoints} pts</p>
+                          <p className={`font-bold text-sm ${i === 0 ? 'text-yellow-400' : 'text-foreground'}`}>{project.totalPoints} pts</p>
                           {isFlashing && (
                             <span className="point-flash absolute -top-1 right-0 text-xs font-bold text-yellow-400 whitespace-nowrap">+pts!</span>
                           )}
                         </div>
-                        <p className="text-[11px] text-gray-500">{project.totalHours.toFixed(1)}h</p>
+                        <p className="text-[11px] text-muted-foreground">{project.totalHours.toFixed(1)}h</p>
                       </div>
                       {/* Timer button */}
                       <button
@@ -237,8 +237,8 @@ export default function Dashboard({ onNavigate }) {
                         }}
                         className={`p-1.5 rounded-lg transition-colors flex-shrink-0 ${
                           runningProjectId === project.id
-                            ? 'bg-emerald-600/30 text-emerald-400 cursor-default'
-                            : 'bg-gray-700/50 hover:bg-emerald-600/20 text-gray-400 hover:text-emerald-400'
+                            ? 'bg-brand-sage/30 text-brand-sage cursor-default'
+                            : 'bg-muted/50 hover:bg-brand-sage/20 text-muted-foreground hover:text-brand-sage'
                         }`}
                         title={runningProjectId === project.id ? 'Timer running' : 'Start timer'}
                       >
@@ -247,7 +247,7 @@ export default function Dashboard({ onNavigate }) {
                       {/* Add points button */}
                       <button
                         onClick={(e) => { e.stopPropagation(); setAddModal(project); }}
-                        className="p-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-400 transition-colors flex-shrink-0"
+                        className="p-1.5 rounded-lg bg-brand-lavender/20 hover:bg-brand-lavender/40 text-brand-lavender transition-colors flex-shrink-0"
                         title="Add points"
                       >
                         <Plus size={13} />
@@ -261,18 +261,18 @@ export default function Dashboard({ onNavigate }) {
         </div>
 
         {/* Recent Activity */}
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-800">
-            <h2 className="font-semibold text-white flex items-center gap-2"><Activity size={16} className="text-indigo-400" /> Recent Activity</h2>
+        <div className="bg-card border border-border rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-border">
+            <h2 className="font-semibold text-foreground flex items-center gap-2"><Activity size={16} className="text-brand-lavender" /> Recent Activity</h2>
           </div>
           {recentActivity.length === 0 ? (
             <div className="px-5 py-12 text-center">
-              <Activity size={28} className="text-gray-700 mx-auto mb-3" />
-              <p className="text-sm font-medium text-gray-500 mb-1">No activity yet</p>
-              <p className="text-xs text-gray-600 mb-4">Log points on your projects to see your work history here.</p>
+              <Activity size={28} className="text-muted-foreground/60 mx-auto mb-3" />
+              <p className="text-sm font-medium text-muted-foreground mb-1">No activity yet</p>
+              <p className="text-xs text-muted-foreground/70 mb-4">Log points on your projects to see your work history here.</p>
               <button
                 onClick={() => onNavigate('projects')}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-400 hover:text-indigo-300 transition-colors"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-lavender hover:text-brand-lavender/80 transition-colors"
               >
                 Log your first points →
               </button>
@@ -283,13 +283,13 @@ export default function Dashboard({ onNavigate }) {
                 <div key={entry.id} className="px-4 py-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-white truncate">{entry.project?.name || 'Unknown'}</p>
-                      <p className="text-[11px] text-gray-500">{entry.activityType || 'General'}</p>
-                      {entry.comment && <p className="text-[11px] text-gray-600 mt-0.5 truncate">{entry.comment}</p>}
+                      <p className="text-sm font-medium text-foreground truncate">{entry.project?.name || 'Unknown'}</p>
+                      <p className="text-[11px] text-muted-foreground">{entry.activityType || 'General'}</p>
+                      {entry.comment && <p className="text-[11px] text-muted-foreground/70 mt-0.5 truncate">{entry.comment}</p>}
                     </div>
                     <div className="text-right flex-shrink-0">
-                      <span className="text-sm font-bold text-indigo-400">+{entry.points}</span>
-                      <p className="text-[10px] text-gray-600">{formatRelative(entry.timestamp)}</p>
+                      <span className="text-sm font-bold text-brand-lavender">+{entry.points}</span>
+                      <p className="text-[10px] text-muted-foreground/70">{formatRelative(entry.timestamp)}</p>
                     </div>
                   </div>
                 </div>
@@ -301,10 +301,10 @@ export default function Dashboard({ onNavigate }) {
 
       {/* OKR Health */}
       {okrHealth.length > 0 && (
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-800 flex items-center justify-between">
-            <h2 className="font-semibold text-white">OKR Investment Health</h2>
-            <span className="text-xs text-gray-500">Are you working on the right things?</span>
+        <div className="bg-card border border-border rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+            <h2 className="font-semibold text-foreground">OKR Investment Health</h2>
+            <span className="text-xs text-muted-foreground">Are you working on the right things?</span>
           </div>
           <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {okrHealth.map((okr, i) => {
@@ -314,15 +314,15 @@ export default function Dashboard({ onNavigate }) {
                 <button
                   key={okr.id}
                   onClick={() => onNavigate('okrs')}
-                  className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50 text-left w-full cursor-pointer hover:border-indigo-500/50 hover:bg-gray-800/80 transition-all"
+                  className="bg-secondary/50 rounded-xl p-4 border border-border/50 text-left w-full cursor-pointer hover:border-indigo-500/50 hover:bg-secondary/80 transition-all"
                 >
-                  <p className="text-sm font-semibold text-white leading-snug mb-3 line-clamp-2">{okr.title}</p>
-                  <div className="h-1.5 bg-gray-700 rounded-full overflow-hidden mb-2">
+                  <p className="text-sm font-semibold text-foreground leading-snug mb-3 line-clamp-2">{okr.title}</p>
+                  <div className="h-1.5 bg-muted rounded-full overflow-hidden mb-2">
                     <div className="h-full bg-indigo-500 rounded-full transition-all duration-700" style={{ width: `${pct}%` }} />
                   </div>
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-400">{okr.projectCount} project{okr.projectCount !== 1 ? 's' : ''}</span>
-                    <span className="text-white font-bold">{okr.totalPoints} pts · {okr.totalHours.toFixed(1)}h</span>
+                    <span className="text-muted-foreground">{okr.projectCount} project{okr.projectCount !== 1 ? 's' : ''}</span>
+                    <span className="text-foreground font-bold">{okr.totalPoints} pts · {okr.totalHours.toFixed(1)}h</span>
                   </div>
                 </button>
               );

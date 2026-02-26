@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { StoreProvider } from './context/StoreContext';
 import { TimerProvider } from './context/TimerContext';
 import Navigation from './components/Navigation';
@@ -9,6 +10,11 @@ import Analytics from './pages/Analytics';
 import OKRs from './pages/OKRs';
 import Customers from './pages/Customers';
 import Triage from './pages/Triage';
+
+const pageVariants = {
+  hidden: { opacity: 0, y: 16 },
+  show:   { opacity: 1, y: 0, transition: { duration: 0.22, ease: 'easeOut' } },
+};
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState('triage');
@@ -25,7 +31,7 @@ function AppContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950">
+    <div className="min-h-screen bg-background">
       <Navigation activeTab={activeTab} onTabChange={handleTabChange} />
 
       {/* Main content — offset matches sidebar: icon-only (md:w-16) at md, full (lg:w-56) at lg */}
@@ -33,17 +39,26 @@ function AppContent() {
         <div className="max-w-6xl mx-auto px-4 py-6">
           {/* TimerWidget is global — appears on all tabs while a timer is running */}
           <TimerWidget />
-          {activeTab === 'dashboard' && <Dashboard onNavigate={handleNavigate} />}
-          {activeTab === 'projects' && (
-            <Projects
-              initialProjectId={projectTarget}
-              onProjectSelect={(id) => setProjectTarget(id)}
-            />
-          )}
-          {activeTab === 'triage' && <Triage />}
-          {activeTab === 'analytics' && <Analytics onNavigate={handleNavigate} />}
-          {activeTab === 'okrs' && <OKRs />}
-          {activeTab === 'customers' && <Customers />}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              variants={pageVariants}
+              initial="hidden"
+              animate="show"
+            >
+              {activeTab === 'dashboard' && <Dashboard onNavigate={handleNavigate} />}
+              {activeTab === 'projects' && (
+                <Projects
+                  initialProjectId={projectTarget}
+                  onProjectSelect={(id) => setProjectTarget(id)}
+                />
+              )}
+              {activeTab === 'triage' && <Triage />}
+              {activeTab === 'analytics' && <Analytics onNavigate={handleNavigate} />}
+              {activeTab === 'okrs' && <OKRs />}
+              {activeTab === 'customers' && <Customers />}
+            </motion.div>
+          </AnimatePresence>
         </div>
       </main>
     </div>

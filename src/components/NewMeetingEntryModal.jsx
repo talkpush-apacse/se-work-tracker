@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import Modal from './Modal';
 import { useAppStore } from '../context/StoreContext';
+import { Input } from './ui/input';
+import { Button } from './ui/button';
+import RichTextEditor from './ui/RichTextEditor';
 
 // Returns today's date as a YYYY-MM-DD string in local time
 function todayLocalISO() {
@@ -35,42 +38,44 @@ export default function NewMeetingEntryModal({ project, onClose }) {
     <Modal title="New Meeting Entry" onClose={onClose} size="lg">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1.5">Meeting Date *</label>
-          <input
+          <label className="block text-xs font-medium text-muted-foreground mb-1.5">Meeting Date *</label>
+          <Input
             type="date"
             value={form.meetingDate}
             onChange={(e) => setForm(p => ({ ...p, meetingDate: e.target.value }))}
-            className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40 [color-scheme:dark]"
+            className="[color-scheme:dark]"
           />
-          {errors.meetingDate && <p className="mt-1 text-xs text-red-400">{errors.meetingDate}</p>}
+          {errors.meetingDate && <p className="mt-1 text-xs text-destructive">{errors.meetingDate}</p>}
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1.5">Raw Notes *</label>
-          <textarea
-            rows={8}
-            placeholder="Paste your raw meeting notes here — action items, decisions, follow-ups, anything..."
+          <label className="block text-xs font-medium text-muted-foreground mb-1.5">Notes *</label>
+          <RichTextEditor
             value={form.rawNotes}
-            onChange={(e) => setForm(p => ({ ...p, rawNotes: e.target.value }))}
-            className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40 resize-y"
+            onChange={val => setForm(p => ({ ...p, rawNotes: val }))}
+            placeholder="Paste your raw meeting notes here — action items, decisions, follow-ups, anything..."
+            minHeight="200px"
           />
-          {errors.rawNotes && <p className="mt-1 text-xs text-red-400">{errors.rawNotes}</p>}
+          {errors.rawNotes && <p className="mt-1 text-xs text-destructive">{errors.rawNotes}</p>}
         </div>
 
         <div className="flex gap-3 pt-1">
-          <button
+          <Button
             type="button"
+            variant="secondary"
+            size="sm"
             onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl bg-gray-700 hover:bg-gray-600 text-sm font-medium transition-colors"
+            className="flex-1"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="submit"
-            className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm font-bold text-white transition-colors"
+            size="sm"
+            className="flex-1"
           >
             Save Entry
-          </button>
+          </Button>
         </div>
       </form>
     </Modal>

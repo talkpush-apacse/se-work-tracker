@@ -35,17 +35,17 @@ function CustomerForm({ initial = {}, onSubmit, onCancel }) {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="block text-xs font-medium text-gray-400 mb-1.5">Customer Name *</label>
+        <label className="block text-xs font-medium text-muted-foreground mb-1.5">Customer Name *</label>
         <input
           value={form.name}
           onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
           placeholder="e.g. TaskUs, Accenture, Inspiro"
-          className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+          className="w-full bg-secondary border border-border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
         />
-        {errors.name && <p className="mt-1 text-xs text-red-400">{errors.name}</p>}
+        {errors.name && <p className="mt-1 text-xs text-destructive">{errors.name}</p>}
       </div>
       <div>
-        <label className="block text-xs font-medium text-gray-400 mb-1.5">Color</label>
+        <label className="block text-xs font-medium text-muted-foreground mb-1.5">Color</label>
         <div className="flex flex-wrap gap-2">
           {CUSTOMER_COLORS.map(({ name, value }) => (
             <button
@@ -60,8 +60,8 @@ function CustomerForm({ initial = {}, onSubmit, onCancel }) {
         </div>
       </div>
       <div className="flex gap-3 pt-1">
-        <button type="button" onClick={onCancel} className="flex-1 py-2.5 rounded-xl bg-gray-700 hover:bg-gray-600 text-sm font-medium transition-colors">Cancel</button>
-        <button type="submit" className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm font-bold text-white transition-colors">{initial.id ? 'Save Changes' : 'Add Customer'}</button>
+        <button type="button" onClick={onCancel} className="flex-1 py-2.5 rounded-xl bg-muted hover:bg-gray-600 text-sm font-medium transition-colors">Cancel</button>
+        <button type="submit" className="flex-1 py-2.5 rounded-xl bg-brand-lavender hover:bg-brand-lavender/80 text-sm font-bold text-foreground transition-colors">{initial.id ? 'Save Changes' : 'Add Customer'}</button>
       </div>
     </form>
   );
@@ -75,19 +75,19 @@ function QuickAddProjectForm({ customerId, okrs, onSubmit, onCancel }) {
   const canSubmit = name.trim();
 
   return (
-    <div className="mt-3 pt-3 border-t border-gray-700/60 space-y-2">
-      <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">New Project</p>
+    <div className="mt-3 pt-3 border-t border-border/60 space-y-2">
+      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">New Project</p>
       <input
         value={name}
         onChange={e => setName(e.target.value)}
         placeholder="Project name *"
-        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+        className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
       />
       {okrs.length > 0 && (
         <select
           value={okrId}
           onChange={e => setOkrId(e.target.value)}
-          className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+          className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-xs text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
         >
           <option value="">— Link OKR (optional) —</option>
           {okrs.map(o => (
@@ -99,7 +99,7 @@ function QuickAddProjectForm({ customerId, okrs, onSubmit, onCancel }) {
         <button
           type="button"
           onClick={onCancel}
-          className="flex-1 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-xs font-medium transition-colors"
+          className="flex-1 py-1.5 rounded-lg bg-muted hover:bg-gray-600 text-xs font-medium transition-colors"
         >
           Cancel
         </button>
@@ -107,7 +107,7 @@ function QuickAddProjectForm({ customerId, okrs, onSubmit, onCancel }) {
           type="button"
           disabled={!canSubmit}
           onClick={() => onSubmit({ name: name.trim(), customerId, okrId: okrId || null })}
-          className="flex-1 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-white transition-colors"
+          className="flex-1 py-1.5 rounded-lg bg-brand-lavender hover:bg-brand-lavender/80 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-foreground transition-colors"
         >
           Create
         </button>
@@ -142,7 +142,7 @@ function SortableCustomerRow({ customer, linkedProjects, totalPoints, totalHours
       className={`rounded-2xl transition-all ${
         customer.pinned
           ? 'bg-amber-950/20 border border-amber-700/40'
-          : 'bg-gray-900 border border-gray-800'
+          : 'bg-card border border-border'
       } ${isDragging ? 'shadow-2xl shadow-black/40 z-10' : ''}`}
     >
       {/* Colored left border stripe */}
@@ -154,7 +154,7 @@ function SortableCustomerRow({ customer, linkedProjects, totalPoints, totalHours
         <button
           {...attributes}
           {...listeners}
-          className="cursor-grab active:cursor-grabbing text-gray-600 hover:text-gray-400 transition-colors flex-shrink-0 touch-none"
+          className="cursor-grab active:cursor-grabbing text-muted-foreground/70 hover:text-muted-foreground transition-colors flex-shrink-0 touch-none"
           title="Drag to reorder"
           aria-label="Drag to reorder"
         >
@@ -163,7 +163,7 @@ function SortableCustomerRow({ customer, linkedProjects, totalPoints, totalHours
 
         {/* Customer avatar */}
         <div
-          className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center text-white font-bold text-sm"
+          className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center text-foreground font-bold text-sm"
           style={{ backgroundColor: customer.color + '22', color: customer.color }}
           title="Customer color"
         >
@@ -172,28 +172,28 @@ function SortableCustomerRow({ customer, linkedProjects, totalPoints, totalHours
 
         {/* Name + date */}
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-white truncate">{customer.name}</p>
-          <p className="text-xs text-gray-500">Added: {formatDate(customer.createdAt)}</p>
+          <p className="font-semibold text-foreground truncate">{customer.name}</p>
+          <p className="text-xs text-muted-foreground">Added: {formatDate(customer.createdAt)}</p>
         </div>
 
         {/* Stats */}
         <div className="hidden sm:flex items-center gap-4 flex-shrink-0 text-center">
           <div>
             <p className="text-sm font-bold" style={{ color: customer.color }}>{linkedProjects.length}</p>
-            <p className="text-[10px] text-gray-500">Projects</p>
+            <p className="text-[10px] text-muted-foreground">Projects</p>
           </div>
           <div>
-            <p className="text-sm font-bold text-white">{totalPoints}</p>
-            <p className="text-[10px] text-gray-500">Points</p>
+            <p className="text-sm font-bold text-foreground">{totalPoints}</p>
+            <p className="text-[10px] text-muted-foreground">Points</p>
           </div>
           <div>
-            <p className="text-sm font-bold text-white">{totalHours.toFixed(1)}</p>
-            <p className="text-[10px] text-gray-500">Hours</p>
+            <p className="text-sm font-bold text-foreground">{totalHours.toFixed(1)}</p>
+            <p className="text-[10px] text-muted-foreground">Hours</p>
           </div>
           {taskPts > 0 && (
             <div>
               <p className="text-sm font-bold text-teal-400">⚡{taskPts}</p>
-              <p className="text-[10px] text-gray-500">Task Pts</p>
+              <p className="text-[10px] text-muted-foreground">Task Pts</p>
             </div>
           )}
         </div>
@@ -203,7 +203,7 @@ function SortableCustomerRow({ customer, linkedProjects, totalPoints, totalHours
           <button
             onClick={() => setShowAddProject(v => !v)}
             title="Add project for this customer"
-            className="p-1.5 rounded-lg text-gray-500 hover:text-indigo-400 hover:bg-gray-800 transition-colors"
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-brand-lavender hover:bg-secondary transition-colors"
           >
             <FolderKanban size={13} />
           </button>
@@ -212,14 +212,14 @@ function SortableCustomerRow({ customer, linkedProjects, totalPoints, totalHours
             title={customer.pinned ? 'Unpin customer' : 'Pin to top'}
             className={`p-1.5 rounded-lg transition-colors ${
               customer.pinned
-                ? 'text-amber-400 hover:text-amber-300 hover:bg-amber-900/40'
-                : 'text-gray-500 hover:text-amber-400 hover:bg-gray-800'
+                ? 'text-brand-amber hover:text-amber-300 hover:bg-amber-900/40'
+                : 'text-muted-foreground hover:text-brand-amber hover:bg-secondary'
             }`}
           >
             {customer.pinned ? <PinOff size={13} /> : <Pin size={13} />}
           </button>
-          <button onClick={() => onEdit(customer)} className="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-gray-800 transition-colors"><Pencil size={13} /></button>
-          <button onClick={() => onDelete(customer)} className="p-1.5 rounded-lg text-gray-500 hover:text-red-400 hover:bg-gray-800 transition-colors"><Trash2 size={13} /></button>
+          <button onClick={() => onEdit(customer)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"><Pencil size={13} /></button>
+          <button onClick={() => onDelete(customer)} className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-secondary transition-colors"><Trash2 size={13} /></button>
         </div>
       </div>
 
@@ -310,19 +310,19 @@ export default function Customers() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Customers</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Enterprise clients linked to your projects</p>
+          <h1 className="text-2xl font-bold text-foreground">Customers</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Enterprise clients linked to your projects</p>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setBulkModal(true)}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 border border-gray-700 text-sm font-medium text-gray-300 hover:text-white transition-all"
+            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-secondary hover:bg-muted border border-border text-sm font-medium text-foreground/80 hover:text-foreground transition-all"
           >
             <ListPlus size={15} /> Bulk Add
           </button>
           <button
             onClick={() => setCreateModal(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm font-bold text-white transition-all shadow-lg shadow-indigo-600/30"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-lavender hover:bg-brand-lavender/80 text-sm font-bold text-foreground transition-all shadow-lg shadow-indigo-600/30"
           >
             <Plus size={16} /> Add Customer
           </button>
@@ -330,10 +330,10 @@ export default function Customers() {
       </div>
 
       {customers.length === 0 ? (
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl py-16 text-center">
-          <Users size={32} className="text-gray-700 mx-auto mb-3" />
-          <p className="text-gray-500 text-sm">No customers yet.</p>
-          <button onClick={() => setCreateModal(true)} className="mt-3 text-sm text-indigo-400 hover:text-indigo-300">Add your first customer →</button>
+        <div className="bg-card border border-border rounded-2xl py-16 text-center">
+          <Users size={32} className="text-muted-foreground/60 mx-auto mb-3" />
+          <p className="text-muted-foreground text-sm">No customers yet.</p>
+          <button onClick={() => setCreateModal(true)} className="mt-3 text-sm text-brand-lavender hover:text-brand-lavender/80">Add your first customer →</button>
         </div>
       ) : (
         <div className="space-y-6">
@@ -341,9 +341,9 @@ export default function Customers() {
           {pinnedCustomers.length > 0 && (
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <Pin size={13} className="text-amber-400" />
+                <Pin size={13} className="text-brand-amber" />
                 <span className="text-sm font-semibold text-amber-300">Priority</span>
-                <span className="text-xs text-gray-600">({pinnedCustomers.length})</span>
+                <span className="text-xs text-muted-foreground/70">({pinnedCustomers.length})</span>
               </div>
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handlePinnedDragEnd}>
                 <SortableContext items={pinnedCustomers.map(c => c.id)} strategy={verticalListSortingStrategy}>
@@ -359,8 +359,8 @@ export default function Customers() {
           {unpinnedCustomers.length > 0 && (
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <span className="text-sm font-semibold text-gray-400">Non Priority</span>
-                <span className="text-xs text-gray-600">({unpinnedCustomers.length})</span>
+                <span className="text-sm font-semibold text-muted-foreground">Non Priority</span>
+                <span className="text-xs text-muted-foreground/70">({unpinnedCustomers.length})</span>
               </div>
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleUnpinnedDragEnd}>
                 <SortableContext items={unpinnedCustomers.map(c => c.id)} strategy={verticalListSortingStrategy}>

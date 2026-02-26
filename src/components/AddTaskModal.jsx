@@ -7,6 +7,7 @@ import {
   TASK_STATUSES, TASK_STATUS_LABELS,
   TASK_RECIPIENTS,
 } from '../constants';
+import { Button } from './ui/button';
 
 const BLANK_FORM = {
   description: '',
@@ -72,7 +73,7 @@ export default function AddTaskModal({ project, onClose }) {
 
         {/* Saved confirmation flash */}
         {showFlash && (
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-brand-sage/15 border border-brand-sage/20 text-brand-sage text-xs font-semibold">
             <Check size={13} />
             Task saved! Add another one.
           </div>
@@ -80,13 +81,13 @@ export default function AddTaskModal({ project, onClose }) {
 
         {/* Running count badge */}
         {savedCount > 0 && !showFlash && (
-          <p className="text-xs text-gray-500">
-            <span className="font-semibold text-indigo-400">{savedCount}</span> {savedCount === 1 ? 'task' : 'tasks'} added this session
+          <p className="text-xs text-muted-foreground">
+            <span className="font-semibold text-brand-lavender">{savedCount}</span> {savedCount === 1 ? 'task' : 'tasks'} added this session
           </p>
         )}
 
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1.5">Task Description *</label>
+          <label className="block text-xs font-medium text-muted-foreground mb-1.5">Task Description *</label>
           <textarea
             ref={textareaRef}
             rows={3}
@@ -94,18 +95,18 @@ export default function AddTaskModal({ project, onClose }) {
             value={form.description}
             onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
             placeholder="What needs to be done?"
-            className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40 resize-none"
+            className="w-full bg-card border border-border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40 resize-none"
           />
-          {errors.description && <p className="mt-1 text-xs text-red-400">{errors.description}</p>}
+          {errors.description && <p className="mt-1 text-xs text-destructive">{errors.description}</p>}
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-gray-400 mb-1.5">Task Type</label>
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5">Task Type</label>
             <select
               value={form.taskType}
               onChange={e => setForm(p => ({ ...p, taskType: e.target.value }))}
-              className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+              className="w-full h-10 bg-card border border-border rounded-md px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
             >
               {TASK_TYPES.map(t => (
                 <option key={t} value={t}>{TASK_TYPE_LABELS[t]}</option>
@@ -113,11 +114,11 @@ export default function AddTaskModal({ project, onClose }) {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-400 mb-1.5">Status</label>
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5">Status</label>
             <select
               value={form.status}
               onChange={e => setForm(p => ({ ...p, status: e.target.value }))}
-              className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+              className="w-full h-10 bg-card border border-border rounded-md px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
             >
               {TASK_STATUSES.map(s => (
                 <option key={s} value={s}>{TASK_STATUS_LABELS[s]}</option>
@@ -127,13 +128,13 @@ export default function AddTaskModal({ project, onClose }) {
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1.5">
-            Recipient <span className="text-gray-600">(optional)</span>
+          <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+            Recipient <span className="text-muted-foreground/50">(optional)</span>
           </label>
           <select
             value={form.assigneeOrTeam}
             onChange={e => setForm(p => ({ ...p, assigneeOrTeam: e.target.value }))}
-            className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+            className="w-full h-10 bg-card border border-border rounded-md px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
           >
             <option value="">— Select recipient —</option>
             {TASK_RECIPIENTS.map(r => (
@@ -144,29 +145,34 @@ export default function AddTaskModal({ project, onClose }) {
 
         <div className="space-y-2 pt-1">
           {/* Save & Add Another — full width, secondary style */}
-          <button
+          <Button
             type="button"
+            variant="secondary"
+            size="sm"
             onClick={handleSaveAndAnother}
-            className="w-full py-2.5 rounded-xl bg-gray-700 hover:bg-gray-600 border border-gray-600 text-sm font-semibold text-gray-200 transition-colors"
+            className="w-full"
           >
             + Save & Add Another
-          </button>
+          </Button>
 
           {/* Cancel + Done row */}
           <div className="flex gap-3">
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={onClose}
-              className="flex-1 py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-sm font-medium text-gray-400 transition-colors"
+              className="flex-1"
             >
               {savedCount > 0 ? 'Done' : 'Cancel'}
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
-              className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm font-bold text-white transition-colors"
+              size="sm"
+              className="flex-1"
             >
               Add Task
-            </button>
+            </Button>
           </div>
         </div>
 
