@@ -5,6 +5,7 @@ import {
   Calendar, User, Tag, AlertCircle, Archive, ArchiveX, Trash2,
   Settings, RotateCcw, Pencil, GripVertical, ExternalLink, ArrowLeft,
   Timer, Square, Pin, CheckSquare, Paperclip,
+  Bookmark, Table2, X,
 } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
@@ -23,7 +24,9 @@ import {
   TASK_TYPE_POINTS,
   AUTO_TRACK_RATE,
   AUTO_TRACK_MIN_SECONDS,
+  ANNOTATION_TAGS, ANNOTATION_TAG_LABELS, ANNOTATION_TAG_COLORS,
 } from '../constants';
+import Modal from '../components/Modal';
 
 // ─── Helper: strip HTML tags for compact plain-text previews ──────────────────
 function stripHtml(html) {
@@ -1705,9 +1708,207 @@ function TaskDetailView({ task, customer, onBack }) {
   );
 }
 
+// ─── Annotation row ──────────────────────────────────────────────────────────
+function AnnotationRow({ annotation, customer, onEdit, onDelete }) {
+  return (
+    <div className="flex items-start gap-3 py-2.5 border-b border-border/50 last:border-b-0">
+      {/* Tag dot */}
+      <div
+        className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1.5"
+        style={{ backgroundColor: ANNOTATION_TAG_COLORS[annotation.tag] }}
+        title={ANNOTATION_TAG_LABELS[annotation.tag]}
+      />
+      {/* Customer badge + date */}
+      <div className="flex-shrink-0 min-w-[110px]">
+        {customer && (
+          <span
+            className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-full border mb-0.5"
+            style={{
+              backgroundColor: customer.color + '22',
+              color: customer.color,
+              borderColor: customer.color + '55',
+            }}
+          >
+            {customer.name}
+          </span>
+        )}
+        <p className="text-[10px] text-muted-foreground">{annotation.date}</p>
+      </div>
+      {/* Tag badge */}
+      <span
+        className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 mt-0.5"
+        style={{
+          backgroundColor: ANNOTATION_TAG_COLORS[annotation.tag] + '22',
+          color: ANNOTATION_TAG_COLORS[annotation.tag],
+        }}
+      >
+        {ANNOTATION_TAG_LABELS[annotation.tag]}
+      </span>
+      {/* Text */}
+      <p className="flex-1 text-sm text-foreground leading-relaxed min-w-0">{annotation.text}</p>
+      {/* Actions */}
+      <div className="flex gap-1 flex-shrink-0">
+        <button
+          onClick={() => onEdit(annotation)}
+          className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+        >
+          <Pencil size={12} />
+        </button>
+        <button
+          onClick={() => onDelete(annotation)}
+          className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-secondary transition-colors"
+        >
+          <Trash2 size={12} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── VOU Modal (add/edit meeting VOU) ────────────────────────────────────────
+function VouModal({ initial = {}, customers, onSubmit, onCancel }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [form, setForm] = useState({
+    customerId:  initial.customerId  || '',
+    meetingDate: initial.meetingDate || today,
+    action:      initial.action      || '',
+    who:         initial.who         || '',
+    dueDate:     initial.dueDate     || '',
+    notes:       initial.notes       || '',
+    resolved:    initial.resolved    || false,
+  });
+  const [errors, setErrors] = useState({});
+
+  const validate = () => {
+    const e = {};
+    if (!form.customerId)  e.customerId  = 'Required';
+    if (!form.meetingDate) e.meetingDate = 'Required';
+    if (!form.action.trim()) e.action   = 'Required';
+    if (!form.who.trim())    e.who      = 'Required';
+    return e;
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const errs = validate();
+    if (Object.keys(errs).length) { setErrors(errs); return; }
+    onSubmit({
+      customerId:  form.customerId,
+      meetingDate: form.meetingDate,
+      action:      form.action.trim(),
+      who:         form.who.trim(),
+      dueDate:     form.dueDate || null,
+      notes:       form.notes.trim(),
+      resolved:    form.resolved,
+    });
+  };
+
+  const f = (key) => ({
+    value: form[key],
+    onChange: (e) => setForm(p => ({ ...p, [key]: e.target.value })),
+  });
+
+  return (
+    <Modal title={initial.id ? 'Edit VOU' : 'Log Meeting VOU'} onClose={onCancel} size="md">
+      <form onSubmit={handleSubmit} className="space-y-3">
+        {/* Customer */}
+        <div>
+          <label className="block text-xs font-medium text-muted-foreground mb-1.5">Customer *</label>
+          <select
+            {...f('customerId')}
+            className="w-full h-10 bg-card border border-border rounded-md px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+          >
+            <option value="">Select customer…</option>
+            {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          {errors.customerId && <p className="mt-1 text-xs text-destructive">{errors.customerId}</p>}
+        </div>
+
+        {/* Meeting date */}
+        <div>
+          <label className="block text-xs font-medium text-muted-foreground mb-1.5">Meeting Date *</label>
+          <input
+            type="date"
+            {...f('meetingDate')}
+            className="w-full h-10 bg-card border border-border rounded-md px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+          />
+          {errors.meetingDate && <p className="mt-1 text-xs text-destructive">{errors.meetingDate}</p>}
+        </div>
+
+        {/* Action */}
+        <div>
+          <label className="block text-xs font-medium text-muted-foreground mb-1.5">Action *</label>
+          <input
+            placeholder="What was agreed / decided?"
+            {...f('action')}
+            className="w-full h-10 bg-card border border-border rounded-md px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+          />
+          {errors.action && <p className="mt-1 text-xs text-destructive">{errors.action}</p>}
+        </div>
+
+        {/* Who */}
+        <div>
+          <label className="block text-xs font-medium text-muted-foreground mb-1.5">Who *</label>
+          <input
+            placeholder="Person responsible"
+            {...f('who')}
+            className="w-full h-10 bg-card border border-border rounded-md px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+          />
+          {errors.who && <p className="mt-1 text-xs text-destructive">{errors.who}</p>}
+        </div>
+
+        {/* Due date + Notes in grid */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5">Due Date <span className="text-muted-foreground/50">(optional)</span></label>
+            <input
+              type="date"
+              {...f('dueDate')}
+              className="w-full h-10 bg-card border border-border rounded-md px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+            />
+          </div>
+          <div className="flex items-end">
+            <label className="flex items-center gap-2 cursor-pointer mb-1">
+              <input
+                type="checkbox"
+                checked={form.resolved}
+                onChange={e => setForm(p => ({ ...p, resolved: e.target.checked }))}
+                className="w-4 h-4 rounded border-border"
+              />
+              <span className="text-xs font-medium text-muted-foreground">Resolved</span>
+            </label>
+          </div>
+        </div>
+
+        {/* Notes */}
+        <div>
+          <label className="block text-xs font-medium text-muted-foreground mb-1.5">Notes <span className="text-muted-foreground/50">(optional)</span></label>
+          <textarea
+            placeholder="Additional context…"
+            rows={2}
+            {...f('notes')}
+            className="w-full bg-card border border-border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40 resize-none"
+          />
+        </div>
+
+        <div className="flex gap-3 pt-1">
+          <button type="button" onClick={onCancel} className="flex-1 py-2.5 rounded-xl bg-muted hover:bg-gray-600 text-sm font-medium transition-colors">Cancel</button>
+          <button type="submit" className="flex-1 py-2.5 rounded-xl bg-brand-lavender hover:bg-brand-lavender/80 text-sm font-bold text-foreground transition-colors">
+            {initial.id ? 'Save Changes' : 'Log VOU'}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 // ─── Main Triage page ──────────────────────────────────────────────────────────
 export default function Triage() {
-  const { meetingEntries, tasks, customers, updateTask, addTask, reorderTasks, addPoint, okrs } = useAppStore();
+  const {
+    meetingEntries, tasks, customers, updateTask, addTask, reorderTasks, addPoint, okrs,
+    annotations, addAnnotation, updateAnnotation, deleteAnnotation,
+    meetingVOUs, addMeetingVOU, updateMeetingVOU, deleteMeetingVOU,
+  } = useAppStore();
   const { isRunning, taskId: runningTaskId, startTimer, stopTimer } = useTimerContext();
   const [taskDetailId, setTaskDetailId] = useState(null);
   const [triageRefresh, setTriageRefresh] = useState(0);
@@ -1725,6 +1926,22 @@ export default function Triage() {
 
   // Bulk selection state
   const [selectedTaskIds, setSelectedTaskIds] = useState(new Set());
+
+  // Annotation section state
+  const [showAnnotationForm, setShowAnnotationForm] = useState(false);
+  const [annotationForm, setAnnotationForm] = useState({ customerId: '', date: new Date().toISOString().slice(0, 10), tag: 'good', text: '' });
+  const [annotationErrors, setAnnotationErrors] = useState({});
+  const [editAnnotation, setEditAnnotation] = useState(null);
+  const [deleteAnnotationTarget, setDeleteAnnotationTarget] = useState(null);
+  const [filterAnnotationCustomer, setFilterAnnotationCustomer] = useState('');
+  const [filterAnnotationTag, setFilterAnnotationTag] = useState('');
+
+  // Meeting VOU section state
+  const [showVouModal, setShowVouModal] = useState(false);
+  const [vouEditTarget, setVouEditTarget] = useState(null);
+  const [vouDeleteTarget, setVouDeleteTarget] = useState(null);
+  const [filterVouCustomer, setFilterVouCustomer] = useState('');
+  const [showResolved, setShowResolved] = useState(false);
 
   // dnd-kit sensors
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
@@ -1766,6 +1983,26 @@ export default function Triage() {
     }, {}),
     [untriagedEntries, customerMap]
   );
+
+  // Filtered annotations (newest first)
+  const filteredAnnotations = useMemo(() => {
+    return annotations
+      .filter(a => (!filterAnnotationCustomer || a.customerId === filterAnnotationCustomer))
+      .filter(a => (!filterAnnotationTag || a.tag === filterAnnotationTag))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, 30);
+  }, [annotations, filterAnnotationCustomer, filterAnnotationTag]);
+
+  // Filtered VOUs — unresolved first, then by meetingDate DESC
+  const filteredVOUs = useMemo(() => {
+    return meetingVOUs
+      .filter(v => (!filterVouCustomer || v.customerId === filterVouCustomer))
+      .filter(v => showResolved ? true : !v.resolved)
+      .sort((a, b) => {
+        if (a.resolved !== b.resolved) return a.resolved ? 1 : -1;
+        return b.meetingDate.localeCompare(a.meetingDate);
+      });
+  }, [meetingVOUs, filterVouCustomer, showResolved]);
 
   // Active tasks: open, in-progress, blocked (excludes done and archived)
   const activeTasks = useMemo(
@@ -1892,6 +2129,67 @@ export default function Triage() {
     const newIndex  = activeTasks.findIndex(t => t.id === over.id);
     const reordered = arrayMove(activeTasks, oldIndex, newIndex);
     reorderTasks(reordered.map(t => t.id));
+  };
+
+  // ─── Annotation handlers ─────────────────────────────────────────────────────
+  const handleAnnotationSubmit = () => {
+    const errs = {};
+    if (!annotationForm.customerId) errs.customerId = 'Required';
+    if (!annotationForm.text.trim()) errs.text = 'Required';
+    if (Object.keys(errs).length) { setAnnotationErrors(errs); return; }
+    if (editAnnotation) {
+      updateAnnotation(editAnnotation.id, {
+        customerId: annotationForm.customerId,
+        date: annotationForm.date,
+        tag: annotationForm.tag,
+        text: annotationForm.text.trim(),
+      });
+      setEditAnnotation(null);
+    } else {
+      addAnnotation({
+        customerId: annotationForm.customerId,
+        date: annotationForm.date,
+        tag: annotationForm.tag,
+        text: annotationForm.text.trim(),
+      });
+    }
+    setAnnotationForm({ customerId: '', date: new Date().toISOString().slice(0, 10), tag: 'good', text: '' });
+    setAnnotationErrors({});
+    setShowAnnotationForm(false);
+  };
+
+  const handleEditAnnotation = (a) => {
+    setEditAnnotation(a);
+    setAnnotationForm({ customerId: a.customerId, date: a.date, tag: a.tag, text: a.text });
+    setAnnotationErrors({});
+    setShowAnnotationForm(true);
+  };
+
+  const handleCancelAnnotation = () => {
+    setEditAnnotation(null);
+    setAnnotationForm({ customerId: '', date: new Date().toISOString().slice(0, 10), tag: 'good', text: '' });
+    setAnnotationErrors({});
+    setShowAnnotationForm(false);
+  };
+
+  // ─── VOU handlers ────────────────────────────────────────────────────────────
+  const handleVouSubmit = (data) => {
+    if (vouEditTarget) {
+      updateMeetingVOU(vouEditTarget.id, data);
+      setVouEditTarget(null);
+    } else {
+      addMeetingVOU(data);
+    }
+    setShowVouModal(false);
+  };
+
+  const handleEditVou = (v) => {
+    setVouEditTarget(v);
+    setShowVouModal(true);
+  };
+
+  const handleDeleteVou = (v) => {
+    setVouDeleteTarget(v);
   };
 
   // ── Task Detail sub-view ───────────────────────────────────────────────────
@@ -2218,6 +2516,321 @@ export default function Triage() {
           )
         )}
       </div>
+
+      {/* ── Annotations Section ──────────────────────────────────────────────── */}
+      <div>
+        {/* Section header */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Bookmark size={15} className="text-emerald-400" />
+            <h2 className="text-sm font-semibold text-foreground">Annotations</h2>
+            {annotations.length > 0 && (
+              <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                {annotations.length}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={() => { setEditAnnotation(null); setAnnotationErrors({}); setShowAnnotationForm(v => !v); }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-secondary hover:bg-muted border border-border text-xs font-medium text-foreground/80 hover:text-foreground transition-all"
+          >
+            {showAnnotationForm ? <X size={13} /> : <Plus size={13} />}
+            {showAnnotationForm ? 'Cancel' : 'Add'}
+          </button>
+        </div>
+
+        {/* Inline add / edit form */}
+        {showAnnotationForm && (
+          <div className="mb-3 bg-card border border-border rounded-2xl p-4 space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              {/* Customer */}
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1.5">Customer *</label>
+                <select
+                  value={annotationForm.customerId}
+                  onChange={e => setAnnotationForm(p => ({ ...p, customerId: e.target.value }))}
+                  className="w-full h-10 bg-secondary border border-border rounded-lg px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+                >
+                  <option value="">Select customer…</option>
+                  {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+                {annotationErrors.customerId && <p className="mt-1 text-xs text-destructive">{annotationErrors.customerId}</p>}
+              </div>
+              {/* Date */}
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1.5">Date</label>
+                <input
+                  type="date"
+                  value={annotationForm.date}
+                  onChange={e => setAnnotationForm(p => ({ ...p, date: e.target.value }))}
+                  className="w-full h-10 bg-secondary border border-border rounded-lg px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+                />
+              </div>
+            </div>
+
+            {/* Tag radio */}
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-2">Tag *</label>
+              <div className="flex gap-2">
+                {ANNOTATION_TAGS.map(tag => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => setAnnotationForm(p => ({ ...p, tag }))}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                      annotationForm.tag === tag ? 'border-transparent' : 'border-border bg-secondary text-muted-foreground hover:text-foreground'
+                    }`}
+                    style={annotationForm.tag === tag ? {
+                      backgroundColor: ANNOTATION_TAG_COLORS[tag] + '25',
+                      color: ANNOTATION_TAG_COLORS[tag],
+                      borderColor: ANNOTATION_TAG_COLORS[tag] + '60',
+                    } : {}}
+                  >
+                    <span
+                      className="w-2 h-2 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: ANNOTATION_TAG_COLORS[tag] }}
+                    />
+                    {ANNOTATION_TAG_LABELS[tag]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Text */}
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Note *</label>
+              <textarea
+                placeholder="What happened? What did you observe?"
+                rows={2}
+                value={annotationForm.text}
+                onChange={e => setAnnotationForm(p => ({ ...p, text: e.target.value }))}
+                className="w-full bg-secondary border border-border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40 resize-none"
+              />
+              {annotationErrors.text && <p className="mt-1 text-xs text-destructive">{annotationErrors.text}</p>}
+            </div>
+
+            <div className="flex gap-3">
+              <button onClick={handleCancelAnnotation} className="flex-1 py-2 rounded-xl bg-muted hover:bg-gray-600 text-sm font-medium transition-colors">Cancel</button>
+              <button onClick={handleAnnotationSubmit} className="flex-1 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-sm font-bold text-white transition-colors">
+                {editAnnotation ? 'Save Changes' : 'Add Annotation'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Filter bar */}
+        {annotations.length > 0 && (
+          <div className="flex gap-2 mb-3 flex-wrap">
+            <select
+              value={filterAnnotationCustomer}
+              onChange={e => setFilterAnnotationCustomer(e.target.value)}
+              className="h-8 bg-secondary border border-border rounded-lg px-2 text-xs text-foreground focus:outline-none focus:border-ring"
+            >
+              <option value="">All Customers</option>
+              {customers.filter(c => annotations.some(a => a.customerId === c.id)).map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            <select
+              value={filterAnnotationTag}
+              onChange={e => setFilterAnnotationTag(e.target.value)}
+              className="h-8 bg-secondary border border-border rounded-lg px-2 text-xs text-foreground focus:outline-none focus:border-ring"
+            >
+              <option value="">All Tags</option>
+              {ANNOTATION_TAGS.map(t => <option key={t} value={t}>{ANNOTATION_TAG_LABELS[t]}</option>)}
+            </select>
+          </div>
+        )}
+
+        {/* Annotation list */}
+        {annotations.length === 0 && !showAnnotationForm ? (
+          <div className="bg-card border border-border rounded-2xl px-5 py-10 text-center">
+            <Bookmark size={24} className="text-muted-foreground/60 mx-auto mb-2" />
+            <p className="text-muted-foreground text-sm">No annotations yet.</p>
+            <p className="text-muted-foreground/70 text-xs mt-1">Add observations tagged as Good, Bad, or Learnings.</p>
+          </div>
+        ) : filteredAnnotations.length === 0 ? (
+          <div className="bg-card border border-border rounded-2xl px-5 py-6 text-center">
+            <p className="text-muted-foreground text-sm">No annotations match this filter.</p>
+          </div>
+        ) : (
+          <div className="bg-card border border-border rounded-2xl px-4 py-1">
+            {filteredAnnotations.map(a => (
+              <AnnotationRow
+                key={a.id}
+                annotation={a}
+                customer={customerMap.get(a.customerId)}
+                onEdit={handleEditAnnotation}
+                onDelete={setDeleteAnnotationTarget}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Meeting VOUs Section ──────────────────────────────────────────────── */}
+      <div>
+        {/* Section header */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Table2 size={15} className="text-cyan-400" />
+            <h2 className="text-sm font-semibold text-foreground">Meeting VOUs</h2>
+            <span className="text-[10px] text-muted-foreground/60">Value of Understanding</span>
+            {meetingVOUs.filter(v => !v.resolved).length > 0 && (
+              <span className="bg-cyan-500/20 text-cyan-400 border border-cyan-500/20 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                {meetingVOUs.filter(v => !v.resolved).length}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={() => { setVouEditTarget(null); setShowVouModal(true); }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-secondary hover:bg-muted border border-border text-xs font-medium text-foreground/80 hover:text-foreground transition-all"
+          >
+            <Plus size={13} /> Log VOU
+          </button>
+        </div>
+
+        {/* Filter bar */}
+        <div className="flex items-center gap-2 mb-3 flex-wrap">
+          <select
+            value={filterVouCustomer}
+            onChange={e => setFilterVouCustomer(e.target.value)}
+            className="h-8 bg-secondary border border-border rounded-lg px-2 text-xs text-foreground focus:outline-none focus:border-ring"
+          >
+            <option value="">All Customers</option>
+            {customers.filter(c => meetingVOUs.some(v => v.customerId === c.id)).map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showResolved}
+              onChange={e => setShowResolved(e.target.checked)}
+              className="w-4 h-4 rounded border-border"
+            />
+            <span className="text-xs text-muted-foreground">Show Resolved</span>
+          </label>
+        </div>
+
+        {/* VOU table or empty state */}
+        {meetingVOUs.length === 0 ? (
+          <div className="bg-card border border-border rounded-2xl px-5 py-10 text-center">
+            <Table2 size={24} className="text-muted-foreground/60 mx-auto mb-2" />
+            <p className="text-muted-foreground text-sm">No VOUs logged yet.</p>
+            <p className="text-muted-foreground/70 text-xs mt-1">Log action items and decisions from your meetings.</p>
+          </div>
+        ) : filteredVOUs.length === 0 ? (
+          <div className="bg-card border border-border rounded-2xl px-5 py-6 text-center">
+            <p className="text-muted-foreground text-sm">No VOUs match this filter.</p>
+          </div>
+        ) : (
+          <div className="bg-card border border-border rounded-2xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="border-b border-border bg-secondary/40">
+                  <tr>
+                    <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-muted-foreground w-[120px]">Customer</th>
+                    <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-muted-foreground w-[100px]">Date</th>
+                    <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-muted-foreground">Action</th>
+                    <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-muted-foreground w-[100px]">Who</th>
+                    <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-muted-foreground w-[90px]">Due</th>
+                    <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-muted-foreground">Notes</th>
+                    <th className="text-center px-3 py-2.5 text-[11px] font-semibold text-muted-foreground w-[40px]">✓</th>
+                    <th className="px-3 py-2.5 w-[60px]" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredVOUs.map((v, i) => {
+                    const customer = customerMap.get(v.customerId);
+                    return (
+                      <tr
+                        key={v.id}
+                        className={`border-b border-border/50 last:border-b-0 transition-colors ${
+                          v.resolved ? 'opacity-50' : i % 2 === 0 ? '' : 'bg-secondary/20'
+                        }`}
+                      >
+                        <td className="px-3 py-2.5">
+                          {customer ? (
+                            <span
+                              className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-full border truncate max-w-[110px]"
+                              style={{ backgroundColor: customer.color + '22', color: customer.color, borderColor: customer.color + '55' }}
+                            >
+                              {customer.name}
+                            </span>
+                          ) : <span className="text-muted-foreground text-xs">—</span>}
+                        </td>
+                        <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{v.meetingDate}</td>
+                        <td className="px-3 py-2.5">
+                          <span className={`text-sm ${v.resolved ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                            {v.action}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5 text-xs text-foreground/80 whitespace-nowrap">{v.who}</td>
+                        <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{v.dueDate || '—'}</td>
+                        <td className="px-3 py-2.5 text-xs text-muted-foreground max-w-[200px] truncate">{v.notes || '—'}</td>
+                        <td className="px-3 py-2.5 text-center">
+                          <button
+                            onClick={() => updateMeetingVOU(v.id, { resolved: !v.resolved })}
+                            title={v.resolved ? 'Mark unresolved' : 'Mark resolved'}
+                            className={`w-5 h-5 rounded border-2 flex items-center justify-center mx-auto transition-all ${
+                              v.resolved
+                                ? 'bg-emerald-600 border-emerald-600'
+                                : 'border-border hover:border-emerald-500'
+                            }`}
+                          >
+                            {v.resolved && <Check size={11} className="text-white" />}
+                          </button>
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <div className="flex gap-1 justify-end">
+                            <button onClick={() => handleEditVou(v)} className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
+                              <Pencil size={12} />
+                            </button>
+                            <button onClick={() => handleDeleteVou(v)} className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-secondary transition-colors">
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* VOU Modal */}
+      {showVouModal && (
+        <VouModal
+          initial={vouEditTarget || {}}
+          customers={customers}
+          onSubmit={handleVouSubmit}
+          onCancel={() => { setShowVouModal(false); setVouEditTarget(null); }}
+        />
+      )}
+
+      {/* Annotation delete confirm */}
+      {deleteAnnotationTarget && (
+        <ConfirmDialog
+          title="Delete Annotation"
+          message={`Delete this ${ANNOTATION_TAG_LABELS[deleteAnnotationTarget.tag]} annotation? This cannot be undone.`}
+          onConfirm={() => { deleteAnnotation(deleteAnnotationTarget.id); setDeleteAnnotationTarget(null); }}
+          onCancel={() => setDeleteAnnotationTarget(null)}
+        />
+      )}
+
+      {/* VOU delete confirm */}
+      {vouDeleteTarget && (
+        <ConfirmDialog
+          title="Delete VOU"
+          message={`Delete the VOU "${vouDeleteTarget.action}"? This cannot be undone.`}
+          onConfirm={() => { deleteMeetingVOU(vouDeleteTarget.id); setVouDeleteTarget(null); }}
+          onCancel={() => setVouDeleteTarget(null)}
+        />
+      )}
     </div>
   );
 }

@@ -102,6 +102,15 @@ export const ACTIVITY_COLORS = {
 export const AUTO_TRACK_RATE = 2150 / 160; // 13.4375
 export const AUTO_TRACK_MIN_SECONDS = 30;  // Ignore sessions shorter than 30s
 
+// Annotation tags
+export const ANNOTATION_TAGS = ['good', 'bad', 'learning'];
+export const ANNOTATION_TAG_LABELS = { good: 'Good', bad: 'Bad', learning: 'Learning' };
+export const ANNOTATION_TAG_COLORS = {
+  good:     '#10b981',  // emerald green
+  bad:      '#f43f5e',  // rose red
+  learning: '#f59e0b',  // amber yellow
+};
+
 // Milestone statuses
 export const MILESTONE_STATUSES = ['pending', 'in-progress', 'completed', 'cancelled'];
 

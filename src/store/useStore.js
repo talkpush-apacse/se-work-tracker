@@ -11,6 +11,8 @@ const KEYS = {
   milestones: 'gpt-milestones',
   aiOutputs: 'gpt-ai-outputs',
   aiSettings: 'gpt-ai-settings',
+  annotations: 'gpt-annotations',
+  meetingVOUs: 'gpt-meeting-vous',
 };
 
 const MIGRATION_FLAG = 'gpt-migrated-to-neon';
@@ -183,6 +185,8 @@ export function useStore() {
   const [tasks, setTasks] = useState(() => load(KEYS.tasks));
   const [milestones, setMilestones] = useState(() => load(KEYS.milestones));
   const [aiOutputs, setAiOutputs] = useState(() => load(KEYS.aiOutputs));
+  const [annotations, setAnnotations] = useState(() => load(KEYS.annotations));
+  const [meetingVOUs, setMeetingVOUs] = useState(() => load(KEYS.meetingVOUs));
   const [aiSettings, setAiSettings] = useState(() => {
     const stored = load(KEYS.aiSettings, null);
     if (!stored) return DEFAULT_AI_SETTINGS;
@@ -207,6 +211,8 @@ export function useStore() {
   useEffect(() => { save(KEYS.milestones, milestones); }, [milestones]);
   useEffect(() => { save(KEYS.aiOutputs, aiOutputs); }, [aiOutputs]);
   useEffect(() => { save(KEYS.aiSettings, aiSettings); }, [aiSettings]);
+  useEffect(() => { save(KEYS.annotations, annotations); }, [annotations]);
+  useEffect(() => { save(KEYS.meetingVOUs, meetingVOUs); }, [meetingVOUs]);
 
   // ─── Neon save effects (debounced, only after mount-fetch) ───
   useEffect(() => { if (mountedRef.current) debouncedSave('okrs', okrs); }, [okrs]);
@@ -217,9 +223,11 @@ export function useStore() {
   useEffect(() => { if (mountedRef.current) debouncedSave('milestones', milestones); }, [milestones]);
   useEffect(() => { if (mountedRef.current) debouncedSave('aiOutputs', aiOutputs); }, [aiOutputs]);
   useEffect(() => { if (mountedRef.current) debouncedSave('aiSettings', aiSettings); }, [aiSettings]);
+  useEffect(() => { if (mountedRef.current) debouncedSave('annotations', annotations); }, [annotations]);
+  useEffect(() => { if (mountedRef.current) debouncedSave('meetingVOUs', meetingVOUs); }, [meetingVOUs]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (mountedRef.current) setSyncStatus('saving'); }, [okrs, customers, points, meetingEntries, tasks, milestones, aiOutputs, aiSettings]);
+  useEffect(() => { if (mountedRef.current) setSyncStatus('saving'); }, [okrs, customers, points, meetingEntries, tasks, milestones, aiOutputs, aiSettings, annotations, meetingVOUs]);
 
   useEffect(() => {
     if (syncStatus === 'saving') {
@@ -277,6 +285,8 @@ export function useStore() {
         setMeetingEntries(rMeetingEntries);
         setTasks(rTasks);
         setMilestones(rMilestones);
+        if (remote.annotations) setAnnotations(remote.annotations);
+        if (remote.meetingVOUs) setMeetingVOUs(remote.meetingVOUs);
         if (remote.aiOutputs) setAiOutputs(remote.aiOutputs);
         if (remote.aiSettings && Object.keys(remote.aiSettings).length > 0) {
           setAiSettings(prev => ({
@@ -321,7 +331,7 @@ export function useStore() {
   const updateCustomer = useCallback((id, data) => {
     setCustomers(prev => prev.map(c => c.id === id ? { ...c, ...data } : c));
   }, []);
-  // Cascade delete: points, meeting entries, tasks (+ their AI outputs), milestones
+  // Cascade delete: points, meeting entries, tasks (+ their AI outputs), milestones, annotations, meetingVOUs
   const deleteCustomer = useCallback((id) => {
     setCustomers(prev => prev.filter(c => c.id !== id));
     setPoints(prev => prev.filter(pt => pt.customerId !== id));
@@ -332,6 +342,8 @@ export function useStore() {
       return prev.filter(t => t.customerId !== id);
     });
     setMilestones(prev => prev.filter(m => m.customerId !== id));
+    setAnnotations(prev => prev.filter(a => a.customerId !== id));
+    setMeetingVOUs(prev => prev.filter(v => v.customerId !== id));
   }, []);
   const reorderCustomers = useCallback((orderedIds) => {
     setCustomers(prev => orderedIds.map(id => prev.find(c => c.id === id)).filter(Boolean));
@@ -417,6 +429,40 @@ export function useStore() {
     return milestones.filter(m => m.customerId === customerId);
   }, [milestones]);
 
+  // ─── Annotation actions ───
+  const addAnnotation = useCallback((data) => {
+    // data: { customerId, date (YYYY-MM-DD), text, tag ('good'|'bad'|'learning') }
+    const a = { id: uid(), createdAt: new Date().toISOString(), ...data };
+    setAnnotations(prev => [...prev, a]);
+    return a;
+  }, []);
+  const updateAnnotation = useCallback((id, data) => {
+    setAnnotations(prev => prev.map(a => a.id === id ? { ...a, ...data } : a));
+  }, []);
+  const deleteAnnotation = useCallback((id) => {
+    setAnnotations(prev => prev.filter(a => a.id !== id));
+  }, []);
+  const getCustomerAnnotations = useCallback((customerId) => {
+    return annotations.filter(a => a.customerId === customerId);
+  }, [annotations]);
+
+  // ─── Meeting VOU actions ───
+  const addMeetingVOU = useCallback((data) => {
+    // data: { customerId, meetingDate, action, who, dueDate (null|YYYY-MM-DD), notes, resolved }
+    const v = { id: uid(), createdAt: new Date().toISOString(), resolved: false, ...data };
+    setMeetingVOUs(prev => [...prev, v]);
+    return v;
+  }, []);
+  const updateMeetingVOU = useCallback((id, data) => {
+    setMeetingVOUs(prev => prev.map(v => v.id === id ? { ...v, ...data } : v));
+  }, []);
+  const deleteMeetingVOU = useCallback((id) => {
+    setMeetingVOUs(prev => prev.filter(v => v.id !== id));
+  }, []);
+  const getCustomerMeetingVOUs = useCallback((customerId) => {
+    return meetingVOUs.filter(v => v.customerId === customerId);
+  }, [meetingVOUs]);
+
   // ─── AI output actions ───
   const addAiOutput = useCallback((data) => {
     const output = { id: uid(), createdAt: new Date().toISOString(), ...data };
@@ -458,6 +504,7 @@ export function useStore() {
   const exportData = useCallback(() => {
     const data = {
       okrs, customers, points, tasks, meetingEntries, milestones, aiOutputs, aiSettings,
+      annotations, meetingVOUs,
       exportedAt: new Date().toISOString(), version: 2,
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -467,7 +514,7 @@ export function useStore() {
     a.download = `work-tracker-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [okrs, customers, points, tasks, meetingEntries, milestones, aiOutputs, aiSettings]);
+  }, [okrs, customers, points, tasks, meetingEntries, milestones, aiOutputs, aiSettings, annotations, meetingVOUs]);
 
   const importData = useCallback((file) => {
     const reader = new FileReader();
@@ -481,6 +528,8 @@ export function useStore() {
         if (data.meetingEntries) setMeetingEntries(data.meetingEntries);
         if (data.milestones) setMilestones(data.milestones);
         if (data.aiOutputs) setAiOutputs(data.aiOutputs);
+        if (data.annotations) setAnnotations(data.annotations);
+        if (data.meetingVOUs) setMeetingVOUs(data.meetingVOUs);
       } catch { alert('Invalid backup file'); }
     };
     reader.readAsText(file);
@@ -488,6 +537,7 @@ export function useStore() {
 
   return {
     okrs, customers, points, meetingEntries, tasks, milestones, aiOutputs,
+    annotations, meetingVOUs,
     addOkr, updateOkr, deleteOkr,
     addCustomer, updateCustomer, deleteCustomer, reorderCustomers,
     addPoint, deletePoint, updatePoint,
@@ -495,6 +545,8 @@ export function useStore() {
     addMeetingEntry, markMeetingEntryTriaged, getCustomerMeetingEntries,
     addTask, updateTask, deleteTask, reorderTasks, getCustomerTasks,
     addMilestone, updateMilestone, deleteMilestone, getCustomerMilestones,
+    addAnnotation, updateAnnotation, deleteAnnotation, getCustomerAnnotations,
+    addMeetingVOU, updateMeetingVOU, deleteMeetingVOU, getCustomerMeetingVOUs,
     addAiOutput, getTaskAiOutputs, updateAiOutput,
     aiSettings, updateAiSettings,
     exportData, importData,
