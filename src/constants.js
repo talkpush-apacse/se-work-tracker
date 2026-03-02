@@ -101,3 +101,20 @@ export const ACTIVITY_COLORS = {
 // Points-per-hour rate for auto-tracked task sessions (2150 / 160 hours)
 export const AUTO_TRACK_RATE = 2150 / 160; // 13.4375
 export const AUTO_TRACK_MIN_SECONDS = 30;  // Ignore sessions shorter than 30s
+
+// Milestone statuses
+export const MILESTONE_STATUSES = ['pending', 'in-progress', 'completed', 'cancelled'];
+
+export const MILESTONE_STATUS_LABELS = {
+  'pending':     'Pending',
+  'in-progress': 'In Progress',
+  'completed':   'Completed',
+  'cancelled':   'Cancelled',
+};
+
+export const MILESTONE_STATUS_COLORS = {
+  'pending':     '#f59e0b',
+  'in-progress': '#6366f1',
+  'completed':   '#10b981',
+  'cancelled':   '#6b7280',
+};

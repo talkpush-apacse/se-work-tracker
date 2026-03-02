@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, Users, ListPlus, Pin, PinOff, GripVertical } from 'lucide-react';
+import { Plus, Pencil, Trash2, Users, ListPlus, Pin, PinOff, GripVertical, ChevronRight } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -18,6 +18,7 @@ import { useAppStore } from '../context/StoreContext';
 import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import BulkAddCustomersModal from '../components/BulkAddCustomersModal';
+import CustomerDetailView from '../components/CustomerDetailView';
 import { CUSTOMER_COLORS } from '../constants';
 import { formatDate } from '../utils/dateHelpers';
 
@@ -68,7 +69,7 @@ function CustomerForm({ initial = {}, onSubmit, onCancel }) {
 }
 
 // ─── Sortable customer row ────────────────────────────────────────────────────
-function SortableCustomerRow({ customer, taskCount, totalPoints, totalHours, taskPts, onEdit, onDelete, onPin }) {
+function SortableCustomerRow({ customer, taskCount, totalPoints, totalHours, taskPts, onEdit, onDelete, onPin, onView }) {
   const {
     attributes,
     listeners,
@@ -110,20 +111,26 @@ function SortableCustomerRow({ customer, taskCount, totalPoints, totalHours, tas
           <GripVertical size={16} />
         </button>
 
-        {/* Customer avatar */}
-        <div
-          className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center text-foreground font-bold text-sm"
+        {/* Customer avatar — clickable, opens detail view */}
+        <button
+          onClick={() => onView(customer)}
+          className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center text-foreground font-bold text-sm hover:opacity-80 transition-opacity"
           style={{ backgroundColor: customer.color + '22', color: customer.color }}
-          title="Customer color"
+          title={`View ${customer.name}`}
         >
           {customer.name.slice(0, 2).toUpperCase()}
-        </div>
+        </button>
 
-        {/* Name + date */}
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold text-foreground truncate">{customer.name}</p>
+        {/* Name + date — clickable, opens detail view */}
+        <button
+          onClick={() => onView(customer)}
+          className="flex-1 min-w-0 text-left group"
+        >
+          <p className="font-semibold text-foreground truncate group-hover:text-brand-lavender transition-colors">
+            {customer.name}
+          </p>
           <p className="text-xs text-muted-foreground">Added: {formatDate(customer.createdAt)}</p>
-        </div>
+        </button>
 
         {/* Stats */}
         <div className="hidden sm:flex items-center gap-4 flex-shrink-0 text-center">
@@ -160,8 +167,16 @@ function SortableCustomerRow({ customer, taskCount, totalPoints, totalHours, tas
           >
             {customer.pinned ? <PinOff size={13} /> : <Pin size={13} />}
           </button>
-          <button onClick={() => onEdit(customer)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"><Pencil size={13} /></button>
-          <button onClick={() => onDelete(customer)} className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-secondary transition-colors"><Trash2 size={13} /></button>
+          <button onClick={() => onEdit(customer)}  className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground   hover:bg-secondary transition-colors"><Pencil     size={13} /></button>
+          <button onClick={() => onDelete(customer)} className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-secondary transition-colors"><Trash2     size={13} /></button>
+          {/* Open detail view */}
+          <button
+            onClick={() => onView(customer)}
+            title="View customer details"
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-brand-lavender hover:bg-secondary transition-colors"
+          >
+            <ChevronRight size={14} />
+          </button>
         </div>
       </div>
     </div>
@@ -172,26 +187,29 @@ function SortableCustomerRow({ customer, taskCount, totalPoints, totalHours, tas
 export default function Customers() {
   const { customers, points, tasks, addCustomer, updateCustomer, deleteCustomer, reorderCustomers } = useAppStore();
   const [createModal, setCreateModal] = useState(false);
-  const [bulkModal, setBulkModal] = useState(false);
-  const [editTarget, setEditTarget] = useState(null);
+  const [bulkModal,   setBulkModal]   = useState(false);
+  const [editTarget,   setEditTarget]   = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+
+  // Customer detail view state
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   // Split into pinned / unpinned while preserving store order within each group
-  const pinnedCustomers = customers.filter(c => !!c.pinned);
+  const pinnedCustomers   = customers.filter(c => !!c.pinned);
   const unpinnedCustomers = customers.filter(c => !c.pinned);
 
   const handlePin = (id, value) => updateCustomer(id, { pinned: value });
 
   // Helper: compute stats for a customer (direct — no project indirection)
   const getCustomerStats = (customer) => {
-    const custPoints = points.filter(pt => pt.customerId === customer.id);
+    const custPoints  = points.filter(pt => pt.customerId === customer.id);
     const totalPoints = custPoints.reduce((s, e) => s + e.points, 0);
-    const totalHours = custPoints.reduce((s, e) => s + e.hours, 0);
-    const custTasks = tasks.filter(t => t.customerId === customer.id);
-    const taskCount = custTasks.length;
-    const taskPts = custTasks.reduce((s, t) => s + (t.points || 0), 0);
+    const totalHours  = custPoints.reduce((s, e) => s + e.hours,  0);
+    const custTasks   = tasks.filter(t => t.customerId === customer.id);
+    const taskCount   = custTasks.length;
+    const taskPts     = custTasks.reduce((s, t) => s + (t.points || 0), 0);
     return { taskCount, totalPoints, totalHours, taskPts };
   };
 
@@ -229,10 +247,27 @@ export default function Customers() {
         onEdit={setEditTarget}
         onDelete={setDeleteTarget}
         onPin={handlePin}
+        onView={setSelectedCustomer}
       />
     );
   };
 
+  // ── Customer detail view ──────────────────────────────────────────────────
+  // Keep selectedCustomer in sync with the store (e.g. after edit)
+  const liveSelectedCustomer = selectedCustomer
+    ? customers.find(c => c.id === selectedCustomer.id) ?? null
+    : null;
+
+  if (liveSelectedCustomer) {
+    return (
+      <CustomerDetailView
+        customer={liveSelectedCustomer}
+        onBack={() => setSelectedCustomer(null)}
+      />
+    );
+  }
+
+  // ── Customer list view ────────────────────────────────────────────────────
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
@@ -315,7 +350,12 @@ export default function Customers() {
         <ConfirmDialog
           title="Delete Customer"
           message={`Delete "${deleteTarget.name}"? All tasks, points, meetings, and milestones for this customer will also be deleted. This cannot be undone.`}
-          onConfirm={() => { deleteCustomer(deleteTarget.id); setDeleteTarget(null); }}
+          onConfirm={() => {
+            // If we're viewing this customer, go back first
+            if (selectedCustomer?.id === deleteTarget.id) setSelectedCustomer(null);
+            deleteCustomer(deleteTarget.id);
+            setDeleteTarget(null);
+          }}
           onCancel={() => setDeleteTarget(null)}
         />
       )}
