@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Users, Check } from 'lucide-react';
+import { Users, Check, Search, X } from 'lucide-react';
 import Modal from './Modal';
 import { ACTIVITY_TYPES, AUTO_TRACK_RATE } from '../constants';
 import { useAppStore } from '../context/StoreContext';
@@ -24,6 +24,7 @@ export default function DistributeTimeModal({ session, onClose }) {
   const [comment, setComment] = useState(session.taskDescription || '');
   const [showDiscard, setShowDiscard] = useState(false);
   const [error, setError] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Sort customers: pinned first, then alphabetical
   const sortedCustomers = useMemo(
@@ -33,6 +34,14 @@ export default function DistributeTimeModal({ session, onClose }) {
       return a.name.localeCompare(b.name);
     }),
     [customers]
+  );
+
+  // Filter by search query
+  const visibleCustomers = useMemo(
+    () => searchQuery.trim()
+      ? sortedCustomers.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()))
+      : sortedCustomers,
+    [sortedCustomers, searchQuery]
   );
 
   const selectedCount = selectedIds.size;
@@ -123,8 +132,33 @@ export default function DistributeTimeModal({ session, onClose }) {
             <p className="text-sm text-muted-foreground">No customers. Create one first.</p>
           </div>
         ) : (
+          <>
+            {/* Search input */}
+            <div className="relative mb-2">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search customers..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full pl-8 pr-7 py-1.5 text-sm bg-card border border-border rounded-lg focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40 text-foreground placeholder:text-muted-foreground"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
           <div className="max-h-48 overflow-y-auto rounded-xl border border-border bg-secondary/30">
-            {sortedCustomers.map(customer => {
+            {visibleCustomers.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No customers match &ldquo;{searchQuery}&rdquo;
+              </p>
+            ) : visibleCustomers.map(customer => {
               const isSelected = selectedIds.has(customer.id);
               return (
                 <button
@@ -166,6 +200,7 @@ export default function DistributeTimeModal({ session, onClose }) {
               );
             })}
           </div>
+          </>
         )}
         {error && <p className="mt-1.5 text-xs text-destructive">{error}</p>}
       </div>
