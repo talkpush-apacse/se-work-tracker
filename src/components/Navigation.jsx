@@ -1,4 +1,4 @@
-import { LayoutDashboard, Target, Users, Menu, X, Download, Upload, ListTodo, Cloud, CloudOff, Loader2 } from 'lucide-react';
+import { LayoutDashboard, Target, Users, Menu, X, Download, Upload, ListTodo, Cloud, CloudOff, Loader2, Plug } from 'lucide-react';
 import { useState, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAppStore } from '../context/StoreContext';
@@ -7,10 +7,11 @@ import { format, startOfDay, endOfDay } from 'date-fns';
 import { filterPointsByRange } from '../utils/dateHelpers';
 
 const tabs = [
-  { id: 'triage',    label: 'Triage',    icon: ListTodo },
-  { id: 'customers', label: 'Customers', icon: Users },
-  { id: 'okrs',      label: 'OKRs',      icon: Target },
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'triage',       label: 'Triage',       icon: ListTodo },
+  { id: 'customers',    label: 'Customers',    icon: Users },
+  { id: 'okrs',         label: 'OKRs',         icon: Target },
+  { id: 'dashboard',    label: 'Dashboard',    icon: LayoutDashboard },
+  { id: 'integrations', label: 'Integrations', icon: Plug },
 ];
 
 export default function Navigation({ activeTab, onTabChange }) {

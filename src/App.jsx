@@ -2,12 +2,14 @@ import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { StoreProvider } from './context/StoreContext';
 import { TimerProvider } from './context/TimerContext';
+import { GoogleAuthProvider } from './context/GoogleAuthContext';
 import Navigation from './components/Navigation';
 import TimerWidget from './components/TimerWidget';
 import Dashboard from './pages/Dashboard';
 import OKRs from './pages/OKRs';
 import Customers from './pages/Customers';
 import Triage from './pages/Triage';
+import Integrations from './pages/Integrations';
 
 const pageVariants = {
   hidden: { opacity: 0, y: 16 },
@@ -37,10 +39,11 @@ function AppContent() {
               initial="hidden"
               animate="show"
             >
-              {activeTab === 'dashboard' && <Dashboard onNavigate={handleTabChange} />}
-              {activeTab === 'triage' && <Triage />}
-              {activeTab === 'okrs' && <OKRs />}
-              {activeTab === 'customers' && <Customers />}
+              {activeTab === 'dashboard'    && <Dashboard onNavigate={handleTabChange} />}
+              {activeTab === 'triage'       && <Triage />}
+              {activeTab === 'okrs'         && <OKRs />}
+              {activeTab === 'customers'    && <Customers />}
+              {activeTab === 'integrations' && <Integrations />}
             </motion.div>
           </AnimatePresence>
         </div>
@@ -53,7 +56,9 @@ export default function App() {
   return (
     <StoreProvider>
       <TimerProvider>
-        <AppContent />
+        <GoogleAuthProvider>
+          <AppContent />
+        </GoogleAuthProvider>
       </TimerProvider>
     </StoreProvider>
   );
