@@ -5,8 +5,6 @@ import { TimerProvider } from './context/TimerContext';
 import Navigation from './components/Navigation';
 import TimerWidget from './components/TimerWidget';
 import Dashboard from './pages/Dashboard';
-import Projects from './pages/Projects';
-import Analytics from './pages/Analytics';
 import OKRs from './pages/OKRs';
 import Customers from './pages/Customers';
 import Triage from './pages/Triage';
@@ -18,16 +16,9 @@ const pageVariants = {
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState('triage');
-  const [projectTarget, setProjectTarget] = useState(null);
-
-  const handleNavigate = (tab, projectId = null) => {
-    setActiveTab(tab);
-    setProjectTarget(projectId);
-  };
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
-    setProjectTarget(null);
   };
 
   return (
@@ -46,15 +37,8 @@ function AppContent() {
               initial="hidden"
               animate="show"
             >
-              {activeTab === 'dashboard' && <Dashboard onNavigate={handleNavigate} />}
-              {activeTab === 'projects' && (
-                <Projects
-                  initialProjectId={projectTarget}
-                  onProjectSelect={(id) => setProjectTarget(id)}
-                />
-              )}
+              {activeTab === 'dashboard' && <Dashboard onNavigate={handleTabChange} />}
               {activeTab === 'triage' && <Triage />}
-              {activeTab === 'analytics' && <Analytics onNavigate={handleNavigate} />}
               {activeTab === 'okrs' && <OKRs />}
               {activeTab === 'customers' && <Customers />}
             </motion.div>

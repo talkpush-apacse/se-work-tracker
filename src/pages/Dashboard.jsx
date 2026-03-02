@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef } from 'react';
-import { Trophy, Zap, Clock, Flame, Activity, TrendingUp, Star, Plus, Timer } from 'lucide-react';
+import { Trophy, Zap, Clock, Flame, Activity, TrendingUp, Star, Plus, Timer, Users } from 'lucide-react';
 import { useAppStore } from '../context/StoreContext';
 import { useTimerContext } from '../context/TimerContext';
 import { getThisWeekRange, filterPointsByRange, formatRelative, formatDateTime, getStreakDays } from '../utils/dateHelpers';
@@ -41,66 +41,67 @@ function StatCard({ icon: Icon, label, value, sub, color = 'indigo' }) {
 }
 
 export default function Dashboard({ onNavigate }) {
-  const { projects, customers, okrs, points } = useAppStore();
-  const { isRunning, projectId: runningProjectId, startTimer, stopTimer } = useTimerContext();
-  const [addModal, setAddModal] = useState(null);
-  const [timerConflict, setTimerConflict] = useState(null); // holds the project to start after conflict
+  const { customers, okrs, points, tasks } = useAppStore();
+  const { isRunning, customerId: runningCustomerId, startTimer, stopTimer } = useTimerContext();
+  const [addModal, setAddModal] = useState(null); // holds customer object for AddPointsModal
+  const [timerConflict, setTimerConflict] = useState(null); // holds the customer to start after conflict
   const [flashId, setFlashId] = useState(null);
-  const flashRef = useRef({});
 
   // Week stats — only recompute when points array changes
-  const { weekPoints, totalPts, totalHrs, topProject, topActivity, streak } = useMemo(() => {
+  const { weekPoints, totalPts, totalHrs, topCustomer, topActivity, streak } = useMemo(() => {
     const { start, end } = getThisWeekRange();
     const wp = filterPointsByRange(points, start, end);
     const pts = wp.reduce((s, p) => s + p.points, 0);
     const hrs = wp.reduce((s, p) => s + p.hours, 0);
 
-    // Most active project this week
-    const projectWeekPoints = {};
-    wp.forEach(p => { projectWeekPoints[p.projectId] = (projectWeekPoints[p.projectId] || 0) + p.points; });
-    const topProjectId = Object.entries(projectWeekPoints).sort((a, b) => b[1] - a[1])[0]?.[0];
-    const topProj = projects.find(p => p.id === topProjectId);
+    // Most active customer this week
+    const customerWeekPoints = {};
+    wp.forEach(p => { customerWeekPoints[p.customerId] = (customerWeekPoints[p.customerId] || 0) + p.points; });
+    const topCustomerId = Object.entries(customerWeekPoints).sort((a, b) => b[1] - a[1])[0]?.[0];
+    const topCust = customers.find(c => c.id === topCustomerId);
 
     // Most common activity this week
     const actCounts = {};
     wp.forEach(p => { const key = p.activityType || 'General'; actCounts[key] = (actCounts[key] || 0) + p.points; });
     const topAct = Object.entries(actCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
 
-    return { weekPoints: wp, totalPts: pts, totalHrs: hrs, topProject: topProj, topActivity: topAct, streak: getStreakDays(points) };
-  }, [points, projects]);
+    return { weekPoints: wp, totalPts: pts, totalHrs: hrs, topCustomer: topCust, topActivity: topAct, streak: getStreakDays(points) };
+  }, [points, customers]);
 
-  const activeProjects = useMemo(
-    () => projects.filter(p => p.status === 'Active'),
-    [projects]
-  );
+  // Active customers = customers with any tasks or points
+  const activeCustomerCount = useMemo(() => {
+    const active = new Set();
+    tasks.forEach(t => { if (t.customerId) active.add(t.customerId); });
+    points.forEach(p => { if (p.customerId) active.add(p.customerId); });
+    return active.size;
+  }, [tasks, points]);
 
-  // Leaderboard: active projects sorted by total points — O(N_projects × M_points)
+  // Customer Leaderboard: all customers sorted by total points
   const leaderboard = useMemo(
-    () => activeProjects.map(project => {
-      const entries = points.filter(pt => pt.projectId === project.id);
+    () => customers.map(customer => {
+      const entries = points.filter(pt => pt.customerId === customer.id);
       const totalPoints = entries.reduce((s, e) => s + e.points, 0);
       const totalHours = entries.reduce((s, e) => s + e.hours, 0);
       const lastActivity = entries.length ? entries.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0].timestamp : null;
-      return { ...project, totalPoints, totalHours, lastActivity };
-    }).sort((a, b) => b.totalPoints - a.totalPoints),
-    [activeProjects, points]
+      const taskCount = tasks.filter(t => t.customerId === customer.id).length;
+      return { ...customer, totalPoints, totalHours, lastActivity, taskCount };
+    }).filter(c => c.totalPoints > 0 || c.taskCount > 0)
+      .sort((a, b) => b.totalPoints - a.totalPoints),
+    [customers, points, tasks]
   );
 
   const maxPoints = leaderboard[0]?.totalPoints || 1;
 
-  // OKR health — O(N_OKRs × N_projects × M_points)
+  // OKR health — direct point lookup via okrId
   const okrHealth = useMemo(
     () => okrs.map(okr => {
-      const okrProjects = projects.filter(p => p.okrId === okr.id);
-      const okrPoints = okrProjects.reduce((s, proj) => {
-        return s + points.filter(pt => pt.projectId === proj.id).reduce((ss, e) => ss + e.points, 0);
-      }, 0);
-      const okrHours = okrProjects.reduce((s, proj) => {
-        return s + points.filter(pt => pt.projectId === proj.id).reduce((ss, e) => ss + e.hours, 0);
-      }, 0);
-      return { ...okr, projectCount: okrProjects.length, totalPoints: okrPoints, totalHours: okrHours };
+      const okrPts = points.filter(pt => pt.okrId === okr.id);
+      const okrPoints = okrPts.reduce((s, e) => s + e.points, 0);
+      const okrHours = okrPts.reduce((s, e) => s + e.hours, 0);
+      const taskCount = tasks.filter(t => t.okrId === okr.id).length;
+      return { ...okr, taskCount, totalPoints: okrPoints, totalHours: okrHours };
     }).sort((a, b) => b.totalPoints - a.totalPoints),
-    [okrs, projects, points]
+    [okrs, points, tasks]
   );
 
   // Recent activity feed — sort+slice only when points changes
@@ -109,14 +110,14 @@ export default function Dashboard({ onNavigate }) {
       .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
       .slice(0, 15)
       .map(entry => {
-        const project = projects.find(p => p.id === entry.projectId);
-        return { ...entry, project };
+        const customer = customers.find(c => c.id === entry.customerId);
+        return { ...entry, customer };
       }),
-    [points, projects]
+    [points, customers]
   );
 
   const handlePointSuccess = (entry) => {
-    setFlashId(entry.projectId);
+    setFlashId(entry.customerId);
     setTimeout(() => setFlashId(null), 1000);
   };
 
@@ -149,9 +150,9 @@ export default function Dashboard({ onNavigate }) {
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <StatCard icon={Zap} label="Points this week" value={totalPts} color="indigo" />
         <StatCard icon={Clock} label="Hours this week" value={totalHrs.toFixed(1)} color="violet" />
-        <StatCard icon={Star} label="Top project" value={topProject?.name || 'None yet'} sub="this week" color="amber" />
+        <StatCard icon={Star} label="Top customer" value={topCustomer?.name || 'None yet'} sub="this week" color="amber" />
         <StatCard icon={Activity} label="Top activity" value={topActivity ? topActivity.split(' ')[0] : 'None yet'} sub="by points" color="emerald" />
-        <StatCard icon={TrendingUp} label="Active projects" value={activeProjects.length} color="rose" />
+        <StatCard icon={Users} label="Active customers" value={activeCustomerCount} color="rose" />
       </div>
 
       {/* Weekly summary banner */}
@@ -161,8 +162,8 @@ export default function Dashboard({ onNavigate }) {
             <span className="font-bold text-foreground">Weekly Summary:</span> You've invested{' '}
             <span className="text-yellow-400 font-bold">{totalPts} points</span> and{' '}
             <span className="text-brand-sage font-bold">{totalHrs.toFixed(1)}h</span> across{' '}
-            {new Set(weekPoints.map(p => p.projectId)).size} projects.
-            {topProject && <> Top focus: <span className="text-brand-lavender/80 font-semibold">{topProject.name}</span>.</>}
+            {new Set(weekPoints.map(p => p.customerId).filter(Boolean)).size} customers.
+            {topCustomer && <> Top focus: <span className="text-brand-lavender/80 font-semibold">{topCustomer.name}</span>.</>}
           </p>
         </div>
       )}
@@ -171,82 +172,71 @@ export default function Dashboard({ onNavigate }) {
         {/* Leaderboard */}
         <div className="xl:col-span-2 bg-card border border-border rounded-2xl overflow-hidden">
           <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-            <h2 className="font-semibold text-foreground flex items-center gap-2"><Trophy size={16} className="text-yellow-400" /> Project Leaderboard</h2>
-            <span className="text-xs text-muted-foreground">Active projects</span>
+            <h2 className="font-semibold text-foreground flex items-center gap-2"><Trophy size={16} className="text-yellow-400" /> Customer Leaderboard</h2>
+            <span className="text-xs text-muted-foreground">By total points</span>
           </div>
           {leaderboard.length === 0 ? (
             <div className="px-5 py-12 text-center">
-              <p className="text-muted-foreground text-sm">No active projects yet.</p>
-              <button onClick={() => onNavigate('projects')} className="mt-3 text-sm text-brand-lavender hover:text-brand-lavender/80">Create your first project →</button>
+              <p className="text-muted-foreground text-sm">No customer activity yet.</p>
+              <button onClick={() => onNavigate('customers')} className="mt-3 text-sm text-brand-lavender hover:text-brand-lavender/80">Add your first customer →</button>
             </div>
           ) : (
             <div className="divide-y divide-gray-800/60">
-              {leaderboard.map((project, i) => {
-                const customer = customers.find(c => c.id === project.customerId);
-                const okr = okrs.find(o => o.id === project.okrId);
-                const pct = maxPoints > 0 ? (project.totalPoints / maxPoints) * 100 : 0;
-                const isFlashing = flashId === project.id;
+              {leaderboard.map((customer, i) => {
+                const pct = maxPoints > 0 ? (customer.totalPoints / maxPoints) * 100 : 0;
+                const isFlashing = flashId === customer.id;
 
                 return (
                   <div
-                    key={project.id}
-                    className={`px-5 py-3.5 hover:bg-secondary/50 transition-colors cursor-pointer ${i === 0 ? 'bg-yellow-500/5' : ''}`}
-                    onClick={() => onNavigate('projects', project.id)}
+                    key={customer.id}
+                    className={`px-5 py-3.5 hover:bg-secondary/50 transition-colors ${i === 0 ? 'bg-yellow-500/5' : ''}`}
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-7 flex items-center justify-center flex-shrink-0">{rankIcon(i)}</div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`font-semibold text-sm ${i === 0 ? 'text-yellow-100' : 'text-foreground'}`}>{project.name}</span>
-                          {customer && (
-                            <span
-                              className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold"
-                              style={{ backgroundColor: (customer.color || '#6366f1') + '22', color: customer.color || '#6366f1', border: `1px solid ${customer.color || '#6366f1'}40` }}
-                            >
-                              {customer.name}
-                            </span>
-                          )}
+                          <span className={`font-semibold text-sm ${i === 0 ? 'text-yellow-100' : 'text-foreground'}`}>{customer.name}</span>
+                          <span className="text-[10px] text-muted-foreground">{customer.taskCount} tasks</span>
                         </div>
-                        {okr && <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{okr.title}</p>}
                         <div className="mt-1.5 h-1 bg-secondary rounded-full overflow-hidden">
                           <div
                             className="h-full rounded-full transition-all duration-700"
-                            style={{ width: `${pct}%`, backgroundColor: customer?.color || '#6366f1' }}
+                            style={{ width: `${pct}%`, backgroundColor: customer.color || '#6366f1' }}
                           />
                         </div>
                       </div>
                       <div className="text-right flex-shrink-0">
                         <div className="relative">
-                          <p className={`font-bold text-sm ${i === 0 ? 'text-yellow-400' : 'text-foreground'}`}>{project.totalPoints} pts</p>
+                          <p className={`font-bold text-sm ${i === 0 ? 'text-yellow-400' : 'text-foreground'}`}>{customer.totalPoints} pts</p>
                           {isFlashing && (
                             <span className="point-flash absolute -top-1 right-0 text-xs font-bold text-yellow-400 whitespace-nowrap">+pts!</span>
                           )}
                         </div>
-                        <p className="text-[11px] text-muted-foreground">{project.totalHours.toFixed(1)}h</p>
+                        <p className="text-[11px] text-muted-foreground">{customer.totalHours.toFixed(1)}h</p>
                       </div>
                       {/* Timer button */}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (isRunning && runningProjectId !== project.id) {
-                            setTimerConflict(project);
+                          if (isRunning && runningCustomerId !== customer.id) {
+                            setTimerConflict(customer);
                           } else if (!isRunning) {
-                            startTimer(project.id);
+                            startTimer(customer.id);
                           }
-                          // If already running for THIS project, widget is visible — no action needed
+                          // If already running for THIS customer, widget is visible — no action needed
                         }}
                         className={`p-1.5 rounded-lg transition-colors flex-shrink-0 ${
-                          runningProjectId === project.id
+                          runningCustomerId === customer.id
                             ? 'bg-brand-sage/30 text-brand-sage cursor-default'
                             : 'bg-muted/50 hover:bg-brand-sage/20 text-muted-foreground hover:text-brand-sage'
                         }`}
-                        title={runningProjectId === project.id ? 'Timer running' : 'Start timer'}
+                        title={runningCustomerId === customer.id ? 'Timer running' : 'Start timer'}
                       >
                         <Timer size={13} />
                       </button>
                       {/* Add points button */}
                       <button
-                        onClick={(e) => { e.stopPropagation(); setAddModal(project); }}
+                        onClick={(e) => { e.stopPropagation(); setAddModal(customer); }}
                         className="p-1.5 rounded-lg bg-brand-lavender/20 hover:bg-brand-lavender/40 text-brand-lavender transition-colors flex-shrink-0"
                         title="Add points"
                       >
@@ -269,9 +259,9 @@ export default function Dashboard({ onNavigate }) {
             <div className="px-5 py-12 text-center">
               <Activity size={28} className="text-muted-foreground/60 mx-auto mb-3" />
               <p className="text-sm font-medium text-muted-foreground mb-1">No activity yet</p>
-              <p className="text-xs text-muted-foreground/70 mb-4">Log points on your projects to see your work history here.</p>
+              <p className="text-xs text-muted-foreground/70 mb-4">Log points for your customers to see your work history here.</p>
               <button
-                onClick={() => onNavigate('projects')}
+                onClick={() => onNavigate('triage')}
                 className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-lavender hover:text-brand-lavender/80 transition-colors"
               >
                 Log your first points →
@@ -283,7 +273,7 @@ export default function Dashboard({ onNavigate }) {
                 <div key={entry.id} className="px-4 py-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{entry.project?.name || 'Unknown'}</p>
+                      <p className="text-sm font-medium text-foreground truncate">{entry.customer?.name || 'Unknown'}</p>
                       <p className="text-[11px] text-muted-foreground">{entry.activityType || 'General'}</p>
                       {entry.comment && <p className="text-[11px] text-muted-foreground/70 mt-0.5 truncate">{entry.comment}</p>}
                     </div>
@@ -307,7 +297,7 @@ export default function Dashboard({ onNavigate }) {
             <span className="text-xs text-muted-foreground">Are you working on the right things?</span>
           </div>
           <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {okrHealth.map((okr, i) => {
+            {okrHealth.map((okr) => {
               const maxOkrPts = okrHealth[0]?.totalPoints || 1;
               const pct = maxOkrPts > 0 ? (okr.totalPoints / maxOkrPts) * 100 : 0;
               return (
@@ -321,7 +311,7 @@ export default function Dashboard({ onNavigate }) {
                     <div className="h-full bg-indigo-500 rounded-full transition-all duration-700" style={{ width: `${pct}%` }} />
                   </div>
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">{okr.projectCount} project{okr.projectCount !== 1 ? 's' : ''}</span>
+                    <span className="text-muted-foreground">{okr.taskCount} task{okr.taskCount !== 1 ? 's' : ''}</span>
                     <span className="text-foreground font-bold">{okr.totalPoints} pts · {okr.totalHours.toFixed(1)}h</span>
                   </div>
                 </button>
@@ -333,7 +323,7 @@ export default function Dashboard({ onNavigate }) {
 
       {addModal && (
         <AddPointsModal
-          project={addModal}
+          customer={addModal}
           onClose={() => setAddModal(null)}
           onSuccess={handlePointSuccess}
         />
@@ -342,7 +332,7 @@ export default function Dashboard({ onNavigate }) {
       {timerConflict && (
         <ConfirmDialog
           title="Timer Already Running"
-          message={`A timer is already running for another project. Stop it first (you'll be prompted to save), then start a new timer for "${timerConflict.name}".`}
+          message={`A timer is already running for another customer. Stop it first (you'll be prompted to save), then start a new timer for "${timerConflict.name}".`}
           danger={false}
           onConfirm={() => { stopTimer(); setTimerConflict(null); }}
           onCancel={() => setTimerConflict(null)}

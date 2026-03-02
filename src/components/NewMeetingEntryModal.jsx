@@ -14,7 +14,7 @@ function todayLocalISO() {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-export default function NewMeetingEntryModal({ project, onClose }) {
+export default function NewMeetingEntryModal({ customer, onClose }) {
   const { addMeetingEntry } = useAppStore();
   const [form, setForm] = useState({ meetingDate: todayLocalISO(), rawNotes: '' });
   const [errors, setErrors] = useState({});
@@ -30,7 +30,7 @@ export default function NewMeetingEntryModal({ project, onClose }) {
     e.preventDefault();
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
-    addMeetingEntry({ projectId: project.id, meetingDate: form.meetingDate, rawNotes: form.rawNotes.trim() });
+    addMeetingEntry({ customerId: customer.id, meetingDate: form.meetingDate, rawNotes: form.rawNotes.trim() });
     onClose();
   };
 

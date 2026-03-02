@@ -14,10 +14,11 @@ const BLANK_FORM = {
   taskType: 'mine',
   assigneeOrTeam: '',
   status: 'open',
+  okrId: '',
 };
 
-export default function AddTaskModal({ project, onClose }) {
-  const { addTask } = useAppStore();
+export default function AddTaskModal({ customer, onClose }) {
+  const { addTask, okrs } = useAppStore();
   const [form, setForm] = useState(BLANK_FORM);
   const [errors, setErrors] = useState({});
   const [savedCount, setSavedCount] = useState(0);
@@ -42,7 +43,8 @@ export default function AddTaskModal({ project, onClose }) {
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return false; }
     addTask({
-      projectId: project.id,
+      customerId: customer.id,
+      okrId: form.okrId || null,
       meetingEntryId: null,
       description: form.description.trim(),
       taskType: form.taskType,
@@ -142,6 +144,25 @@ export default function AddTaskModal({ project, onClose }) {
             ))}
           </select>
         </div>
+
+        {/* Optional OKR selector */}
+        {okrs.length > 0 && (
+          <div>
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+              OKR <span className="text-muted-foreground/50">(optional)</span>
+            </label>
+            <select
+              value={form.okrId}
+              onChange={e => setForm(p => ({ ...p, okrId: e.target.value }))}
+              className="w-full h-10 bg-card border border-border rounded-md px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+            >
+              <option value="">No OKR</option>
+              {okrs.map(o => (
+                <option key={o.id} value={o.id}>{o.quarter} — {o.title}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div className="space-y-2 pt-1">
           {/* Save & Add Another — full width, secondary style */}

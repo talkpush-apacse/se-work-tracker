@@ -5,6 +5,9 @@ import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import BulkAddOKRsModal from '../components/BulkAddOKRsModal';
 import { formatDate } from '../utils/dateHelpers';
+import {
+  TASK_STATUS_LABELS, TASK_STATUS_COLORS,
+} from '../constants';
 
 // ─── Quarter options ──────────────────────────────────────────────────────────
 function generateQuarters() {
@@ -291,7 +294,7 @@ function PointsProgress({ totalPoints, targetPoints, onSetTarget }) {
 
 // ─── Main OKRs page ───────────────────────────────────────────────────────────
 export default function OKRs() {
-  const { okrs, projects, points, tasks, addOkr, updateOkr, deleteOkr } = useAppStore();
+  const { okrs, points, tasks, customers, addOkr, updateOkr, deleteOkr } = useAppStore();
   const [createModal, setCreateModal] = useState(false);
   const [bulkModal, setBulkModal] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
@@ -308,6 +311,9 @@ export default function OKRs() {
       keyResults: (okr.keyResults || []).map(kr => kr.id === krId ? { ...kr, ...patch } : kr),
     });
   };
+
+  // Build a customer lookup map for displaying customer names on tasks
+  const customerMap = new Map(customers.map(c => [c.id, c]));
 
   // Group OKRs by quarter
   const byQuarter = okrs.reduce((acc, okr) => {
@@ -332,7 +338,7 @@ export default function OKRs() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">OKRs</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Objectives that guide your project priorities</p>
+          <p className="text-sm text-muted-foreground mt-0.5">Objectives that guide your work priorities</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -373,16 +379,13 @@ export default function OKRs() {
 
               <div className="space-y-3">
                 {byQuarter[quarter].map((okr) => {
-                  const linkedProjects = projects.filter(p => p.okrId === okr.id);
-                  const totalPoints = linkedProjects.reduce((s, proj) => {
-                    return s + points.filter(pt => pt.projectId === proj.id).reduce((ss, e) => ss + e.points, 0);
-                  }, 0);
-                  const totalHours = linkedProjects.reduce((s, proj) => {
-                    return s + points.filter(pt => pt.projectId === proj.id).reduce((ss, e) => ss + e.hours, 0);
-                  }, 0);
-                  // Task completion points rolled up from all linked projects
-                  const taskPts = linkedProjects.reduce((s, proj) =>
-                    s + tasks.filter(t => t.projectId === proj.id).reduce((ss, t) => ss + (t.points || 0), 0), 0);
+                  // Direct lookups — no project indirection
+                  const linkedTasks = tasks.filter(t => t.okrId === okr.id);
+                  const okrPoints = points.filter(pt => pt.okrId === okr.id);
+                  const totalPoints = okrPoints.reduce((s, e) => s + e.points, 0);
+                  const totalHours = okrPoints.reduce((s, e) => s + e.hours, 0);
+                  // Task completion points
+                  const taskPts = linkedTasks.reduce((s, t) => s + (t.points || 0), 0);
                   const isExpanded = expanded[okr.id];
                   const keyResults = okr.keyResults || [];
 
@@ -408,7 +411,7 @@ export default function OKRs() {
                             />
 
                             <div className="flex items-center gap-4 mt-2 flex-wrap">
-                              <span className="text-xs text-muted-foreground">{linkedProjects.length} project{linkedProjects.length !== 1 ? 's' : ''}</span>
+                              <span className="text-xs text-muted-foreground">{linkedTasks.length} task{linkedTasks.length !== 1 ? 's' : ''}</span>
                               <span className="text-xs font-semibold text-brand-lavender">{totalPoints} pts</span>
                               <span className="text-xs text-muted-foreground">{totalHours.toFixed(1)}h</span>
                               {taskPts > 0 && (
@@ -430,7 +433,7 @@ export default function OKRs() {
                         </div>
                       </div>
 
-                      {/* Expanded panel: KRs + linked projects */}
+                      {/* Expanded panel: KRs + linked tasks */}
                       {isExpanded && (
                         <div className="border-t border-border">
                           {/* Key Results */}
@@ -470,22 +473,42 @@ export default function OKRs() {
                             </div>
                           )}
 
-                          {/* Linked projects */}
-                          {linkedProjects.length > 0 && (
+                          {/* Linked tasks */}
+                          {linkedTasks.length > 0 && (
                             <div className={`px-5 py-3 space-y-2 ${keyResults.length > 0 ? 'border-t border-border/60' : ''}`}>
-                              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Linked Projects</p>
-                              {linkedProjects.map(p => (
-                                <div key={p.id} className="flex items-center justify-between text-xs">
-                                  <span className="text-foreground/80">{p.name}</span>
-                                  <span className={`font-medium ${p.status === 'Active' ? 'text-brand-sage' : p.status === 'On Hold' ? 'text-brand-amber' : 'text-muted-foreground'}`}>{p.status}</span>
-                                </div>
-                              ))}
+                              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Linked Tasks</p>
+                              {linkedTasks.map(t => {
+                                const cust = customerMap.get(t.customerId);
+                                return (
+                                  <div key={t.id} className="flex items-center justify-between text-xs gap-2">
+                                    <span className="text-foreground/80 truncate flex-1">{t.description}</span>
+                                    {cust && (
+                                      <span
+                                        className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold flex-shrink-0"
+                                        style={{
+                                          backgroundColor: (cust.color || '#10b981') + '22',
+                                          color: cust.color || '#10b981',
+                                          border: `1px solid ${cust.color || '#10b981'}40`,
+                                        }}
+                                      >
+                                        {cust.name}
+                                      </span>
+                                    )}
+                                    <span
+                                      className="font-medium flex-shrink-0"
+                                      style={{ color: TASK_STATUS_COLORS[t.status] || undefined }}
+                                    >
+                                      {TASK_STATUS_LABELS[t.status] || t.status}
+                                    </span>
+                                  </div>
+                                );
+                              })}
                             </div>
                           )}
 
-                          {keyResults.length === 0 && linkedProjects.length === 0 && (
+                          {keyResults.length === 0 && linkedTasks.length === 0 && (
                             <div className="px-5 py-5 text-center">
-                              <p className="text-xs text-muted-foreground/70 italic mb-3">No key results or linked projects yet.</p>
+                              <p className="text-xs text-muted-foreground/70 italic mb-3">No key results or linked tasks yet.</p>
                               <button
                                 onClick={() => updateOkr(okr.id, {
                                   keyResults: [{ id: krUid(), text: '', type: 'boolean', value: null }],
@@ -520,7 +543,7 @@ export default function OKRs() {
       {deleteTarget && (
         <ConfirmDialog
           title="Delete OKR"
-          message={`Delete "${deleteTarget.title}"? Projects linked to this OKR will lose their OKR reference.`}
+          message={`Delete "${deleteTarget.title}"? Tasks linked to this OKR will lose their OKR reference.`}
           onConfirm={() => { deleteOkr(deleteTarget.id); setDeleteTarget(null); }}
           onCancel={() => setDeleteTarget(null)}
         />

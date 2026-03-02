@@ -56,7 +56,7 @@ export function useTimer() {
     if (!current) return null;
     const elapsed = Math.min(calcElapsed(current.startedAt), MAX_SECONDS);
     const session = {
-      projectId: current.projectId,
+      customerId: current.customerId ?? null,
       taskId: current.taskId ?? null,
       taskDescription: current.taskDescription ?? null,
       elapsedSeconds: elapsed,
@@ -123,14 +123,15 @@ export function useTimer() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // Empty deps is intentional: run exactly once on mount
 
-  // taskId and taskDescription are optional — project-level timers pass neither
-  const startTimer = useCallback((projectId, taskId = null, taskDescription = null) => {
+  // customerId can be null for General Focus Time (not linked to any customer)
+  // taskId and taskDescription are optional — customer-level timers pass neither
+  const startTimer = useCallback((customerId = null, taskId = null, taskDescription = null) => {
     // Guard against double-start
     const existing = loadTimerState();
     if (existing && existing.isRunning) return;
 
     const startedAt = new Date().toISOString();
-    const state = { projectId, taskId, taskDescription, startedAt, isRunning: true };
+    const state = { customerId, taskId, taskDescription, startedAt, isRunning: true };
     saveTimerState(state);
     setTimerState(state);
     setElapsedSeconds(0);
@@ -143,7 +144,7 @@ export function useTimer() {
 
   return {
     isRunning: !!timerState,
-    projectId: timerState?.projectId ?? null,
+    customerId: timerState?.customerId ?? null,
     taskId: timerState?.taskId ?? null,
     elapsedSeconds,
     startedAt: timerState?.startedAt ?? null,

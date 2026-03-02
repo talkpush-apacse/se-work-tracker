@@ -22,8 +22,6 @@ export const CUSTOMER_COLORS = [
   { name: 'Teal', value: '#14b8a6' },
 ];
 
-export const PROJECT_STATUSES = ['Active', 'On Hold', 'Completed'];
-
 // Task types — only 'comms' and 'focus-time' appear in dropdowns.
 // 'mine' and 'coordinate' entries are kept in the maps below for backward compat
 // with existing localStorage tasks but are excluded from the active array.

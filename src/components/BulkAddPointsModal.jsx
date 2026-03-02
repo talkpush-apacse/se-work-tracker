@@ -43,7 +43,7 @@ function parseLine(raw) {
   };
 }
 
-export default function BulkAddPointsModal({ project, onClose }) {
+export default function BulkAddPointsModal({ customer, onClose }) {
   const { addPoint } = useAppStore();
   const [text, setText] = useState('');
   const [result, setResult] = useState(null);
@@ -61,7 +61,7 @@ export default function BulkAddPointsModal({ project, onClose }) {
   const handleConfirm = () => {
     valid.forEach(item => {
       addPoint({
-        projectId: project.id,
+        customerId: customer.id,
         points: item.points,
         hours: item.hours,
         activityType: item.activityType,
@@ -73,7 +73,7 @@ export default function BulkAddPointsModal({ project, onClose }) {
 
   if (result) {
     return (
-      <Modal title={`Bulk Add Points — ${project.name}`} onClose={onClose} size="sm">
+      <Modal title={`Bulk Add Points — ${customer.name}`} onClose={onClose} size="sm">
         <div className="text-center py-4 space-y-3">
           <div className="w-12 h-12 rounded-full bg-brand-sage/10 flex items-center justify-center mx-auto">
             <Zap size={22} className="text-brand-sage" />
@@ -89,7 +89,7 @@ export default function BulkAddPointsModal({ project, onClose }) {
   }
 
   return (
-    <Modal title={`Bulk Add Points — ${project.name}`} onClose={onClose} size="xl">
+    <Modal title={`Bulk Add Points — ${customer.name}`} onClose={onClose} size="xl">
       <div className="space-y-4">
         <div>
           <label className="block text-xs font-medium text-muted-foreground mb-1.5">

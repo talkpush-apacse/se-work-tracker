@@ -4,6 +4,7 @@ import { ACTIVITY_TYPES, AUTO_TRACK_RATE } from '../constants';
 import { useAppStore } from '../context/StoreContext';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
+import DistributeTimeModal from './DistributeTimeModal';
 
 function formatHMS(totalSeconds) {
   const h = Math.floor(totalSeconds / 3600);
@@ -13,9 +14,14 @@ function formatHMS(totalSeconds) {
 }
 
 export default function SaveSessionModal({ session, onClose }) {
-  const { addPoint, projects } = useAppStore();
+  const { addPoint, customers, okrs } = useAppStore();
 
-  const project = projects.find(p => p.id === session.projectId);
+  // General Focus Time sessions (customerId === null) → show distribution modal
+  if (!session.customerId) {
+    return <DistributeTimeModal session={session} onClose={onClose} />;
+  }
+
+  const customer = customers.find(c => c.id === session.customerId);
   const prefilledHours = parseFloat((session.elapsedSeconds / 3600).toFixed(2));
   const prefilledPoints = Math.round(prefilledHours * AUTO_TRACK_RATE * 100) / 100;
 
@@ -23,6 +29,7 @@ export default function SaveSessionModal({ session, onClose }) {
     points: String(prefilledPoints),
     hours: String(prefilledHours),
     activityType: '',
+    okrId: '',
     // Pre-fill from task description when timer was started on a specific task
     comment: session.taskDescription || '',
   });
@@ -43,7 +50,8 @@ export default function SaveSessionModal({ session, onClose }) {
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
     addPoint({
-      projectId: session.projectId,
+      customerId: session.customerId,
+      okrId: form.okrId || null,
       points: Number(form.points),
       hours: Number(form.hours),
       activityType: form.activityType,
@@ -57,14 +65,14 @@ export default function SaveSessionModal({ session, onClose }) {
     onChange: (e) => setForm(p => ({ ...p, [key]: e.target.value })),
   });
 
-  const projectName = project?.name ?? 'Unknown Project';
+  const customerName = customer?.name ?? 'Unknown Customer';
 
   return (
-    <Modal title={`Save Session — ${projectName}`} onClose={() => setShowDiscard(true)} size="md">
-      {/* Orphaned project warning */}
-      {!project && (
+    <Modal title={`Save Session — ${customerName}`} onClose={() => setShowDiscard(true)} size="md">
+      {/* Orphaned customer warning */}
+      {!customer && (
         <div className="mb-4 rounded-xl border border-brand-amber/40 bg-brand-amber/10 px-3 py-2.5">
-          <p className="text-xs text-brand-amber font-medium">⚠️ The project for this session was deleted. The entry will be saved but will appear as "Unknown" in your history.</p>
+          <p className="text-xs text-brand-amber font-medium">⚠️ The customer for this session was deleted. The entry will be saved but will appear as "Unknown" in your history.</p>
         </div>
       )}
 
@@ -116,7 +124,20 @@ export default function SaveSessionModal({ session, onClose }) {
             <option value="">Select activity...</option>
             {ACTIVITY_TYPES.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
-          {errors.activityType && <p className="mt-1 text-xs text-destructive">{errors.activityType}</p>}
+        </div>
+
+        {/* Optional OKR selector */}
+        <div>
+          <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+            OKR <span className="text-muted-foreground/50">(optional)</span>
+          </label>
+          <select
+            {...field('okrId')}
+            className="w-full h-10 bg-card border border-border rounded-md px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+          >
+            <option value="">No OKR</option>
+            {okrs.map(o => <option key={o.id} value={o.id}>{o.quarter} — {o.title}</option>)}
+          </select>
         </div>
 
         <div>

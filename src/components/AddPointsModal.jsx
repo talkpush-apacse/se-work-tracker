@@ -5,12 +5,13 @@ import { useAppStore } from '../context/StoreContext';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 
-export default function AddPointsModal({ project, onClose, onSuccess }) {
-  const { addPoint } = useAppStore();
+export default function AddPointsModal({ customer, onClose, onSuccess }) {
+  const { addPoint, okrs } = useAppStore();
   const [form, setForm] = useState({
     points: '',
     hours: '',
     activityType: '',
+    okrId: '',
     comment: '',
   });
   const [errors, setErrors] = useState({});
@@ -28,7 +29,8 @@ export default function AddPointsModal({ project, onClose, onSuccess }) {
     if (Object.keys(errs).length) { setErrors(errs); return; }
 
     const entry = addPoint({
-      projectId: project.id,
+      customerId: customer.id,
+      okrId: form.okrId || null,
       points: Number(form.points),
       hours: Number(form.hours),
       activityType: form.activityType,
@@ -44,7 +46,7 @@ export default function AddPointsModal({ project, onClose, onSuccess }) {
   });
 
   return (
-    <Modal title={`Add Points — ${project.name}`} onClose={onClose}>
+    <Modal title={`Add Points — ${customer.name}`} onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -82,8 +84,23 @@ export default function AddPointsModal({ project, onClose, onSuccess }) {
             <option value="">Select activity...</option>
             {ACTIVITY_TYPES.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
-          {errors.activityType && <p className="mt-1 text-xs text-destructive">{errors.activityType}</p>}
         </div>
+
+        {/* Optional OKR selector */}
+        {okrs.length > 0 && (
+          <div>
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+              OKR <span className="text-muted-foreground/50">(optional)</span>
+            </label>
+            <select
+              {...field('okrId')}
+              className="w-full h-10 bg-card border border-border rounded-md px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+            >
+              <option value="">No OKR</option>
+              {okrs.map(o => <option key={o.id} value={o.id}>{o.quarter} — {o.title}</option>)}
+            </select>
+          </div>
+        )}
 
         <div>
           <label className="block text-xs font-medium text-muted-foreground mb-1.5">

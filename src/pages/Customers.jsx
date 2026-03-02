@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, Users, ListPlus, Pin, PinOff, GripVertical, FolderKanban } from 'lucide-react';
+import { Plus, Pencil, Trash2, Users, ListPlus, Pin, PinOff, GripVertical } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -67,57 +67,8 @@ function CustomerForm({ initial = {}, onSubmit, onCancel }) {
   );
 }
 
-// ─── Quick Add Project form (inline in customer card) ─────────────────────────
-function QuickAddProjectForm({ customerId, okrs, onSubmit, onCancel }) {
-  const [name, setName] = useState('');
-  const [okrId, setOkrId] = useState(okrs[0]?.id || '');
-
-  const canSubmit = name.trim();
-
-  return (
-    <div className="mt-3 pt-3 border-t border-border/60 space-y-2">
-      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">New Project</p>
-      <input
-        value={name}
-        onChange={e => setName(e.target.value)}
-        placeholder="Project name *"
-        className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
-      />
-      {okrs.length > 0 && (
-        <select
-          value={okrId}
-          onChange={e => setOkrId(e.target.value)}
-          className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-xs text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
-        >
-          <option value="">— Link OKR (optional) —</option>
-          {okrs.map(o => (
-            <option key={o.id} value={o.id}>{o.title}</option>
-          ))}
-        </select>
-      )}
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="flex-1 py-1.5 rounded-lg bg-muted hover:bg-gray-600 text-xs font-medium transition-colors"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          disabled={!canSubmit}
-          onClick={() => onSubmit({ name: name.trim(), customerId, okrId: okrId || null })}
-          className="flex-1 py-1.5 rounded-lg bg-brand-lavender hover:bg-brand-lavender/80 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-foreground transition-colors"
-        >
-          Create
-        </button>
-      </div>
-    </div>
-  );
-}
-
 // ─── Sortable customer row ────────────────────────────────────────────────────
-function SortableCustomerRow({ customer, linkedProjects, totalPoints, totalHours, taskPts, okrs, onEdit, onDelete, onPin, onAddProject }) {
+function SortableCustomerRow({ customer, taskCount, totalPoints, totalHours, taskPts, onEdit, onDelete, onPin }) {
   const {
     attributes,
     listeners,
@@ -132,8 +83,6 @@ function SortableCustomerRow({ customer, linkedProjects, totalPoints, totalHours
     transition,
     opacity: isDragging ? 0.5 : 1,
   };
-
-  const [showAddProject, setShowAddProject] = useState(false);
 
   return (
     <div
@@ -179,8 +128,8 @@ function SortableCustomerRow({ customer, linkedProjects, totalPoints, totalHours
         {/* Stats */}
         <div className="hidden sm:flex items-center gap-4 flex-shrink-0 text-center">
           <div>
-            <p className="text-sm font-bold" style={{ color: customer.color }}>{linkedProjects.length}</p>
-            <p className="text-[10px] text-muted-foreground">Projects</p>
+            <p className="text-sm font-bold" style={{ color: customer.color }}>{taskCount}</p>
+            <p className="text-[10px] text-muted-foreground">Tasks</p>
           </div>
           <div>
             <p className="text-sm font-bold text-foreground">{totalPoints}</p>
@@ -201,13 +150,6 @@ function SortableCustomerRow({ customer, linkedProjects, totalPoints, totalHours
         {/* Action buttons */}
         <div className="flex gap-1 items-center flex-shrink-0 ml-2">
           <button
-            onClick={() => setShowAddProject(v => !v)}
-            title="Add project for this customer"
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-brand-lavender hover:bg-secondary transition-colors"
-          >
-            <FolderKanban size={13} />
-          </button>
-          <button
             onClick={() => onPin(customer.id, !customer.pinned)}
             title={customer.pinned ? 'Unpin customer' : 'Pin to top'}
             className={`p-1.5 rounded-lg transition-colors ${
@@ -222,25 +164,13 @@ function SortableCustomerRow({ customer, linkedProjects, totalPoints, totalHours
           <button onClick={() => onDelete(customer)} className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-secondary transition-colors"><Trash2 size={13} /></button>
         </div>
       </div>
-
-      {/* Inline Add Project form (toggled) */}
-      {showAddProject && (
-        <div className="px-4 pb-4">
-          <QuickAddProjectForm
-            customerId={customer.id}
-            okrs={okrs}
-            onSubmit={(data) => { onAddProject(data); setShowAddProject(false); }}
-            onCancel={() => setShowAddProject(false)}
-          />
-        </div>
-      )}
     </div>
   );
 }
 
 // ─── Main Customers page ──────────────────────────────────────────────────────
 export default function Customers() {
-  const { customers, projects, points, tasks, okrs, addCustomer, updateCustomer, deleteCustomer, reorderCustomers, addProject } = useAppStore();
+  const { customers, points, tasks, addCustomer, updateCustomer, deleteCustomer, reorderCustomers } = useAppStore();
   const [createModal, setCreateModal] = useState(false);
   const [bulkModal, setBulkModal] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
@@ -254,16 +184,15 @@ export default function Customers() {
 
   const handlePin = (id, value) => updateCustomer(id, { pinned: value });
 
-  // Helper: compute stats for a customer (avoids duplication across sections)
+  // Helper: compute stats for a customer (direct — no project indirection)
   const getCustomerStats = (customer) => {
-    const linkedProjects = projects.filter(p => p.customerId === customer.id);
-    const totalPoints = linkedProjects.reduce((s, proj) =>
-      s + points.filter(pt => pt.projectId === proj.id).reduce((ss, e) => ss + e.points, 0), 0);
-    const totalHours = linkedProjects.reduce((s, proj) =>
-      s + points.filter(pt => pt.projectId === proj.id).reduce((ss, e) => ss + e.hours, 0), 0);
-    const taskPts = linkedProjects.reduce((s, proj) =>
-      s + tasks.filter(t => t.projectId === proj.id).reduce((ss, t) => ss + (t.points || 0), 0), 0);
-    return { linkedProjects, totalPoints, totalHours, taskPts };
+    const custPoints = points.filter(pt => pt.customerId === customer.id);
+    const totalPoints = custPoints.reduce((s, e) => s + e.points, 0);
+    const totalHours = custPoints.reduce((s, e) => s + e.hours, 0);
+    const custTasks = tasks.filter(t => t.customerId === customer.id);
+    const taskCount = custTasks.length;
+    const taskPts = custTasks.reduce((s, t) => s + (t.points || 0), 0);
+    return { taskCount, totalPoints, totalHours, taskPts };
   };
 
   // Drag handler for pinned section — reorder within pinned, keep unpinned order
@@ -288,20 +217,18 @@ export default function Customers() {
 
   // Render a customer row with stats
   const renderCustomerRow = (customer) => {
-    const { linkedProjects, totalPoints, totalHours, taskPts } = getCustomerStats(customer);
+    const { taskCount, totalPoints, totalHours, taskPts } = getCustomerStats(customer);
     return (
       <SortableCustomerRow
         key={customer.id}
         customer={customer}
-        linkedProjects={linkedProjects}
+        taskCount={taskCount}
         totalPoints={totalPoints}
         totalHours={totalHours}
         taskPts={taskPts}
-        okrs={okrs}
         onEdit={setEditTarget}
         onDelete={setDeleteTarget}
         onPin={handlePin}
-        onAddProject={(data) => addProject(data)}
       />
     );
   };
@@ -311,7 +238,7 @@ export default function Customers() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Customers</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Enterprise clients linked to your projects</p>
+          <p className="text-sm text-muted-foreground mt-0.5">Enterprise clients you track work for</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -387,7 +314,7 @@ export default function Customers() {
       {deleteTarget && (
         <ConfirmDialog
           title="Delete Customer"
-          message={`Delete "${deleteTarget.name}"? Their projects will remain but lose the customer link.`}
+          message={`Delete "${deleteTarget.name}"? All tasks, points, meetings, and milestones for this customer will also be deleted. This cannot be undone.`}
           onConfirm={() => { deleteCustomer(deleteTarget.id); setDeleteTarget(null); }}
           onCancel={() => setDeleteTarget(null)}
         />

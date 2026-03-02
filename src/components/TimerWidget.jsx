@@ -14,13 +14,13 @@ function formatHMS(totalSeconds) {
 export default function TimerWidget() {
   const {
     isRunning,
-    projectId,
+    customerId,
     stoppedSession,
     clearStoppedSession,
     stopTimer,
   } = useTimerContext();
   const elapsedSeconds = useTimerDisplay();
-  const { projects, customers } = useAppStore();
+  const { customers } = useAppStore();
   const [showSave, setShowSave] = useState(false);
 
   // Open save modal when timer stops
@@ -38,15 +38,16 @@ export default function TimerWidget() {
   // Nothing to render when not running and no pending save
   if (!isRunning && !showSave) return null;
 
-  const activeProjectId = isRunning ? projectId : stoppedSession?.projectId;
-  const project = projects.find(p => p.id === activeProjectId);
-  const customer = customers.find(c => c.id === project?.customerId);
+  const activeCustomerId = isRunning ? customerId : stoppedSession?.customerId;
+  const customer = customers.find(c => c.id === activeCustomerId);
+  // When customerId is null, it's a General Focus Time session
+  const isGeneralFocusTime = !activeCustomerId;
 
   return (
     <>
       {isRunning && (
         <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-emerald-700/50 bg-emerald-950/60 px-5 py-3 shadow-lg shadow-emerald-900/20 animate-fade-in">
-          {/* Pulsing indicator + project info */}
+          {/* Pulsing indicator + customer info */}
           <div className="flex items-center gap-3 min-w-0">
             <span className="relative flex h-2.5 w-2.5 flex-shrink-0">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
@@ -57,9 +58,9 @@ export default function TimerWidget() {
 
             <div className="min-w-0">
               <p className="text-sm font-semibold text-white truncate leading-tight">
-                {project?.name ?? 'Unknown Project'}
+                {isGeneralFocusTime ? 'General Focus Time' : (customer?.name ?? 'Unknown Customer')}
               </p>
-              {customer && (
+              {customer && !isGeneralFocusTime && (
                 <span
                   className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold leading-tight"
                   style={{

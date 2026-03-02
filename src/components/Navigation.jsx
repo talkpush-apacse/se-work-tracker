@@ -1,4 +1,4 @@
-import { LayoutDashboard, FolderKanban, BarChart3, Target, Users, Menu, X, Download, Upload, ListTodo, Cloud, CloudOff, Loader2 } from 'lucide-react';
+import { LayoutDashboard, Target, Users, Menu, X, Download, Upload, ListTodo, Cloud, CloudOff, Loader2 } from 'lucide-react';
 import { useState, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAppStore } from '../context/StoreContext';
@@ -8,11 +8,9 @@ import { filterPointsByRange } from '../utils/dateHelpers';
 
 const tabs = [
   { id: 'triage',    label: 'Triage',    icon: ListTodo },
-  { id: 'projects',  label: 'Projects',  icon: FolderKanban },
-  { id: 'okrs',      label: 'OKRs',      icon: Target },
   { id: 'customers', label: 'Customers', icon: Users },
+  { id: 'okrs',      label: 'OKRs',      icon: Target },
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'analytics', label: 'Analytics', icon: BarChart3 },
 ];
 
 export default function Navigation({ activeTab, onTabChange }) {

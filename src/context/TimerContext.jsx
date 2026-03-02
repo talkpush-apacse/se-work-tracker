@@ -10,27 +10,28 @@ const TimerDisplayContext = createContext(0);
 
 export function TimerProvider({ children }) {
   const timer = useTimer();
-  const { projects } = useAppStore();
+  const { customers } = useAppStore();
 
-  // If the project being timed gets deleted, auto-stop the timer
+  // If the customer being timed gets deleted, auto-stop the timer
+  // (skip check when customerId is null — General Focus Time)
   const stopTimerRef = useRef(timer.stopTimer);
   stopTimerRef.current = timer.stopTimer;
 
   useEffect(() => {
-    if (timer.isRunning && timer.projectId) {
-      const stillExists = projects.some(p => p.id === timer.projectId);
+    if (timer.isRunning && timer.customerId) {
+      const stillExists = customers.some(c => c.id === timer.customerId);
       if (!stillExists) {
         stopTimerRef.current();
       }
     }
-  }, [projects, timer.isRunning, timer.projectId]);
+  }, [customers, timer.isRunning, timer.customerId]);
 
   // Memoised control value — reference stays stable between every 1-second tick,
   // so components that only need start/stop/state don't re-render every second.
   const controlValue = useMemo(
     () => ({
       isRunning: timer.isRunning,
-      projectId: timer.projectId,
+      customerId: timer.customerId,
       taskId: timer.taskId,
       startedAt: timer.startedAt,
       stoppedSession: timer.stoppedSession,
@@ -40,7 +41,7 @@ export function TimerProvider({ children }) {
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
-      timer.isRunning, timer.projectId, timer.taskId, timer.startedAt,
+      timer.isRunning, timer.customerId, timer.taskId, timer.startedAt,
       timer.stoppedSession, timer.clearStoppedSession, timer.startTimer, timer.stopTimer,
     ]
   );
@@ -55,7 +56,7 @@ export function TimerProvider({ children }) {
 }
 
 /**
- * Returns stable control values (isRunning, projectId, taskId, startedAt,
+ * Returns stable control values (isRunning, customerId, taskId, startedAt,
  * stoppedSession, clearStoppedSession, startTimer, stopTimer).
  * Does NOT re-render on every timer tick — only on start/stop/session events.
  */
