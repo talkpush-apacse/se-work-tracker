@@ -27,11 +27,7 @@ import {
   ANNOTATION_TAGS, ANNOTATION_TAG_LABELS, ANNOTATION_TAG_COLORS,
 } from '../constants';
 import Modal from '../components/Modal';
-
-// ─── Helper: strip HTML tags for compact plain-text previews ──────────────────
-function stripHtml(html) {
-  return (html || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-}
+import { stripHtml } from '../lib/utils';
 
 // ─── Helper: resolve recipient label from value key ───────────────────────────
 function recipientLabel(value) {

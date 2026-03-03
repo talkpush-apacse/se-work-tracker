@@ -37,8 +37,10 @@ function save(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
+// Use the Web Crypto API for collision-free IDs — works in all modern browsers
+// and avoids the rare Date.now() collision risk under rapid bulk-create operations.
 function uid() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2);
+  return crypto.randomUUID();
 }
 
 // Migrate OKRs that predate the keyResults/quarter fields

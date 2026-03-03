@@ -1,5 +1,5 @@
 import { LayoutDashboard, Target, Users, Menu, X, Download, Upload, ListTodo, Cloud, CloudOff, Loader2, Plug } from 'lucide-react';
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAppStore } from '../context/StoreContext';
 import { useTimerContext, useTimerDisplay } from '../context/TimerContext';
@@ -21,10 +21,14 @@ export default function Navigation({ activeTab, onTabChange }) {
   const elapsedSeconds = useTimerDisplay();
   const fileRef = useRef();
 
-  // Today at a glance
+  // Today at a glance — memoized so it only recalculates when `points` changes,
+  // not on every tab switch or timer tick that re-renders Navigation.
   const now = new Date();
-  const todayPoints = filterPointsByRange(points, startOfDay(now), endOfDay(now))
-    .reduce((sum, p) => sum + p.points, 0);
+  const todayPoints = useMemo(
+    () => filterPointsByRange(points, startOfDay(now), endOfDay(now))
+            .reduce((sum, p) => sum + p.points, 0),
+    [points] // eslint-disable-line react-hooks/exhaustive-deps
+  );
   const timerTaskDesc = isRunning && runningTaskId
     ? tasks.find(t => t.id === runningTaskId)?.description
     : null;

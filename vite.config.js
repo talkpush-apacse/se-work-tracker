@@ -4,6 +4,12 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Drop console.log and console.debug calls from production bundles.
+  // console.warn and console.error are preserved for runtime error visibility.
+  // This uses esbuild's native pure-function elimination — no extra dependencies needed.
+  esbuild: {
+    pure: ['console.log', 'console.debug'],
+  },
   plugins: [
     react(),
     VitePWA({
