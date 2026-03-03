@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import {
   ArrowLeft, Plus, ChevronLeft, ChevronRight,
   Pencil, Trash2, Flag, CheckCircle2, Circle, Ban,
-  ClipboardList, Calendar, Table2, Check,
+  ClipboardList, Calendar, Table2, Check, Clock,
 } from 'lucide-react';
 import { useAppStore } from '../context/StoreContext';
 import {
@@ -10,6 +10,7 @@ import {
   TASK_STATUS_LABELS, TASK_STATUS_COLORS,
   MILESTONE_STATUSES, MILESTONE_STATUS_LABELS, MILESTONE_STATUS_COLORS,
   ANNOTATION_TAGS, ANNOTATION_TAG_LABELS, ANNOTATION_TAG_COLORS,
+  ACTIVITY_TYPES, AUTO_TRACK_RATE,
 } from '../constants';
 import { formatDate } from '../utils/dateHelpers';
 import Modal from './Modal';
@@ -867,15 +868,136 @@ function VOUsTab({ customer, meetingVOUs, onAdd, onEdit, onDelete, onToggleResol
   );
 }
 
+// ── LogHoursModal ─────────────────────────────────────────────────────────────
+function LogHoursModal({ okrs, onSubmit, onCancel }) {
+  const [hours, setHours]               = useState('');
+  const [activityType, setActivityType] = useState('');
+  const [okrId, setOkrId]               = useState('');
+  const [comment, setComment]           = useState('');
+  const [error, setError]               = useState('');
+
+  const previewPoints = hours && !isNaN(hours) && Number(hours) > 0
+    ? Math.round(Number(hours) * AUTO_TRACK_RATE * 100) / 100
+    : null;
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!hours || isNaN(hours) || Number(hours) <= 0) {
+      setError('Enter a valid number of hours.');
+      return;
+    }
+    onSubmit({
+      points:       previewPoints,
+      hours:        Math.round(Number(hours) * 100) / 100,
+      activityType: activityType || '',
+      okrId:        okrId || null,
+      comment:      comment.trim(),
+    });
+  };
+
+  return (
+    <Modal title="Log Hours" onClose={onCancel} size="sm">
+      <form onSubmit={handleSubmit} className="space-y-4">
+
+        {/* Hours input + auto-calculated points preview */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+              Hours Invested *
+            </label>
+            <Input
+              type="number"
+              step="0.25"
+              min="0.25"
+              placeholder="e.g. 1.5"
+              value={hours}
+              onChange={e => { setHours(e.target.value); setError(''); }}
+              autoFocus
+            />
+            {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+              Points (auto)
+            </label>
+            <div className="h-10 flex items-center px-3 rounded-md border border-dashed border-border bg-secondary/40 text-sm font-semibold text-brand-lavender tabular-nums">
+              {previewPoints != null ? `${previewPoints} pts` : '—'}
+            </div>
+          </div>
+        </div>
+
+        {/* Activity Type */}
+        <div>
+          <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+            Activity Type <span className="text-muted-foreground/50">(optional)</span>
+          </label>
+          <select
+            value={activityType}
+            onChange={e => setActivityType(e.target.value)}
+            className="w-full h-10 bg-card border border-border rounded-md px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+          >
+            <option value="">Select activity…</option>
+            {ACTIVITY_TYPES.map(a => <option key={a} value={a}>{a}</option>)}
+          </select>
+        </div>
+
+        {/* OKR — only shown when OKRs exist */}
+        {okrs.length > 0 && (
+          <div>
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+              OKR <span className="text-muted-foreground/50">(optional)</span>
+            </label>
+            <select
+              value={okrId}
+              onChange={e => setOkrId(e.target.value)}
+              className="w-full h-10 bg-card border border-border rounded-md px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+            >
+              <option value="">No OKR</option>
+              {okrs.map(o => <option key={o.id} value={o.id}>{o.quarter} — {o.title}</option>)}
+            </select>
+          </div>
+        )}
+
+        {/* Comment */}
+        <div>
+          <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+            Comment <span className="text-muted-foreground/50">(optional)</span>
+          </label>
+          <textarea
+            rows={2}
+            placeholder="e.g. Helped debug Workday sync issue"
+            value={comment}
+            onChange={e => setComment(e.target.value)}
+            className="w-full bg-card border border-border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40 resize-none"
+          />
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-3 pt-1">
+          <Button type="button" variant="secondary" size="sm" onClick={onCancel} className="flex-1">
+            Cancel
+          </Button>
+          <Button type="submit" size="sm" className="flex-1" disabled={!previewPoints}>
+            Log Hours
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 // ── Main CustomerDetailView ───────────────────────────────────────────────────
 export default function CustomerDetailView({ customer, onBack }) {
   const {
-    tasks, milestones, points,
+    tasks, milestones, points, addPoint, okrs,
     addMilestone, updateMilestone, deleteMilestone,
     annotations, updateAnnotation, deleteAnnotation,
     meetingVOUs, addMeetingVOU, updateMeetingVOU, deleteMeetingVOU,
   } = useAppStore();
   const [activeTab, setActiveTab] = useState('tasks');
+
+  // Log Hours modal state
+  const [showLogHoursModal, setShowLogHoursModal] = useState(false);
 
   // VOU modal state (managed here so VOUsTab + Timeline can share)
   const [showVouModal, setShowVouModal] = useState(false);
@@ -919,6 +1041,11 @@ export default function CustomerDetailView({ customer, onBack }) {
       addMeetingVOU({ ...data, customerId: customer.id });
     }
     setShowVouModal(false);
+  };
+
+  const handleLogHours = (data) => {
+    addPoint({ customerId: customer.id, ...data });
+    setShowLogHoursModal(false);
   };
 
   return (
@@ -972,6 +1099,17 @@ export default function CustomerDetailView({ customer, onBack }) {
               )}
             </div>
           </div>
+
+          {/* Log Hours CTA */}
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => setShowLogHoursModal(true)}
+            className="flex-shrink-0 self-end"
+          >
+            <Clock size={13} className="mr-1.5" />
+            Log Hours
+          </Button>
         </div>
       </div>
 
@@ -1029,6 +1167,15 @@ export default function CustomerDetailView({ customer, onBack }) {
           onEdit={(v) => { setVouEditTarget(v); setShowVouModal(true); }}
           onDelete={(v) => setVouDeleteTarget(v)}
           onToggleResolved={(id, resolved) => updateMeetingVOU(id, { resolved })}
+        />
+      )}
+
+      {/* Log Hours modal */}
+      {showLogHoursModal && (
+        <LogHoursModal
+          okrs={okrs}
+          onSubmit={handleLogHours}
+          onCancel={() => setShowLogHoursModal(false)}
         />
       )}
 
