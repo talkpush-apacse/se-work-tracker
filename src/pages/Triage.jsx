@@ -384,6 +384,19 @@ function TriageEntryCard({ entry, customer, onTriaged }) {
   );
 }
 
+// ─── Jira URL parser ──────────────────────────────────────────────────────────
+/** Strips Atlassian ticket URLs from text and returns the clean text + ticket array. */
+function extractJiraLinks(text = '') {
+  const regex = /https?:\/\/[a-zA-Z0-9-]+\.atlassian\.net\/browse\/([A-Z]+-\d+)/g;
+  const tickets = [];
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    tickets.push({ id: match[1], url: match[0] });
+  }
+  const cleanText = text.replace(regex, '').replace(/\s{2,}/g, ' ').trim();
+  return { cleanText, tickets };
+}
+
 // ─── Task card (in the board) ─────────────────────────────────────────────────
 function TaskCard({ task, customer, isSelected, onSelect, onStatusChange, onArchive }) {
   const { updateTask } = useAppStore();
@@ -393,11 +406,12 @@ function TaskCard({ task, customer, isSelected, onSelect, onStatusChange, onArch
 
   // Aging — days since task creation (client-side, no DB needed)
   const ageDays = Math.floor((Date.now() - new Date(task.createdAt)) / 86_400_000);
-  const ageStyle = ageDays <= 2
-    ? 'text-brand-sage bg-brand-sage/10 border-brand-sage/20'
-    : ageDays <= 5
-      ? 'text-brand-amber bg-amber-500/10 border-amber-500/20'
-      : 'text-destructive bg-destructive/10 border-destructive/20';
+  // 0–7d: muted gray  |  8–13d: amber warning  |  14+d: red urgent
+  const ageStyle = ageDays < 8
+    ? 'text-muted-foreground bg-secondary border-border'
+    : ageDays < 14
+      ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
+      : 'text-red-400 bg-red-500/10 border-red-500/20';
   const [isEditing, setIsEditing] = useState(false);
   const [draftDesc, setDraftDesc] = useState(task.description);
   const editRef = useRef(null);
@@ -448,19 +462,35 @@ function TaskCard({ task, customer, isSelected, onSelect, onStatusChange, onArch
               onClick={e => e.stopPropagation()}
               className="w-full bg-muted/60 border border-indigo-500/50 rounded-lg px-2 py-1 text-xs text-foreground resize-none focus:outline-none focus:border-indigo-400 leading-snug"
             />
-          ) : (
-            <div
-              className="group/desc flex items-start gap-1"
-              onClick={e => { if (!isArchived) { e.stopPropagation(); setIsEditing(true); } }}
-            >
-              <p className={`flex-1 text-xs font-medium leading-snug line-clamp-2 ${isArchived ? 'text-muted-foreground line-through' : 'text-foreground group-hover/desc:text-indigo-200 cursor-text'}`}>
-                {task.description}
-              </p>
-              {!isArchived && (
-                <Pencil size={10} className="flex-shrink-0 mt-0.5 text-muted-foreground/70 opacity-0 group-hover/desc:opacity-100 transition-opacity" />
-              )}
-            </div>
-          )}
+          ) : (() => {
+              const { cleanText, tickets } = extractJiraLinks(task.description);
+              return (
+                <div
+                  className="group/desc flex items-start gap-1"
+                  onClick={e => { if (!isArchived) { e.stopPropagation(); setIsEditing(true); } }}
+                >
+                  <p className={`flex-1 text-xs font-medium leading-snug line-clamp-2 ${isArchived ? 'text-muted-foreground line-through' : 'text-foreground group-hover/desc:text-indigo-200 cursor-text'}`}>
+                    {cleanText}
+                    {tickets.map(t => (
+                      <a
+                        key={t.id}
+                        href={t.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={e => e.stopPropagation()}
+                        className="inline-block ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded border border-brand-lavender/30 bg-brand-lavender/10 text-brand-lavender hover:bg-brand-lavender/20 transition-colors"
+                      >
+                        {t.id}
+                      </a>
+                    ))}
+                  </p>
+                  {!isArchived && (
+                    <Pencil size={10} className="flex-shrink-0 mt-0.5 text-muted-foreground/70 opacity-0 group-hover/desc:opacity-100 transition-opacity" />
+                  )}
+                </div>
+              );
+            })()
+          }
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
           {/* Archive / Unarchive button */}
@@ -1356,6 +1386,12 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, customer, onOpenDe
     () => Math.floor((Date.now() - new Date(task.createdAt)) / 86_400_000),
     [task.createdAt]
   );
+  // 0–7d: muted gray  |  8–13d: amber warning  |  14+d: red urgent
+  const ageStyle = ageDays < 8
+    ? 'text-muted-foreground'
+    : ageDays < 14
+      ? 'text-amber-400'
+      : 'text-red-400';
 
   return (
     <div
@@ -1394,7 +1430,7 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, customer, onOpenDe
         className="flex-1 min-w-0 cursor-pointer"
         onClick={() => onOpenDetail(task)}
       >
-        <div className="flex items-baseline gap-1.5 min-w-0">
+        <div className="flex items-baseline gap-1.5 min-w-0 flex-wrap">
           {/* Pulsing dot when this task's timer is running */}
           {isTimerActive && (
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0 self-center" title="Timer running" />
@@ -1407,14 +1443,33 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, customer, onOpenDe
               {customer.name}
             </span>
           )}
-          <span className="text-sm text-foreground/90 truncate">{task.description}</span>
+          {(() => {
+            const { cleanText, tickets } = extractJiraLinks(task.description);
+            return (
+              <>
+                <span className="text-sm text-foreground/90 truncate">{cleanText}</span>
+                {tickets.map(t => (
+                  <a
+                    key={t.id}
+                    href={t.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={e => e.stopPropagation()}
+                    className="flex-shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded border border-brand-lavender/30 bg-brand-lavender/10 text-brand-lavender hover:bg-brand-lavender/20 transition-colors"
+                  >
+                    {t.id}
+                  </a>
+                ))}
+              </>
+            );
+          })()}
         </div>
         <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
           <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${typeColors.bg} ${typeColors.text} ${typeColors.border}`}>
             {TASK_TYPE_LABELS[task.taskType]}
           </span>
           <span
-            className="text-[10px] text-muted-foreground"
+            className={`text-[10px] font-semibold ${ageStyle}`}
             title={`Created ${ageDays} day${ageDays === 1 ? '' : 's'} ago`}
           >
             {ageDays}d old
@@ -1830,6 +1885,9 @@ export default function Triage() {
   // Priority quick-filter toggle
   const [filterPriorityClients, setFilterPriorityClients] = useState(false);
 
+  // Ref for scrolling to the filter bar (used by the "filtered" badge click)
+  const filterRowRef = useRef(null);
+
   // Bulk selection state
   const [selectedTaskIds, setSelectedTaskIds] = useState(new Set());
 
@@ -1937,6 +1995,13 @@ export default function Triage() {
   }), []);
   const selectAll = () => setSelectedTaskIds(new Set(activeTasks.map(t => t.id)));
   const clearSelection = useCallback(() => setSelectedTaskIds(new Set()), []);
+  const clearAllFilters = useCallback(() => {
+    setFilterCustomerId('');
+    setFilterTaskType('');
+    setFilterStatus('');
+    setFilterPriorityClients(false);
+    clearSelection();
+  }, [clearSelection]);
   const handleBulkStatus = (status) => {
     selectedTaskIds.forEach(id => updateTask(id, { status }));
     clearSelection();
@@ -2086,10 +2151,36 @@ export default function Triage() {
 
   // ── Queue view ─────────────────────────────────────────────────────────────
   return (
+    <>
+    {/* ── Sticky section jump nav ── */}
+    <div className="sticky top-0 z-30 -mx-4 px-4 bg-background/95 backdrop-blur-sm border-b border-border/40 mb-4">
+      <div className="flex gap-0.5 py-1 overflow-x-auto scrollbar-none">
+        {[
+          { href: 'section-queue',       label: 'Queue',       badge: untriagedEntries.length || null },
+          { href: 'section-board',       label: 'Task Board',  badge: null },
+          { href: 'section-annotations', label: 'Annotations', badge: null },
+          { href: 'section-log',         label: 'Weekly Log',  badge: null },
+        ].map(({ href, label, badge }) => (
+          <button
+            key={href}
+            onClick={() => document.getElementById(href)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-all whitespace-nowrap flex-shrink-0"
+          >
+            {label}
+            {badge ? (
+              <span className="bg-amber-500/20 text-brand-amber text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                {badge}
+              </span>
+            ) : null}
+          </button>
+        ))}
+      </div>
+    </div>
+
     <div className="space-y-5">
 
       {/* Triage Queue (untriaged meeting entries) */}
-      <div>
+      <div id="section-queue">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <ClipboardList size={15} className="text-brand-amber" />
@@ -2103,10 +2194,9 @@ export default function Triage() {
         </div>
 
         {untriagedEntries.length === 0 ? (
-          <div className="bg-card border border-border rounded-2xl px-5 py-10 text-center">
-            <ClipboardList size={24} className="text-muted-foreground/60 mx-auto mb-2" />
-            <p className="text-muted-foreground text-sm">Queue is clear!</p>
-            <p className="text-muted-foreground/70 text-xs mt-1">All meeting entries have been triaged.</p>
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-teal-500/10 border border-teal-500/20">
+            <CheckCircle2 size={14} className="text-teal-400 flex-shrink-0" />
+            <p className="text-sm text-teal-400 font-medium">Queue is clear — all meetings triaged</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -2138,7 +2228,7 @@ export default function Triage() {
       </div>
 
       {/* Task Board */}
-      <div>
+      <div id="section-board">
         {/* Board header */}
         <div className="flex items-center gap-2 mb-3">
           <Tag size={15} className="text-brand-lavender" />
@@ -2154,9 +2244,13 @@ export default function Triage() {
             </span>
           )}
           {filtersActive && (
-            <span className="bg-teal-500/15 text-teal-400 border border-teal-500/20 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-              filtered
-            </span>
+            <button
+              onClick={() => filterRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })}
+              className="bg-teal-500/15 text-teal-400 border border-teal-500/20 text-[10px] font-bold px-1.5 py-0.5 rounded-full hover:bg-teal-500/25 transition-colors cursor-pointer"
+              title="Scroll to filter controls"
+            >
+              filtered ↓
+            </button>
           )}
           {/* General Focus Time button — starts timer with no customer */}
           {!isRunning && (
@@ -2203,73 +2297,73 @@ export default function Triage() {
           </div>
         )}
 
-        {/* Filter bar — customer selector */}
-        <div className="flex gap-2 mb-2">
-          <select
-            value={filterCustomerId}
-            onChange={e => handleCustomerFilter(e.target.value)}
-            className="flex-1 bg-secondary border border-border rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
-          >
-            <option value="">All clients</option>
-            {customersWithTasks.map(c => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Priority quick-filter toggle */}
-        <div className="flex gap-2 mb-2">
-          <button
-            onClick={() => { setFilterPriorityClients(v => !v); clearSelection(); }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-              filterPriorityClients
-                ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
-                : 'bg-secondary border-border text-muted-foreground hover:text-amber-300 hover:border-amber-500/40'
-            }`}
-          >
-            <Pin size={11} /> Priority Clients
-          </button>
-        </div>
-
-        {/* Filter bar — row 2: task type + status + clear */}
-        <div className="flex gap-2 mb-3">
-          <select
-            value={filterTaskType}
-            onChange={e => { setFilterTaskType(e.target.value); clearSelection(); }}
-            className="flex-1 bg-secondary border border-border rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
-          >
-            <option value="">All types</option>
-            {TASK_TYPES.map(t => (
-              <option key={t} value={t}>{TASK_TYPE_LABELS[t]}</option>
-            ))}
-          </select>
-          {/* Status filter only shown on Active tab; Closed tab always shows done+archived */}
-          {boardTab === 'active' && (
+        {/* Filter bar — all rows wrapped with ref for scroll-to */}
+        <div ref={filterRowRef} className="space-y-2 mb-3">
+          {/* Row 1: Customer selector */}
+          <div className="flex gap-2">
             <select
-              value={filterStatus}
-              onChange={e => { setFilterStatus(e.target.value); clearSelection(); }}
+              value={filterCustomerId}
+              onChange={e => handleCustomerFilter(e.target.value)}
               className="flex-1 bg-secondary border border-border rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
             >
-              <option value="">All statuses</option>
-              {TASK_STATUSES.filter(s => !['done', 'archived'].includes(s)).map(s => (
-                <option key={s} value={s}>{TASK_STATUS_LABELS[s]}</option>
+              <option value="">All clients</option>
+              {customersWithTasks.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
-          )}
-          {filtersActive && (
+          </div>
+
+          {/* Row 2: Priority quick-filter toggle */}
+          <div className="flex gap-2">
             <button
-              onClick={() => {
-                setFilterCustomerId('');
-                setFilterTaskType('');
-                setFilterStatus('');
-                setFilterPriorityClients(false);
-                clearSelection();
-              }}
-              className="px-2.5 py-2 rounded-xl bg-secondary border border-border text-[10px] text-muted-foreground hover:text-foreground hover:border-border transition-colors flex-shrink-0"
-              title="Clear all filters"
+              onClick={() => { setFilterPriorityClients(v => !v); clearSelection(); }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                filterPriorityClients
+                  ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                  : 'bg-secondary border-border text-muted-foreground hover:text-amber-300 hover:border-amber-500/40'
+              }`}
             >
-              ✕
+              {filterPriorityClients ? <Check size={11} /> : <Pin size={11} />} Priority Clients
             </button>
+          </div>
+
+          {/* Row 3: Task type + status (no ✕ button — see "Clear all" link below) */}
+          <div className="flex gap-2">
+            <select
+              value={filterTaskType}
+              onChange={e => { setFilterTaskType(e.target.value); clearSelection(); }}
+              className="flex-1 bg-secondary border border-border rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+            >
+              <option value="">All types</option>
+              {TASK_TYPES.map(t => (
+                <option key={t} value={t}>{TASK_TYPE_LABELS[t]}</option>
+              ))}
+            </select>
+            {/* Status filter only shown on Active tab; Closed tab always shows done+archived */}
+            {boardTab === 'active' && (
+              <select
+                value={filterStatus}
+                onChange={e => { setFilterStatus(e.target.value); clearSelection(); }}
+                className="flex-1 bg-secondary border border-border rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+              >
+                <option value="">All statuses</option>
+                {TASK_STATUSES.filter(s => !['done', 'archived'].includes(s)).map(s => (
+                  <option key={s} value={s}>{TASK_STATUS_LABELS[s]}</option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {/* Clear all filters — right-aligned text link, appears only when any filter is active */}
+          {filtersActive && (
+            <div className="flex justify-end">
+              <button
+                onClick={clearAllFilters}
+                className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
+              >
+                Clear all filters
+              </button>
+            </div>
           )}
         </div>
 
@@ -2402,7 +2496,7 @@ export default function Triage() {
       </div>
 
       {/* ── Annotations Section ──────────────────────────────────────────────── */}
-      <div>
+      <div id="section-annotations">
         {/* Section header */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
@@ -2553,7 +2647,7 @@ export default function Triage() {
       </div>
 
       {/* ── Weekly Update Log Section ─────────────────────────────────────────── */}
-      <div>
+      <div id="section-log">
         {/* Section header */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
@@ -2683,5 +2777,6 @@ export default function Triage() {
         />
       )}
     </div>
+    </>
   );
 }
