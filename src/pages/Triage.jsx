@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, memo, useRef, useEffect } from 'react';
 import {
-  ChevronDown, Plus, Mic, MicOff, Copy, Save, Check,
+  ChevronDown, Plus, Mic, MicOff, Copy, Save, Check, CheckCircle2,
   Loader2, ClipboardList, Sparkles, ChevronRight,
   Calendar, User, Tag, AlertCircle, Archive, ArchiveX, Trash2,
   Settings, RotateCcw, Pencil, GripVertical, ExternalLink, ArrowLeft,
