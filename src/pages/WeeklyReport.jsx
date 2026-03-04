@@ -449,7 +449,7 @@ export default function WeeklyReport({ onNavigate }) {
 
       {/* ── B: Stats chips ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatChip label="Points"    value={totalPts} />
+        <StatChip label="Points"    value={Number(totalPts).toFixed(1)} />
         <StatChip label="Hours"     value={`${totalHrs}h`} />
         <StatChip label="Customers" value={activeCustomers} />
         <StatChip label="Tasks Done" value={doneTasks} />

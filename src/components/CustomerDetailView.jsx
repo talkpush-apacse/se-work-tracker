@@ -1012,7 +1012,7 @@ function LogHoursModal({ okrs, onSubmit, onCancel }) {
               Points (auto)
             </label>
             <div className="h-10 flex items-center px-3 rounded-md border border-dashed border-border bg-secondary/40 text-sm font-semibold text-brand-lavender tabular-nums">
-              {previewPoints != null ? `${previewPoints} pts` : '—'}
+              {previewPoints != null ? `${Number(previewPoints).toFixed(1)} pts` : '—'}
             </div>
           </div>
         </div>
@@ -1175,7 +1175,7 @@ export default function CustomerDetailView({ customer, onBack }) {
                 <span className="text-xs text-muted-foreground ml-1">closed</span>
               </div>
               <div>
-                <span className="text-lg font-bold text-foreground">{totalPoints}</span>
+                <span className="text-lg font-bold text-foreground">{Number(totalPoints).toFixed(1)}</span>
                 <span className="text-xs text-muted-foreground ml-1">pts earned</span>
               </div>
               <div>

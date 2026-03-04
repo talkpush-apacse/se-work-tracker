@@ -95,7 +95,7 @@ export default function SaveSessionModal({ session, onClose }) {
           {formatHMS(session.elapsedSeconds)}
         </p>
         <p className="text-xs text-muted-foreground mt-0.5">
-          = {prefilledHours}h / {prefilledPoints} pts · pre-filled below, edit if needed
+          = {prefilledHours}h / {prefilledPoints.toFixed(1)} pts · pre-filled below, edit if needed
         </p>
       </div>
 

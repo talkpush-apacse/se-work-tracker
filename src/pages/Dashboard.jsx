@@ -135,7 +135,7 @@ export default function Dashboard({ onNavigate }) {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            This week: <span className={totalPts > 0 ? 'text-brand-lavender font-semibold' : 'text-muted-foreground'}>{totalPts} pts</span> across <span className={weekPoints.length > 0 ? 'text-brand-lavender font-semibold' : 'text-muted-foreground'}>{weekPoints.length}</span> entries
+            This week: <span className={totalPts > 0 ? 'text-brand-lavender font-semibold' : 'text-muted-foreground'}>{Number(totalPts).toFixed(1)} pts</span> across <span className={weekPoints.length > 0 ? 'text-brand-lavender font-semibold' : 'text-muted-foreground'}>{weekPoints.length}</span> entries
           </p>
         </div>
         {streak > 0 && (
@@ -148,7 +148,7 @@ export default function Dashboard({ onNavigate }) {
 
       {/* Quick stats */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <StatCard icon={Zap} label="Points this week" value={totalPts} color="indigo" />
+        <StatCard icon={Zap} label="Points this week" value={Number(totalPts).toFixed(1)} color="indigo" />
         <StatCard icon={Clock} label="Hours this week" value={totalHrs.toFixed(1)} color="violet" />
         <StatCard icon={Star} label="Top customer" value={topCustomer?.name || 'None yet'} sub="this week" color="amber" />
         <StatCard icon={Activity} label="Top activity" value={topActivity ? topActivity.split(' ')[0] : 'None yet'} sub="by points" color="emerald" />
@@ -160,7 +160,7 @@ export default function Dashboard({ onNavigate }) {
         <div className="bg-gradient-to-r from-indigo-900/50 to-violet-900/30 border border-indigo-700/40 rounded-2xl p-4">
           <p className="text-sm text-indigo-200">
             <span className="font-bold text-foreground">Weekly Summary:</span> You've invested{' '}
-            <span className="text-yellow-400 font-bold">{totalPts} points</span> and{' '}
+            <span className="text-yellow-400 font-bold">{Number(totalPts).toFixed(1)} points</span> and{' '}
             <span className="text-brand-sage font-bold">{totalHrs.toFixed(1)}h</span> across{' '}
             {new Set(weekPoints.map(p => p.customerId).filter(Boolean)).size} customers.
             {topCustomer && <> Top focus: <span className="text-brand-lavender/80 font-semibold">{topCustomer.name}</span>.</>}
@@ -207,7 +207,7 @@ export default function Dashboard({ onNavigate }) {
                       </div>
                       <div className="text-right flex-shrink-0">
                         <div className="relative">
-                          <p className={`font-bold text-sm ${i === 0 ? 'text-yellow-400' : 'text-foreground'}`}>{customer.totalPoints} pts</p>
+                          <p className={`font-bold text-sm ${i === 0 ? 'text-yellow-400' : 'text-foreground'}`}>{Number(customer.totalPoints).toFixed(1)} pts</p>
                           {isFlashing && (
                             <span className="point-flash absolute -top-1 right-0 text-xs font-bold text-yellow-400 whitespace-nowrap">+pts!</span>
                           )}
@@ -278,7 +278,7 @@ export default function Dashboard({ onNavigate }) {
                       {entry.comment && <p className="text-[11px] text-muted-foreground/70 mt-0.5 truncate">{entry.comment}</p>}
                     </div>
                     <div className="text-right flex-shrink-0">
-                      <span className="text-sm font-bold text-brand-lavender">+{entry.points}</span>
+                      <span className="text-sm font-bold text-brand-lavender">+{Number(entry.points).toFixed(1)}</span>
                       <p className="text-[10px] text-muted-foreground/70">{formatRelative(entry.timestamp)}</p>
                     </div>
                   </div>
@@ -312,7 +312,7 @@ export default function Dashboard({ onNavigate }) {
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-muted-foreground">{okr.taskCount} task{okr.taskCount !== 1 ? 's' : ''}</span>
-                    <span className="text-foreground font-bold">{okr.totalPoints} pts · {okr.totalHours.toFixed(1)}h</span>
+                    <span className="text-foreground font-bold">{Number(okr.totalPoints).toFixed(1)} pts · {okr.totalHours.toFixed(1)}h</span>
                   </div>
                 </button>
               );

@@ -139,7 +139,7 @@ function SortableCustomerRow({ customer, taskCount, totalPoints, totalHours, tas
             <p className="text-[10px] text-muted-foreground">Tasks</p>
           </div>
           <div>
-            <p className="text-sm font-bold text-foreground">{totalPoints}</p>
+            <p className="text-sm font-bold text-foreground">{Number(totalPoints).toFixed(1)}</p>
             <p className="text-[10px] text-muted-foreground">Points</p>
           </div>
           <div>
@@ -148,7 +148,7 @@ function SortableCustomerRow({ customer, taskCount, totalPoints, totalHours, tas
           </div>
           {taskPts > 0 && (
             <div>
-              <p className="text-sm font-bold text-teal-400">⚡{taskPts}</p>
+              <p className="text-sm font-bold text-teal-400">⚡{Number(taskPts).toFixed(1)}</p>
               <p className="text-[10px] text-muted-foreground">Task Pts</p>
             </div>
           )}

@@ -287,7 +287,7 @@ function PointsProgress({ totalPoints, targetPoints, onSetTarget }) {
           style={{ width: `${pct}%` }}
         />
       </div>
-      <span className="text-[10px] font-semibold text-muted-foreground">{totalPoints}/{targetPoints} pts ({pct}%)</span>
+      <span className="text-[10px] font-semibold text-muted-foreground">{Number(totalPoints).toFixed(1)}/{Number(targetPoints).toFixed(1)} pts ({pct}%)</span>
     </div>
   );
 }
@@ -412,10 +412,10 @@ export default function OKRs() {
 
                             <div className="flex items-center gap-4 mt-2 flex-wrap">
                               <span className="text-xs text-muted-foreground">{linkedTasks.length} task{linkedTasks.length !== 1 ? 's' : ''}</span>
-                              <span className="text-xs font-semibold text-brand-lavender">{totalPoints} pts</span>
+                              <span className="text-xs font-semibold text-brand-lavender">{Number(totalPoints).toFixed(1)} pts</span>
                               <span className="text-xs text-muted-foreground">{totalHours.toFixed(1)}h</span>
                               {taskPts > 0 && (
-                                <span className="text-xs font-semibold text-teal-400">⚡{taskPts} task pts</span>
+                                <span className="text-xs font-semibold text-teal-400">⚡{Number(taskPts).toFixed(1)} task pts</span>
                               )}
                               {keyResults.length > 0 && (
                                 <span className="text-xs text-muted-foreground">{keyResults.length} KR{keyResults.length !== 1 ? 's' : ''}</span>

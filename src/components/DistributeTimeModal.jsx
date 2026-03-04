@@ -168,7 +168,7 @@ export default function DistributeTimeModal({ session, onClose, initialCustomerI
           {formatHMS(session.elapsedSeconds)}
         </p>
         <p className="text-xs text-muted-foreground mt-0.5">
-          = {totalHours}h / {totalPoints} pts — assign a % to each selected customer below
+          = {totalHours}h / {Number(totalPoints).toFixed(1)} pts — assign a % to each selected customer below
         </p>
       </div>
 
@@ -307,7 +307,7 @@ export default function DistributeTimeModal({ session, onClose, initialCustomerI
 
                 {/* Live pts/hrs preview */}
                 <span className="text-[10px] text-muted-foreground flex-shrink-0 hidden sm:inline tabular-nums">
-                  {customerPts(customer.id)} pts · {customerHrs(customer.id)}h
+                  {Number(customerPts(customer.id)).toFixed(1)} pts · {customerHrs(customer.id)}h
                 </span>
 
                 {/* Percentage input */}
@@ -351,7 +351,7 @@ export default function DistributeTimeModal({ session, onClose, initialCustomerI
               <div key={c.id} className="flex items-center justify-between text-xs">
                 <span className="text-foreground/70 truncate flex-1 mr-2">{c.name}</span>
                 <span className="tabular-nums text-muted-foreground flex-shrink-0">
-                  {customerPts(c.id)} pts · {customerHrs(c.id)}h
+                  {Number(customerPts(c.id)).toFixed(1)} pts · {customerHrs(c.id)}h
                   <span className="ml-1.5 text-muted-foreground/60">
                     ({(parseFloat(percentages[c.id]) || 0).toFixed(1)}%)
                   </span>
@@ -362,7 +362,7 @@ export default function DistributeTimeModal({ session, onClose, initialCustomerI
           <div className="flex items-center justify-between text-xs mt-2 pt-2 border-t border-border/30">
             <span className="text-muted-foreground">Total</span>
             <span className="tabular-nums font-semibold text-foreground">
-              {totalPoints} pts · {totalHours}h
+              {Number(totalPoints).toFixed(1)} pts · {totalHours}h
             </span>
           </div>
         </div>
