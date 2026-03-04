@@ -9,7 +9,7 @@ const ALLOWED_ENTITIES = new Set([
   'okrs', 'customers', 'projects', 'points',
   'meetingEntries', 'tasks', 'milestones',
   'aiOutputs', 'aiSettings',
-  'annotations', 'meetingVOUs',   // were missing — bug fix
+  'annotations',                  // were missing — bug fix
   'weeklyReports',                // new
   'weeklyUpdateLogs',             // new
 ]);

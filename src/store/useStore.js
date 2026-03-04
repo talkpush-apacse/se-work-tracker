@@ -12,7 +12,6 @@ const KEYS = {
   aiOutputs: 'gpt-ai-outputs',
   aiSettings: 'gpt-ai-settings',
   annotations: 'gpt-annotations',
-  meetingVOUs: 'gpt-meeting-vous',
   weeklyReports: 'gpt-weekly-reports',
   weeklyUpdateLogs: 'gpt-weekly-update-logs',
 };
@@ -190,7 +189,6 @@ export function useStore() {
   const [milestones, setMilestones] = useState(() => load(KEYS.milestones));
   const [aiOutputs, setAiOutputs] = useState(() => load(KEYS.aiOutputs));
   const [annotations, setAnnotations] = useState(() => load(KEYS.annotations));
-  const [meetingVOUs, setMeetingVOUs] = useState(() => load(KEYS.meetingVOUs));
   const [weeklyReports, setWeeklyReports] = useState(() => load(KEYS.weeklyReports));
   const [weeklyUpdateLogs, setWeeklyUpdateLogs] = useState(() => load(KEYS.weeklyUpdateLogs));
   const [aiSettings, setAiSettings] = useState(() => {
@@ -218,7 +216,6 @@ export function useStore() {
   useEffect(() => { save(KEYS.aiOutputs, aiOutputs); }, [aiOutputs]);
   useEffect(() => { save(KEYS.aiSettings, aiSettings); }, [aiSettings]);
   useEffect(() => { save(KEYS.annotations, annotations); }, [annotations]);
-  useEffect(() => { save(KEYS.meetingVOUs, meetingVOUs); }, [meetingVOUs]);
   useEffect(() => { save(KEYS.weeklyReports, weeklyReports); }, [weeklyReports]);
   useEffect(() => { save(KEYS.weeklyUpdateLogs, weeklyUpdateLogs); }, [weeklyUpdateLogs]);
 
@@ -232,12 +229,11 @@ export function useStore() {
   useEffect(() => { if (mountedRef.current) debouncedSave('aiOutputs', aiOutputs); }, [aiOutputs]);
   useEffect(() => { if (mountedRef.current) debouncedSave('aiSettings', aiSettings); }, [aiSettings]);
   useEffect(() => { if (mountedRef.current) debouncedSave('annotations', annotations); }, [annotations]);
-  useEffect(() => { if (mountedRef.current) debouncedSave('meetingVOUs', meetingVOUs); }, [meetingVOUs]);
   useEffect(() => { if (mountedRef.current) debouncedSave('weeklyReports', weeklyReports); }, [weeklyReports]);
   useEffect(() => { if (mountedRef.current) debouncedSave('weeklyUpdateLogs', weeklyUpdateLogs); }, [weeklyUpdateLogs]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (mountedRef.current) setSyncStatus('saving'); }, [okrs, customers, points, meetingEntries, tasks, milestones, aiOutputs, aiSettings, annotations, meetingVOUs, weeklyReports, weeklyUpdateLogs]);
+  useEffect(() => { if (mountedRef.current) setSyncStatus('saving'); }, [okrs, customers, points, meetingEntries, tasks, milestones, aiOutputs, aiSettings, annotations, weeklyReports, weeklyUpdateLogs]);
 
   useEffect(() => {
     if (syncStatus === 'saving') {
@@ -296,7 +292,6 @@ export function useStore() {
         setTasks(rTasks);
         setMilestones(rMilestones);
         if (remote.annotations) setAnnotations(remote.annotations);
-        if (remote.meetingVOUs) setMeetingVOUs(remote.meetingVOUs);
         if (remote.weeklyReports) setWeeklyReports(remote.weeklyReports);
         if (remote.weeklyUpdateLogs) setWeeklyUpdateLogs(remote.weeklyUpdateLogs);
         if (remote.aiOutputs) setAiOutputs(remote.aiOutputs);
@@ -343,7 +338,7 @@ export function useStore() {
   const updateCustomer = useCallback((id, data) => {
     setCustomers(prev => prev.map(c => c.id === id ? { ...c, ...data } : c));
   }, []);
-  // Cascade delete: points, meeting entries, tasks (+ their AI outputs), milestones, annotations, meetingVOUs
+  // Cascade delete: points, meeting entries, tasks (+ their AI outputs), milestones, annotations
   const deleteCustomer = useCallback((id) => {
     setCustomers(prev => prev.filter(c => c.id !== id));
     setPoints(prev => prev.filter(pt => pt.customerId !== id));
@@ -355,7 +350,6 @@ export function useStore() {
     });
     setMilestones(prev => prev.filter(m => m.customerId !== id));
     setAnnotations(prev => prev.filter(a => a.customerId !== id));
-    setMeetingVOUs(prev => prev.filter(v => v.customerId !== id));
     setWeeklyUpdateLogs(prev => prev.filter(l => l.customerId !== id));
   }, []);
   const reorderCustomers = useCallback((orderedIds) => {
@@ -459,23 +453,6 @@ export function useStore() {
     return annotations.filter(a => a.customerId === customerId);
   }, [annotations]);
 
-  // ─── Meeting VOU actions ───
-  const addMeetingVOU = useCallback((data) => {
-    // data: { customerId, meetingDate, action, who, dueDate (null|YYYY-MM-DD), notes, resolved }
-    const v = { id: uid(), createdAt: new Date().toISOString(), resolved: false, ...data };
-    setMeetingVOUs(prev => [...prev, v]);
-    return v;
-  }, []);
-  const updateMeetingVOU = useCallback((id, data) => {
-    setMeetingVOUs(prev => prev.map(v => v.id === id ? { ...v, ...data } : v));
-  }, []);
-  const deleteMeetingVOU = useCallback((id) => {
-    setMeetingVOUs(prev => prev.filter(v => v.id !== id));
-  }, []);
-  const getCustomerMeetingVOUs = useCallback((customerId) => {
-    return meetingVOUs.filter(v => v.customerId === customerId);
-  }, [meetingVOUs]);
-
   // ─── Weekly Report actions ───
   // Shape: { id, createdAt, weekStart (ISO), weekEnd (ISO), emailText, provider, model, promptUsed }
   const addWeeklyReport = useCallback((data) => {
@@ -545,7 +522,7 @@ export function useStore() {
   const exportData = useCallback(() => {
     const data = {
       okrs, customers, points, tasks, meetingEntries, milestones, aiOutputs, aiSettings,
-      annotations, meetingVOUs,
+      annotations,
       exportedAt: new Date().toISOString(), version: 2,
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -555,7 +532,7 @@ export function useStore() {
     a.download = `work-tracker-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [okrs, customers, points, tasks, meetingEntries, milestones, aiOutputs, aiSettings, annotations, meetingVOUs]);
+  }, [okrs, customers, points, tasks, meetingEntries, milestones, aiOutputs, aiSettings, annotations]);
 
   const importData = useCallback((file) => {
     const reader = new FileReader();
@@ -570,7 +547,6 @@ export function useStore() {
         if (data.milestones) setMilestones(data.milestones);
         if (data.aiOutputs) setAiOutputs(data.aiOutputs);
         if (data.annotations) setAnnotations(data.annotations);
-        if (data.meetingVOUs) setMeetingVOUs(data.meetingVOUs);
       } catch { alert('Invalid backup file'); }
     };
     reader.readAsText(file);
@@ -578,7 +554,7 @@ export function useStore() {
 
   return {
     okrs, customers, points, meetingEntries, tasks, milestones, aiOutputs,
-    annotations, meetingVOUs, weeklyReports, weeklyUpdateLogs,
+    annotations, weeklyReports, weeklyUpdateLogs,
     addOkr, updateOkr, deleteOkr,
     addCustomer, updateCustomer, deleteCustomer, reorderCustomers,
     addPoint, deletePoint, updatePoint,
@@ -587,7 +563,6 @@ export function useStore() {
     addTask, updateTask, deleteTask, reorderTasks, getCustomerTasks,
     addMilestone, updateMilestone, deleteMilestone, getCustomerMilestones,
     addAnnotation, updateAnnotation, deleteAnnotation, getCustomerAnnotations,
-    addMeetingVOU, updateMeetingVOU, deleteMeetingVOU, getCustomerMeetingVOUs,
     addWeeklyReport, updateWeeklyReport, deleteWeeklyReport,
     addWeeklyUpdateLog, updateWeeklyUpdateLog, deleteWeeklyUpdateLog,
     addAiOutput, getTaskAiOutputs, updateAiOutput,

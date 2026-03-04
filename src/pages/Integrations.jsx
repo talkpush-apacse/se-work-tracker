@@ -117,7 +117,7 @@ export default function Integrations() {
         customerId:   assignments[event.id],
         points,
         hours,
-        activityType: 'Joining Meeting',
+        activityType: 'General Admin',
         comment:      `${event.summary || 'Calendar event'} (from Google Calendar)`,
       });
     });

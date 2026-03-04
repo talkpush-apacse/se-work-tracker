@@ -1,10 +1,13 @@
 export const ACTIVITY_TYPES = [
-  'Sending Email',
-  'Joining Meeting',
-  'Troubleshoot / Firefighting',
+  'Scoping',
   'Configuration',
+  'Testing',
+  'UAT',
+  'Training',
+  'Hypercare',
   'Reporting',
-  'Task Review',
+  'General Admin',
+  'Account Management',
 ];
 
 export const CUSTOMER_COLORS = [
@@ -90,12 +93,28 @@ export const AI_OUTPUT_TYPE_LABELS = {
 };
 
 export const ACTIVITY_COLORS = {
-  'Sending Email': '#6366f1',
-  'Joining Meeting': '#8b5cf6',
-  'Troubleshoot / Firefighting': '#f43f5e',
-  'Configuration': '#10b981',
-  'Reporting': '#f59e0b',
-  'Task Review': '#06b6d4',
+  'Scoping':           '#6366f1',
+  'Configuration':     '#10b981',
+  'Testing':           '#f43f5e',
+  'UAT':               '#8b5cf6',
+  'Training':          '#f97316',
+  'Hypercare':         '#f59e0b',
+  'Reporting':         '#06b6d4',
+  'General Admin':     '#6b7280',
+  'Account Management':'#ec4899',
+};
+
+// ─── Task Interaction Types (what kind of work was done) ──────────────────────
+export const TASK_INTERACTION_TYPES = ['Meeting', 'Email', 'Focus Time'];
+export const TASK_INTERACTION_TYPE_LABELS = {
+  'Meeting':    'Meeting',
+  'Email':      'Email',
+  'Focus Time': 'Focus Time',
+};
+export const TASK_INTERACTION_TYPE_COLORS = {
+  'Meeting':    '#8b5cf6',
+  'Email':      '#6366f1',
+  'Focus Time': '#10b981',
 };
 
 // Points-per-hour rate for auto-tracked task sessions (2150 / 160 hours)

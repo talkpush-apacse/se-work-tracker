@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Users, Check, Search, X } from 'lucide-react';
 import Modal from './Modal';
-import { ACTIVITY_TYPES, AUTO_TRACK_RATE } from '../constants';
+import { ACTIVITY_TYPES, AUTO_TRACK_RATE, TASK_INTERACTION_TYPES, TASK_INTERACTION_TYPE_LABELS } from '../constants';
 import { useAppStore } from '../context/StoreContext';
 import { Button } from './ui/button';
 
@@ -47,8 +47,9 @@ export default function DistributeTimeModal({ session, onClose, initialCustomerI
     if (initialCustomerId) return equalSplit(new Set([initialCustomerId]));
     return {};
   });
-  const [activityType, setActivityType] = useState('');
-  const [okrId,        setOkrId]        = useState('');
+  const [activityType,    setActivityType]    = useState('');
+  const [interactionType, setInteractionType] = useState('');
+  const [okrId,           setOkrId]           = useState('');
   const [comment,      setComment]      = useState(session.taskDescription || '');
   const [showDiscard,  setShowDiscard]  = useState(false);
   const [error,        setError]        = useState('');
@@ -147,6 +148,7 @@ export default function DistributeTimeModal({ session, onClose, initialCustomerI
         points: custPoints,
         hours:  custHours,
         activityType,
+        interactionType,
         comment: comment.trim()
           ? `${comment.trim()} (${splitLabel})`
           : splitLabel,
@@ -368,18 +370,33 @@ export default function DistributeTimeModal({ session, onClose, initialCustomerI
         </div>
       )}
 
-      {/* Activity type */}
+      {/* Phase type */}
       <div className="mb-3">
         <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-          Activity Type <span className="text-muted-foreground/50">(optional)</span>
+          Phase Type <span className="text-muted-foreground/50">(optional)</span>
         </label>
         <select
           value={activityType}
           onChange={e => setActivityType(e.target.value)}
           className="w-full h-10 bg-card border border-border rounded-md px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
         >
-          <option value="">Select activity...</option>
+          <option value="">Select phase...</option>
           {ACTIVITY_TYPES.map(a => <option key={a} value={a}>{a}</option>)}
+        </select>
+      </div>
+
+      {/* Interaction type */}
+      <div className="mb-3">
+        <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+          Interaction Type <span className="text-muted-foreground/50">(optional)</span>
+        </label>
+        <select
+          value={interactionType}
+          onChange={e => setInteractionType(e.target.value)}
+          className="w-full h-10 bg-card border border-border rounded-md px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+        >
+          <option value="">Select type...</option>
+          {TASK_INTERACTION_TYPES.map(t => <option key={t} value={t}>{TASK_INTERACTION_TYPE_LABELS[t]}</option>)}
         </select>
       </div>
 

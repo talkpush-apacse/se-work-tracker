@@ -29,7 +29,7 @@ function formatWeekLabel(weekStart, weekEnd) {
   return `${format(weekStart, 'MMM d')} – ${format(weekEnd, 'MMM d, yyyy')}`;
 }
 
-function buildWeekContext({ weekStart, weekEnd, points, tasks, customers, okrs, annotations, meetingVOUs, weeklyUpdateLogs, calendarEvents, gmailEmails }) {
+function buildWeekContext({ weekStart, weekEnd, points, tasks, customers, okrs, annotations, weeklyUpdateLogs, calendarEvents, gmailEmails }) {
   const weekLabel = formatWeekLabel(weekStart, weekEnd);
   const lines = [];
 
@@ -156,18 +156,6 @@ function buildWeekContext({ weekStart, weekEnd, points, tasks, customers, okrs, 
     lines.push('');
   }
 
-  // ── Open action items ──
-  const openVOUs = meetingVOUs.filter(v => !v.resolved).slice(0, 15);
-  if (openVOUs.length > 0) {
-    lines.push('### Open Action Items');
-    openVOUs.forEach(v => {
-      const cName = customerMap.get(v.customerId)?.name;
-      const due = v.dueDate ? ` (due ${v.dueDate})` : '';
-      lines.push(`  - ${cName ? `[${cName}] ` : ''}${v.action}${due}${v.who ? ` — owner: ${v.who}` : ''}`);
-    });
-    lines.push('');
-  }
-
   // ── Calendar meetings ──
   if (calendarEvents && calendarEvents.length > 0) {
     lines.push('### Calendar Meetings');
@@ -238,7 +226,7 @@ async function fetchGmailSent(gmailToken, weekStart, weekEnd) {
 
 export default function WeeklyReport({ onNavigate }) {
   const {
-    points, tasks, customers, okrs, annotations, meetingVOUs, weeklyUpdateLogs,
+    points, tasks, customers, okrs, annotations, weeklyUpdateLogs,
     weeklyReports, addWeeklyReport, deleteWeeklyReport,
     aiSettings, updateAiSettings,
   } = useAppStore();
@@ -298,7 +286,7 @@ export default function WeeklyReport({ onNavigate }) {
 
     const context = buildWeekContext({
       weekStart, weekEnd, points, tasks, customers, okrs,
-      annotations, meetingVOUs, weeklyUpdateLogs, calendarEvents, gmailEmails,
+      annotations, weeklyUpdateLogs, calendarEvents, gmailEmails,
     });
 
     const systemPrompt = localPrompt.trim() || aiSettings.prompts?.weeklyEmail?.trim() || WEEKLY_REPORT_DEFAULT_PROMPT;
@@ -364,7 +352,7 @@ export default function WeeklyReport({ onNavigate }) {
     } finally {
       setIsGenerating(false);
     }
-  }, [provider, weekStart, weekEnd, points, tasks, customers, okrs, annotations, meetingVOUs, weeklyUpdateLogs, googleToken, gmailToken, localPrompt, aiSettings]);
+  }, [provider, weekStart, weekEnd, points, tasks, customers, okrs, annotations, weeklyUpdateLogs, googleToken, gmailToken, localPrompt, aiSettings]);
 
   const handleSave = useCallback(() => {
     const model = provider === 'claude'

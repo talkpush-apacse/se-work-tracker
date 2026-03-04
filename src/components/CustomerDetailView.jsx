@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import {
   ArrowLeft, Plus, ChevronLeft, ChevronRight,
   Pencil, Trash2, Flag, CheckCircle2, Circle, Ban,
-  ClipboardList, Calendar, Table2, Check, Clock,
+  ClipboardList, Calendar, Check, Clock,
 } from 'lucide-react';
 import { useAppStore } from '../context/StoreContext';
 import {
@@ -11,6 +11,7 @@ import {
   MILESTONE_STATUSES, MILESTONE_STATUS_LABELS, MILESTONE_STATUS_COLORS,
   ANNOTATION_TAGS, ANNOTATION_TAG_LABELS, ANNOTATION_TAG_COLORS,
   ACTIVITY_TYPES, AUTO_TRACK_RATE,
+  TASK_INTERACTION_TYPES, TASK_INTERACTION_TYPE_LABELS,
 } from '../constants';
 import { formatDate } from '../utils/dateHelpers';
 import Modal from './Modal';
@@ -747,223 +748,12 @@ function TimelineTab({ tasks, milestones, annotations, customer, onAdd, onEdit, 
   );
 }
 
-// ── VOU Modal (customer pre-filled, no selector needed) ──────────────────────
-function VouModalInline({ initial = {}, customer, onSubmit, onCancel }) {
-  const today = new Date().toISOString().slice(0, 10);
-  const [form, setForm] = useState({
-    meetingDate: initial.meetingDate || today,
-    action:      initial.action      || '',
-    who:         initial.who         || '',
-    dueDate:     initial.dueDate     || '',
-    notes:       initial.notes       || '',
-    resolved:    initial.resolved    || false,
-  });
-  const [errors, setErrors] = useState({});
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const errs = {};
-    if (!form.meetingDate) errs.meetingDate = 'Required';
-    if (!form.action.trim()) errs.action = 'Required';
-    if (!form.who.trim()) errs.who = 'Required';
-    if (Object.keys(errs).length) { setErrors(errs); return; }
-    onSubmit({
-      customerId:  initial.customerId || customer.id,
-      meetingDate: form.meetingDate,
-      action:      form.action.trim(),
-      who:         form.who.trim(),
-      dueDate:     form.dueDate || null,
-      notes:       form.notes.trim(),
-      resolved:    form.resolved,
-    });
-  };
-
-  const f = (key) => ({
-    value: form[key],
-    onChange: (e) => setForm(p => ({ ...p, [key]: e.target.value })),
-  });
-
-  return (
-    <Modal title={initial.id ? 'Edit VOU' : `Log VOU — ${customer.name}`} onClose={onCancel} size="md">
-      <form onSubmit={handleSubmit} className="space-y-3">
-        <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1.5">Meeting Date *</label>
-          <Input type="date" {...f('meetingDate')} className="[color-scheme:dark]" />
-          {errors.meetingDate && <p className="mt-1 text-xs text-destructive">{errors.meetingDate}</p>}
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1.5">Action *</label>
-          <Input placeholder="What was agreed / decided?" {...f('action')} />
-          {errors.action && <p className="mt-1 text-xs text-destructive">{errors.action}</p>}
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1.5">Who *</label>
-          <Input placeholder="Person responsible" {...f('who')} />
-          {errors.who && <p className="mt-1 text-xs text-destructive">{errors.who}</p>}
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1.5">Due Date <span className="text-muted-foreground/50">(optional)</span></label>
-            <Input type="date" {...f('dueDate')} className="[color-scheme:dark]" />
-          </div>
-          <div className="flex items-end">
-            <label className="flex items-center gap-2 cursor-pointer mb-1">
-              <input
-                type="checkbox"
-                checked={form.resolved}
-                onChange={e => setForm(p => ({ ...p, resolved: e.target.checked }))}
-                className="w-4 h-4 rounded border-border"
-              />
-              <span className="text-xs font-medium text-muted-foreground">Resolved</span>
-            </label>
-          </div>
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1.5">Notes <span className="text-muted-foreground/50">(optional)</span></label>
-          <textarea
-            placeholder="Additional context…"
-            rows={2}
-            {...f('notes')}
-            className="w-full bg-card border border-border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40 resize-none"
-          />
-        </div>
-        <div className="flex gap-3 pt-1">
-          <Button type="button" variant="secondary" size="sm" onClick={onCancel} className="flex-1">Cancel</Button>
-          <Button type="submit" size="sm" className="flex-1">{initial.id ? 'Save Changes' : 'Log VOU'}</Button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
-
-// ── VOUs tab ───────────────────────────────────────────────────────────────────
-function VOUsTab({ customer, meetingVOUs, onAdd, onEdit, onDelete, onToggleResolved }) {
-  const [showResolved, setShowResolved] = useState(false);
-
-  const filteredVOUs = useMemo(() => {
-    return [...meetingVOUs]
-      .filter(v => showResolved ? true : !v.resolved)
-      .sort((a, b) => {
-        if (a.resolved !== b.resolved) return a.resolved ? 1 : -1;
-        return b.meetingDate.localeCompare(a.meetingDate);
-      });
-  }, [meetingVOUs, showResolved]);
-
-  return (
-    <div>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            Meeting VOUs ({meetingVOUs.filter(v => !v.resolved).length} unresolved)
-          </h3>
-          <label className="flex items-center gap-1.5 cursor-pointer ml-2">
-            <input
-              type="checkbox"
-              checked={showResolved}
-              onChange={e => setShowResolved(e.target.checked)}
-              className="w-3.5 h-3.5 rounded border-border"
-            />
-            <span className="text-[11px] text-muted-foreground">Show Resolved</span>
-          </label>
-        </div>
-        <button
-          onClick={onAdd}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 text-xs font-semibold transition-all"
-        >
-          <Plus size={12} /> Log VOU
-        </button>
-      </div>
-
-      {meetingVOUs.length === 0 ? (
-        <div className="text-center py-12 bg-card border border-border rounded-2xl border-dashed">
-          <Table2 size={24} className="text-muted-foreground/40 mx-auto mb-2" />
-          <p className="text-sm text-muted-foreground">No VOUs logged for {customer.name}.</p>
-          <button
-            onClick={onAdd}
-            className="mt-2 text-xs text-cyan-400 hover:text-cyan-300 font-semibold transition-colors"
-          >
-            Log first VOU →
-          </button>
-        </div>
-      ) : filteredVOUs.length === 0 ? (
-        <div className="text-center py-8 bg-card border border-border rounded-2xl">
-          <p className="text-sm text-muted-foreground">All VOUs are resolved.</p>
-          <button onClick={() => setShowResolved(true)} className="mt-1 text-xs text-cyan-400 hover:text-cyan-300 font-semibold transition-colors">
-            Show resolved →
-          </button>
-        </div>
-      ) : (
-        <div className="bg-card border border-border rounded-2xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="border-b border-border bg-secondary/40">
-                <tr>
-                  <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-muted-foreground w-[100px]">Date</th>
-                  <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-muted-foreground">Action</th>
-                  <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-muted-foreground w-[100px]">Who</th>
-                  <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-muted-foreground w-[90px]">Due</th>
-                  <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-muted-foreground">Notes</th>
-                  <th className="text-center px-3 py-2.5 text-[11px] font-semibold text-muted-foreground w-[40px]">✓</th>
-                  <th className="px-3 py-2.5 w-[60px]" />
-                </tr>
-              </thead>
-              <tbody>
-                {filteredVOUs.map((v, i) => (
-                  <tr
-                    key={v.id}
-                    className={`border-b border-border/50 last:border-b-0 transition-colors ${
-                      v.resolved ? 'opacity-50' : i % 2 === 0 ? '' : 'bg-secondary/20'
-                    }`}
-                  >
-                    <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{v.meetingDate}</td>
-                    <td className="px-3 py-2.5">
-                      <span className={`text-sm ${v.resolved ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
-                        {v.action}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5 text-xs text-foreground/80 whitespace-nowrap">{v.who}</td>
-                    <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{v.dueDate || '—'}</td>
-                    <td className="px-3 py-2.5 text-xs text-muted-foreground max-w-[200px] truncate">{v.notes || '—'}</td>
-                    <td className="px-3 py-2.5 text-center">
-                      <button
-                        onClick={() => onToggleResolved(v.id, !v.resolved)}
-                        title={v.resolved ? 'Mark unresolved' : 'Mark resolved'}
-                        className={`w-5 h-5 rounded border-2 flex items-center justify-center mx-auto transition-all ${
-                          v.resolved
-                            ? 'bg-emerald-600 border-emerald-600'
-                            : 'border-border hover:border-emerald-500'
-                        }`}
-                      >
-                        {v.resolved && <Check size={11} className="text-white" />}
-                      </button>
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <div className="flex gap-1 justify-end">
-                        <button onClick={() => onEdit(v)} className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
-                          <Pencil size={12} />
-                        </button>
-                        <button onClick={() => onDelete(v)} className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-secondary transition-colors">
-                          <Trash2 size={12} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ── LogHoursModal ─────────────────────────────────────────────────────────────
 function LogHoursModal({ okrs, onSubmit, onCancel }) {
-  const [hours, setHours]               = useState('');
-  const [activityType, setActivityType] = useState('');
-  const [okrId, setOkrId]               = useState('');
+  const [hours,           setHours]           = useState('');
+  const [activityType,    setActivityType]    = useState('');
+  const [interactionType, setInteractionType] = useState('');
+  const [okrId,           setOkrId]           = useState('');
   const [comment, setComment]           = useState('');
   const [error, setError]               = useState('');
 
@@ -978,11 +768,12 @@ function LogHoursModal({ okrs, onSubmit, onCancel }) {
       return;
     }
     onSubmit({
-      points:       previewPoints,
-      hours:        Math.round(Number(hours) * 100) / 100,
-      activityType: activityType || '',
-      okrId:        okrId || null,
-      comment:      comment.trim(),
+      points:          previewPoints,
+      hours:           Math.round(Number(hours) * 100) / 100,
+      activityType:    activityType || '',
+      interactionType: interactionType || '',
+      okrId:           okrId || null,
+      comment:         comment.trim(),
     });
   };
 
@@ -1017,18 +808,33 @@ function LogHoursModal({ okrs, onSubmit, onCancel }) {
           </div>
         </div>
 
-        {/* Activity Type */}
+        {/* Phase Type */}
         <div>
           <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-            Activity Type <span className="text-muted-foreground/50">(optional)</span>
+            Phase Type <span className="text-muted-foreground/50">(optional)</span>
           </label>
           <select
             value={activityType}
             onChange={e => setActivityType(e.target.value)}
             className="w-full h-10 bg-card border border-border rounded-md px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
           >
-            <option value="">Select activity…</option>
+            <option value="">Select phase…</option>
             {ACTIVITY_TYPES.map(a => <option key={a} value={a}>{a}</option>)}
+          </select>
+        </div>
+
+        {/* Interaction Type */}
+        <div>
+          <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+            Interaction Type <span className="text-muted-foreground/50">(optional)</span>
+          </label>
+          <select
+            value={interactionType}
+            onChange={e => setInteractionType(e.target.value)}
+            className="w-full h-10 bg-card border border-border rounded-md px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+          >
+            <option value="">Select type…</option>
+            {TASK_INTERACTION_TYPES.map(t => <option key={t} value={t}>{TASK_INTERACTION_TYPE_LABELS[t]}</option>)}
           </select>
         </div>
 
@@ -1083,17 +889,11 @@ export default function CustomerDetailView({ customer, onBack }) {
     tasks, milestones, points, addPoint, addTask, okrs,
     addMilestone, updateMilestone, deleteMilestone,
     annotations, updateAnnotation, deleteAnnotation,
-    meetingVOUs, addMeetingVOU, updateMeetingVOU, deleteMeetingVOU,
   } = useAppStore();
   const [activeTab, setActiveTab] = useState('tasks');
 
   // Log Hours modal state
   const [showLogHoursModal, setShowLogHoursModal] = useState(false);
-
-  // VOU modal state (managed here so VOUsTab + Timeline can share)
-  const [showVouModal, setShowVouModal] = useState(false);
-  const [vouEditTarget, setVouEditTarget] = useState(null);
-  const [vouDeleteTarget, setVouDeleteTarget] = useState(null);
 
   // Annotation edit/delete from timeline
   const [annotationDeleteTarget, setAnnotationDeleteTarget] = useState(null);
@@ -1111,11 +911,6 @@ export default function CustomerDetailView({ customer, onBack }) {
     () => annotations.filter(a => a.customerId === customer.id),
     [annotations, customer.id]
   );
-  const customerVOUs = useMemo(
-    () => meetingVOUs.filter(v => v.customerId === customer.id),
-    [meetingVOUs, customer.id]
-  );
-
   // Quick stats
   const totalPoints = useMemo(
     () => points.filter(p => p.customerId === customer.id).reduce((s, p) => s + p.points, 0),
@@ -1123,16 +918,6 @@ export default function CustomerDetailView({ customer, onBack }) {
   );
   const openTasks   = customerTasks.filter(t => !['done', 'archived'].includes(t.status)).length;
   const closedTasks = customerTasks.filter(t =>  ['done', 'archived'].includes(t.status)).length;
-
-  const handleVouSubmit = (data) => {
-    if (vouEditTarget) {
-      updateMeetingVOU(vouEditTarget.id, data);
-      setVouEditTarget(null);
-    } else {
-      addMeetingVOU({ ...data, customerId: customer.id });
-    }
-    setShowVouModal(false);
-  };
 
   const handleLogHours = (data) => {
     addPoint({ customerId: customer.id, ...data });
@@ -1182,12 +967,6 @@ export default function CustomerDetailView({ customer, onBack }) {
                 <span className="text-lg font-bold text-brand-amber">{customerMilestones.length}</span>
                 <span className="text-xs text-muted-foreground ml-1">milestones</span>
               </div>
-              {customerVOUs.length > 0 && (
-                <div>
-                  <span className="text-lg font-bold text-cyan-400">{customerVOUs.filter(v => !v.resolved).length}</span>
-                  <span className="text-xs text-muted-foreground ml-1">open VOUs</span>
-                </div>
-              )}
             </div>
           </div>
 
@@ -1209,7 +988,6 @@ export default function CustomerDetailView({ customer, onBack }) {
         {[
           { id: 'tasks',    label: 'Task Log',  icon: ClipboardList },
           { id: 'timeline', label: 'Timeline',  icon: Calendar      },
-          { id: 'vous',     label: 'VOUs',      icon: Table2        },
         ].map(({ id, label, icon: Icon }) => (
           <button
             key={id}
@@ -1222,11 +1000,6 @@ export default function CustomerDetailView({ customer, onBack }) {
           >
             <Icon size={14} />
             {label}
-            {id === 'vous' && customerVOUs.filter(v => !v.resolved).length > 0 && (
-              <span className="text-[10px] bg-cyan-500/20 text-cyan-400 px-1.5 py-0.5 rounded-full font-bold border border-cyan-500/20">
-                {customerVOUs.filter(v => !v.resolved).length}
-              </span>
-            )}
           </button>
         ))}
       </div>
@@ -1255,43 +1028,12 @@ export default function CustomerDetailView({ customer, onBack }) {
         />
       )}
 
-      {activeTab === 'vous' && (
-        <VOUsTab
-          customer={customer}
-          meetingVOUs={customerVOUs}
-          onAdd={() => { setVouEditTarget(null); setShowVouModal(true); }}
-          onEdit={(v) => { setVouEditTarget(v); setShowVouModal(true); }}
-          onDelete={(v) => setVouDeleteTarget(v)}
-          onToggleResolved={(id, resolved) => updateMeetingVOU(id, { resolved })}
-        />
-      )}
-
       {/* Log Hours modal */}
       {showLogHoursModal && (
         <LogHoursModal
           okrs={okrs}
           onSubmit={handleLogHours}
           onCancel={() => setShowLogHoursModal(false)}
-        />
-      )}
-
-      {/* VOU Modal — inline version (reuse pattern) */}
-      {showVouModal && (
-        <VouModalInline
-          initial={vouEditTarget || { customerId: customer.id }}
-          customer={customer}
-          onSubmit={handleVouSubmit}
-          onCancel={() => { setShowVouModal(false); setVouEditTarget(null); }}
-        />
-      )}
-
-      {/* VOU delete confirm */}
-      {vouDeleteTarget && (
-        <ConfirmDialog
-          title="Delete VOU"
-          message={`Delete the VOU "${vouDeleteTarget.action}"? This cannot be undone.`}
-          onConfirm={() => { deleteMeetingVOU(vouDeleteTarget.id); setVouDeleteTarget(null); }}
-          onCancel={() => setVouDeleteTarget(null)}
         />
       )}
 

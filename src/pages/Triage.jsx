@@ -26,6 +26,7 @@ import {
   AUTO_TRACK_MIN_SECONDS,
   ANNOTATION_TAGS, ANNOTATION_TAG_LABELS, ANNOTATION_TAG_COLORS,
   WEEKLY_UPDATE_LOG_TYPES, WEEKLY_UPDATE_LOG_LABELS, WEEKLY_UPDATE_LOG_COLORS,
+  TASK_INTERACTION_TYPES, TASK_INTERACTION_TYPE_LABELS,
 } from '../constants';
 import Modal from '../components/Modal';
 import { stripHtml } from '../lib/utils';
@@ -134,12 +135,13 @@ function InlineCustomerCreate({ onCustomerCreated }) {
 function TriageForm({ entry, customer, customers, onSubmit, onCancel }) {
   const { okrs } = useAppStore();
   const [form, setForm] = useState({
-    customerId:    customer?.id || '',
-    description:   entry.rawNotes.split('\n')[0].slice(0, 120), // pre-fill from first line
-    taskType:      'comms',
-    assigneeOrTeam: '',
-    status:        'open',
-    okrId:         '',
+    customerId:      customer?.id || '',
+    description:     entry.rawNotes.split('\n')[0].slice(0, 120), // pre-fill from first line
+    taskType:        'comms',
+    interactionType: '',
+    assigneeOrTeam:  '',
+    status:          'open',
+    okrId:           '',
   });
 
   // Local list that grows if user creates new entries inline
@@ -230,6 +232,20 @@ function TriageForm({ entry, customer, customers, onSubmit, onCancel }) {
             ))}
           </select>
         </div>
+      </div>
+
+      <div>
+        <label className="block text-xs text-muted-foreground mb-1">Interaction Type <span className="text-muted-foreground/70">(optional)</span></label>
+        <select
+          value={form.interactionType}
+          onChange={e => setForm(p => ({ ...p, interactionType: e.target.value }))}
+          className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+        >
+          <option value="">— Select type —</option>
+          {TASK_INTERACTION_TYPES.map(t => (
+            <option key={t} value={t}>{TASK_INTERACTION_TYPE_LABELS[t]}</option>
+          ))}
+        </select>
       </div>
 
       <div>
@@ -1168,12 +1184,13 @@ function AIWorkspace({ task, customer }) {
 function QuickAddTaskForm({ customers, onSubmit, onCancel }) {
   const { okrs } = useAppStore();
   const [form, setForm] = useState({
-    customerId: '',
-    description: '',
-    taskType: 'comms',
-    assigneeOrTeam: '',
-    status: 'open',
-    okrId: '',
+    customerId:      '',
+    description:     '',
+    taskType:        'comms',
+    interactionType: '',
+    assigneeOrTeam:  '',
+    status:          'open',
+    okrId:           '',
   });
 
   // Live list grows when user creates new entries via InlineCustomerCreate
@@ -1256,6 +1273,20 @@ function QuickAddTaskForm({ customers, onSubmit, onCancel }) {
             ))}
           </select>
         </div>
+      </div>
+
+      <div>
+        <label className="block text-xs text-muted-foreground mb-1">Interaction Type <span className="text-muted-foreground/70">(optional)</span></label>
+        <select
+          value={form.interactionType}
+          onChange={e => setForm(p => ({ ...p, interactionType: e.target.value }))}
+          className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+        >
+          <option value="">— Select type —</option>
+          {TASK_INTERACTION_TYPES.map(t => (
+            <option key={t} value={t}>{TASK_INTERACTION_TYPE_LABELS[t]}</option>
+          ))}
+        </select>
       </div>
 
       <div>
@@ -1539,6 +1570,21 @@ function TaskDetailView({ task, customer, onBack }) {
             </div>
           </div>
 
+          {/* Interaction Type */}
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">Interaction Type</label>
+            <select
+              value={task.interactionType || ''}
+              onChange={e => updateTask(task.id, { interactionType: e.target.value })}
+              className={selectClass}
+            >
+              <option value="" className="bg-secondary">— None —</option>
+              {TASK_INTERACTION_TYPES.map(t => (
+                <option key={t} value={t} className="bg-secondary">{TASK_INTERACTION_TYPE_LABELS[t]}</option>
+              ))}
+            </select>
+          </div>
+
           {/* Assignee / Recipient */}
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1 block">Recipient / Assignee</label>
@@ -1762,149 +1808,11 @@ function AnnotationRow({ annotation, customer, onEdit, onDelete }) {
   );
 }
 
-// ─── VOU Modal (add/edit meeting VOU) ────────────────────────────────────────
-function VouModal({ initial = {}, customers, onSubmit, onCancel }) {
-  const today = new Date().toISOString().slice(0, 10);
-  const [form, setForm] = useState({
-    customerId:  initial.customerId  || '',
-    meetingDate: initial.meetingDate || today,
-    action:      initial.action      || '',
-    who:         initial.who         || '',
-    dueDate:     initial.dueDate     || '',
-    notes:       initial.notes       || '',
-    resolved:    initial.resolved    || false,
-  });
-  const [errors, setErrors] = useState({});
-
-  const validate = () => {
-    const e = {};
-    if (!form.customerId)  e.customerId  = 'Required';
-    if (!form.meetingDate) e.meetingDate = 'Required';
-    if (!form.action.trim()) e.action   = 'Required';
-    if (!form.who.trim())    e.who      = 'Required';
-    return e;
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const errs = validate();
-    if (Object.keys(errs).length) { setErrors(errs); return; }
-    onSubmit({
-      customerId:  form.customerId,
-      meetingDate: form.meetingDate,
-      action:      form.action.trim(),
-      who:         form.who.trim(),
-      dueDate:     form.dueDate || null,
-      notes:       form.notes.trim(),
-      resolved:    form.resolved,
-    });
-  };
-
-  const f = (key) => ({
-    value: form[key],
-    onChange: (e) => setForm(p => ({ ...p, [key]: e.target.value })),
-  });
-
-  return (
-    <Modal title={initial.id ? 'Edit VOU' : 'Log Meeting VOU'} onClose={onCancel} size="md">
-      <form onSubmit={handleSubmit} className="space-y-3">
-        {/* Customer */}
-        <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1.5">Customer *</label>
-          <select
-            {...f('customerId')}
-            className="w-full h-10 bg-card border border-border rounded-md px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
-          >
-            <option value="">Select customer…</option>
-            {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-          {errors.customerId && <p className="mt-1 text-xs text-destructive">{errors.customerId}</p>}
-        </div>
-
-        {/* Meeting date */}
-        <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1.5">Meeting Date *</label>
-          <input
-            type="date"
-            {...f('meetingDate')}
-            className="w-full h-10 bg-card border border-border rounded-md px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
-          />
-          {errors.meetingDate && <p className="mt-1 text-xs text-destructive">{errors.meetingDate}</p>}
-        </div>
-
-        {/* Action */}
-        <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1.5">Action *</label>
-          <input
-            placeholder="What was agreed / decided?"
-            {...f('action')}
-            className="w-full h-10 bg-card border border-border rounded-md px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
-          />
-          {errors.action && <p className="mt-1 text-xs text-destructive">{errors.action}</p>}
-        </div>
-
-        {/* Who */}
-        <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1.5">Who *</label>
-          <input
-            placeholder="Person responsible"
-            {...f('who')}
-            className="w-full h-10 bg-card border border-border rounded-md px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
-          />
-          {errors.who && <p className="mt-1 text-xs text-destructive">{errors.who}</p>}
-        </div>
-
-        {/* Due date + Notes in grid */}
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1.5">Due Date <span className="text-muted-foreground/50">(optional)</span></label>
-            <input
-              type="date"
-              {...f('dueDate')}
-              className="w-full h-10 bg-card border border-border rounded-md px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
-            />
-          </div>
-          <div className="flex items-end">
-            <label className="flex items-center gap-2 cursor-pointer mb-1">
-              <input
-                type="checkbox"
-                checked={form.resolved}
-                onChange={e => setForm(p => ({ ...p, resolved: e.target.checked }))}
-                className="w-4 h-4 rounded border-border"
-              />
-              <span className="text-xs font-medium text-muted-foreground">Resolved</span>
-            </label>
-          </div>
-        </div>
-
-        {/* Notes */}
-        <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1.5">Notes <span className="text-muted-foreground/50">(optional)</span></label>
-          <textarea
-            placeholder="Additional context…"
-            rows={2}
-            {...f('notes')}
-            className="w-full bg-card border border-border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40 resize-none"
-          />
-        </div>
-
-        <div className="flex gap-3 pt-1">
-          <button type="button" onClick={onCancel} className="flex-1 py-2.5 rounded-xl bg-muted hover:bg-gray-600 text-sm font-medium transition-colors">Cancel</button>
-          <button type="submit" className="flex-1 py-2.5 rounded-xl bg-brand-lavender hover:bg-brand-lavender/80 text-sm font-bold text-foreground transition-colors">
-            {initial.id ? 'Save Changes' : 'Log VOU'}
-          </button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
-
 // ─── Main Triage page ──────────────────────────────────────────────────────────
 export default function Triage() {
   const {
     meetingEntries, tasks, customers, updateTask, addTask, reorderTasks, addPoint, okrs,
     annotations, addAnnotation, updateAnnotation, deleteAnnotation,
-    meetingVOUs, addMeetingVOU, updateMeetingVOU, deleteMeetingVOU,
     weeklyUpdateLogs, addWeeklyUpdateLog, deleteWeeklyUpdateLog,
   } = useAppStore();
   const { isRunning, taskId: runningTaskId, startTimer, stopTimer } = useTimerContext();
@@ -1937,13 +1845,6 @@ export default function Triage() {
   // Weekly Update Log section state
   const [logForm, setLogForm] = useState({ type: 'highlight', text: '', customerId: '' });
   const [logDeleteTarget, setLogDeleteTarget] = useState(null);
-
-  // Meeting VOU section state
-  const [showVouModal, setShowVouModal] = useState(false);
-  const [vouEditTarget, setVouEditTarget] = useState(null);
-  const [vouDeleteTarget, setVouDeleteTarget] = useState(null);
-  const [filterVouCustomer, setFilterVouCustomer] = useState('');
-  const [showResolved, setShowResolved] = useState(false);
 
   // dnd-kit sensors
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
@@ -1994,17 +1895,6 @@ export default function Triage() {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .slice(0, 30);
   }, [annotations, filterAnnotationCustomer, filterAnnotationTag]);
-
-  // Filtered VOUs — unresolved first, then by meetingDate DESC
-  const filteredVOUs = useMemo(() => {
-    return meetingVOUs
-      .filter(v => (!filterVouCustomer || v.customerId === filterVouCustomer))
-      .filter(v => showResolved ? true : !v.resolved)
-      .sort((a, b) => {
-        if (a.resolved !== b.resolved) return a.resolved ? 1 : -1;
-        return b.meetingDate.localeCompare(a.meetingDate);
-      });
-  }, [meetingVOUs, filterVouCustomer, showResolved]);
 
   // Active tasks: open, in-progress, blocked (excludes done and archived)
   const activeTasks = useMemo(
@@ -2077,7 +1967,7 @@ export default function Triage() {
       customerId: session.customerId,
       points: pts,
       hours: Math.round(hours * 100) / 100,
-      activityType: 'Task Review',
+      activityType: 'General Admin',
       comment: `Auto-tracked: ${session.taskDescription || 'Task review'}`,
     });
   };
@@ -2184,26 +2074,6 @@ export default function Triage() {
     setAnnotationForm({ customerId: '', date: new Date().toISOString().slice(0, 10), tag: 'good', text: '' });
     setAnnotationErrors({});
     setShowAnnotationForm(false);
-  };
-
-  // ─── VOU handlers ────────────────────────────────────────────────────────────
-  const handleVouSubmit = (data) => {
-    if (vouEditTarget) {
-      updateMeetingVOU(vouEditTarget.id, data);
-      setVouEditTarget(null);
-    } else {
-      addMeetingVOU(data);
-    }
-    setShowVouModal(false);
-  };
-
-  const handleEditVou = (v) => {
-    setVouEditTarget(v);
-    setShowVouModal(true);
-  };
-
-  const handleDeleteVou = (v) => {
-    setVouDeleteTarget(v);
   };
 
   // ── Task Detail sub-view ───────────────────────────────────────────────────
@@ -2803,150 +2673,6 @@ export default function Triage() {
         )}
       </div>
 
-      {/* ── Meeting VOUs Section ──────────────────────────────────────────────── */}
-      <div>
-        {/* Section header */}
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Table2 size={15} className="text-cyan-400" />
-            <h2 className="text-sm font-semibold text-foreground">Meeting VOUs</h2>
-            <span className="text-[10px] text-muted-foreground/60">Value of Understanding</span>
-            {meetingVOUs.filter(v => !v.resolved).length > 0 && (
-              <span className="bg-cyan-500/20 text-cyan-400 border border-cyan-500/20 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                {meetingVOUs.filter(v => !v.resolved).length}
-              </span>
-            )}
-          </div>
-          <button
-            onClick={() => { setVouEditTarget(null); setShowVouModal(true); }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-secondary hover:bg-muted border border-border text-xs font-medium text-foreground/80 hover:text-foreground transition-all"
-          >
-            <Plus size={13} /> Log VOU
-          </button>
-        </div>
-
-        {/* Filter bar */}
-        <div className="flex items-center gap-2 mb-3 flex-wrap">
-          <select
-            value={filterVouCustomer}
-            onChange={e => setFilterVouCustomer(e.target.value)}
-            className="h-8 bg-secondary border border-border rounded-lg px-2 text-xs text-foreground focus:outline-none focus:border-ring"
-          >
-            <option value="">All Customers</option>
-            {customers.filter(c => meetingVOUs.some(v => v.customerId === c.id)).map(c => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-          <label className="flex items-center gap-1.5 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={showResolved}
-              onChange={e => setShowResolved(e.target.checked)}
-              className="w-4 h-4 rounded border-border"
-            />
-            <span className="text-xs text-muted-foreground">Show Resolved</span>
-          </label>
-        </div>
-
-        {/* VOU table or empty state */}
-        {meetingVOUs.length === 0 ? (
-          <div className="bg-card border border-border rounded-2xl px-5 py-10 text-center">
-            <Table2 size={24} className="text-muted-foreground/60 mx-auto mb-2" />
-            <p className="text-muted-foreground text-sm">No VOUs logged yet.</p>
-            <p className="text-muted-foreground/70 text-xs mt-1">Log action items and decisions from your meetings.</p>
-          </div>
-        ) : filteredVOUs.length === 0 ? (
-          <div className="bg-card border border-border rounded-2xl px-5 py-6 text-center">
-            <p className="text-muted-foreground text-sm">No VOUs match this filter.</p>
-          </div>
-        ) : (
-          <div className="bg-card border border-border rounded-2xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="border-b border-border bg-secondary/40">
-                  <tr>
-                    <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-muted-foreground w-[120px]">Customer</th>
-                    <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-muted-foreground w-[100px]">Date</th>
-                    <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-muted-foreground">Action</th>
-                    <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-muted-foreground w-[100px]">Who</th>
-                    <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-muted-foreground w-[90px]">Due</th>
-                    <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-muted-foreground">Notes</th>
-                    <th className="text-center px-3 py-2.5 text-[11px] font-semibold text-muted-foreground w-[40px]">✓</th>
-                    <th className="px-3 py-2.5 w-[60px]" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredVOUs.map((v, i) => {
-                    const customer = customerMap.get(v.customerId);
-                    return (
-                      <tr
-                        key={v.id}
-                        className={`border-b border-border/50 last:border-b-0 transition-colors ${
-                          v.resolved ? 'opacity-50' : i % 2 === 0 ? '' : 'bg-secondary/20'
-                        }`}
-                      >
-                        <td className="px-3 py-2.5">
-                          {customer ? (
-                            <span
-                              className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-full border truncate max-w-[110px]"
-                              style={{ backgroundColor: customer.color + '22', color: customer.color, borderColor: customer.color + '55' }}
-                            >
-                              {customer.name}
-                            </span>
-                          ) : <span className="text-muted-foreground text-xs">—</span>}
-                        </td>
-                        <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{v.meetingDate}</td>
-                        <td className="px-3 py-2.5">
-                          <span className={`text-sm ${v.resolved ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
-                            {v.action}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2.5 text-xs text-foreground/80 whitespace-nowrap">{v.who}</td>
-                        <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{v.dueDate || '—'}</td>
-                        <td className="px-3 py-2.5 text-xs text-muted-foreground max-w-[200px] truncate">{v.notes || '—'}</td>
-                        <td className="px-3 py-2.5 text-center">
-                          <button
-                            onClick={() => updateMeetingVOU(v.id, { resolved: !v.resolved })}
-                            title={v.resolved ? 'Mark unresolved' : 'Mark resolved'}
-                            className={`w-5 h-5 rounded border-2 flex items-center justify-center mx-auto transition-all ${
-                              v.resolved
-                                ? 'bg-emerald-600 border-emerald-600'
-                                : 'border-border hover:border-emerald-500'
-                            }`}
-                          >
-                            {v.resolved && <Check size={11} className="text-white" />}
-                          </button>
-                        </td>
-                        <td className="px-3 py-2.5">
-                          <div className="flex gap-1 justify-end">
-                            <button onClick={() => handleEditVou(v)} className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
-                              <Pencil size={12} />
-                            </button>
-                            <button onClick={() => handleDeleteVou(v)} className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-secondary transition-colors">
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* VOU Modal */}
-      {showVouModal && (
-        <VouModal
-          initial={vouEditTarget || {}}
-          customers={customers}
-          onSubmit={handleVouSubmit}
-          onCancel={() => { setShowVouModal(false); setVouEditTarget(null); }}
-        />
-      )}
-
       {/* Annotation delete confirm */}
       {deleteAnnotationTarget && (
         <ConfirmDialog
@@ -2954,16 +2680,6 @@ export default function Triage() {
           message={`Delete this ${ANNOTATION_TAG_LABELS[deleteAnnotationTarget.tag]} annotation? This cannot be undone.`}
           onConfirm={() => { deleteAnnotation(deleteAnnotationTarget.id); setDeleteAnnotationTarget(null); }}
           onCancel={() => setDeleteAnnotationTarget(null)}
-        />
-      )}
-
-      {/* VOU delete confirm */}
-      {vouDeleteTarget && (
-        <ConfirmDialog
-          title="Delete VOU"
-          message={`Delete the VOU "${vouDeleteTarget.action}"? This cannot be undone.`}
-          onConfirm={() => { deleteMeetingVOU(vouDeleteTarget.id); setVouDeleteTarget(null); }}
-          onCancel={() => setVouDeleteTarget(null)}
         />
       )}
     </div>

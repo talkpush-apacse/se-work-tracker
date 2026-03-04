@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import Modal from './Modal';
-import { ACTIVITY_TYPES } from '../constants';
+import { ACTIVITY_TYPES, TASK_INTERACTION_TYPES, TASK_INTERACTION_TYPE_LABELS } from '../constants';
 import { useAppStore } from '../context/StoreContext';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
@@ -10,8 +10,9 @@ export default function AddPointsModal({ customer, onClose, onSuccess }) {
   const [form, setForm] = useState({
     points: '',
     hours: '',
-    activityType: '',
-    okrId: '',
+    activityType:    '',
+    interactionType: '',
+    okrId:           '',
     comment: '',
   });
   const [errors, setErrors] = useState({});
@@ -33,8 +34,9 @@ export default function AddPointsModal({ customer, onClose, onSuccess }) {
       okrId: form.okrId || null,
       points: Number(form.points),
       hours: Number(form.hours),
-      activityType: form.activityType,
-      comment: form.comment.trim(),
+      activityType:    form.activityType,
+      interactionType: form.interactionType,
+      comment:         form.comment.trim(),
     });
     onSuccess?.(entry);
     onClose();
@@ -75,14 +77,27 @@ export default function AddPointsModal({ customer, onClose, onSuccess }) {
 
         <div>
           <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-            Activity Type <span className="text-muted-foreground/50">(optional)</span>
+            Phase Type <span className="text-muted-foreground/50">(optional)</span>
           </label>
           <select
             {...field('activityType')}
             className="w-full h-10 bg-card border border-border rounded-md px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
           >
-            <option value="">Select activity...</option>
+            <option value="">Select phase...</option>
             {ACTIVITY_TYPES.map(a => <option key={a} value={a}>{a}</option>)}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+            Interaction Type <span className="text-muted-foreground/50">(optional)</span>
+          </label>
+          <select
+            {...field('interactionType')}
+            className="w-full h-10 bg-card border border-border rounded-md px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+          >
+            <option value="">Select type...</option>
+            {TASK_INTERACTION_TYPES.map(t => <option key={t} value={t}>{TASK_INTERACTION_TYPE_LABELS[t]}</option>)}
           </select>
         </div>
 

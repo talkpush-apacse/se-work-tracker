@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import Modal from './Modal';
-import { ACTIVITY_TYPES, AUTO_TRACK_RATE } from '../constants';
+import { ACTIVITY_TYPES, AUTO_TRACK_RATE, TASK_INTERACTION_TYPES, TASK_INTERACTION_TYPE_LABELS } from '../constants';
 import { useAppStore } from '../context/StoreContext';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
@@ -23,12 +23,13 @@ export default function SaveSessionModal({ session, onClose }) {
   // All hooks must be declared before any early return
   const [showDistribute, setShowDistribute] = useState(false);
   const [form, setForm] = useState({
-    points:       String(prefilledPoints),
-    hours:        String(prefilledHours),
-    activityType: '',
-    okrId:        '',
+    points:          String(prefilledPoints),
+    hours:           String(prefilledHours),
+    activityType:    '',
+    interactionType: '',
+    okrId:           '',
     // Pre-fill from task description when timer was started on a specific task
-    comment:      session.taskDescription || '',
+    comment:         session.taskDescription || '',
   });
   const [errors,      setErrors]      = useState({});
   const [showDiscard, setShowDiscard] = useState(false);
@@ -62,12 +63,13 @@ export default function SaveSessionModal({ session, onClose }) {
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
     addPoint({
-      customerId:   session.customerId,
-      okrId:        form.okrId || null,
-      points:       Number(form.points),
-      hours:        Number(form.hours),
-      activityType: form.activityType,
-      comment:      form.comment.trim(),
+      customerId:      session.customerId,
+      okrId:           form.okrId || null,
+      points:          Number(form.points),
+      hours:           Number(form.hours),
+      activityType:    form.activityType,
+      interactionType: form.interactionType,
+      comment:         form.comment.trim(),
     });
     onClose();
   };
@@ -127,14 +129,27 @@ export default function SaveSessionModal({ session, onClose }) {
 
         <div>
           <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-            Activity Type <span className="text-muted-foreground/50">(optional)</span>
+            Phase Type <span className="text-muted-foreground/50">(optional)</span>
           </label>
           <select
             {...field('activityType')}
             className="w-full h-10 bg-card border border-border rounded-md px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
           >
-            <option value="">Select activity...</option>
+            <option value="">Select phase...</option>
             {ACTIVITY_TYPES.map(a => <option key={a} value={a}>{a}</option>)}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+            Interaction Type <span className="text-muted-foreground/50">(optional)</span>
+          </label>
+          <select
+            {...field('interactionType')}
+            className="w-full h-10 bg-card border border-border rounded-md px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+          >
+            <option value="">Select type...</option>
+            {TASK_INTERACTION_TYPES.map(t => <option key={t} value={t}>{TASK_INTERACTION_TYPE_LABELS[t]}</option>)}
           </select>
         </div>
 

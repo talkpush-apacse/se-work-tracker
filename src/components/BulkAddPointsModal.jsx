@@ -93,16 +93,16 @@ export default function BulkAddPointsModal({ customer, onClose }) {
       <div className="space-y-4">
         <div>
           <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-            One entry per line — <code className="text-brand-lavender bg-brand-lavender/10 px-1 rounded">points, hours, activityType (optional), comment</code>
+            One entry per line — <code className="text-brand-lavender bg-brand-lavender/10 px-1 rounded">points, hours, phase (optional), comment</code>
           </label>
           <textarea
             value={text}
             onChange={e => setText(e.target.value)}
             placeholder={
               `5, 1.5, Configuration, Set up SSO for onboarding\n` +
-              `3, 0.5, Sending Email, Followed up on integration tickets\n` +
-              `8, 2, Troubleshoot / Firefighting, Fixed Workday sync issue\n` +
-              `4, 1, Joining Meeting, Weekly sync with TaskUs team\n` +
+              `3, 0.5, Account Management, Followed up on integration tickets\n` +
+              `8, 2, Testing, Fixed Workday sync issue\n` +
+              `4, 1, General Admin, Weekly sync with TaskUs team\n` +
               `2, 0.5, Reporting, Sent weekly status report`
             }
             rows={7}
@@ -112,7 +112,7 @@ export default function BulkAddPointsModal({ customer, onClose }) {
           <div className="mt-1.5 text-xs text-muted-foreground space-y-0.5">
             <p>• <strong className="text-foreground/70">points</strong> — positive number (e.g. <code className="text-brand-lavender bg-brand-lavender/10 px-1 rounded">5</code> or <code className="text-brand-lavender bg-brand-lavender/10 px-1 rounded">2.5</code>)</p>
             <p>• <strong className="text-foreground/70">hours</strong> — decimal allowed (e.g. <code className="text-brand-lavender bg-brand-lavender/10 px-1 rounded">1.5</code>)</p>
-            <p>• <strong className="text-foreground/70">activityType</strong> — optional, one of: {ACTIVITY_TYPES.map((t, i) => (
+            <p>• <strong className="text-foreground/70">phase</strong> — optional, one of: {ACTIVITY_TYPES.map((t, i) => (
               <span key={t}><code className="text-brand-lavender bg-brand-lavender/10 px-1 rounded">{t}</code>{i < ACTIVITY_TYPES.length - 1 ? ', ' : ''}</span>
             ))}</p>
             <p>• <strong className="text-foreground/70">comment</strong> — optional, can contain commas</p>
