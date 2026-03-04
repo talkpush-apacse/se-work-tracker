@@ -16,25 +16,37 @@ function formatHMS(totalSeconds) {
 export default function SaveSessionModal({ session, onClose }) {
   const { addPoint, customers, okrs } = useAppStore();
 
-  // General Focus Time sessions (customerId === null) → show distribution modal
-  if (!session.customerId) {
-    return <DistributeTimeModal session={session} onClose={onClose} />;
+  // Compute pre-filled values up-front (needed by useState initialiser below)
+  const prefilledHours  = parseFloat((session.elapsedSeconds / 3600).toFixed(2));
+  const prefilledPoints = Math.round(prefilledHours * AUTO_TRACK_RATE * 100) / 100;
+
+  // All hooks must be declared before any early return
+  const [showDistribute, setShowDistribute] = useState(false);
+  const [form, setForm] = useState({
+    points:       String(prefilledPoints),
+    hours:        String(prefilledHours),
+    activityType: '',
+    okrId:        '',
+    // Pre-fill from task description when timer was started on a specific task
+    comment:      session.taskDescription || '',
+  });
+  const [errors,      setErrors]      = useState({});
+  const [showDiscard, setShowDiscard] = useState(false);
+
+  // General Focus Time sessions (customerId === null) → show distribution modal directly
+  // Task sessions where user clicked "Split across customers" → also show distribution modal
+  if (!session.customerId || showDistribute) {
+    return (
+      <DistributeTimeModal
+        session={session}
+        onClose={onClose}
+        // Pre-select the task's original customer when switching from task-session view
+        initialCustomerId={showDistribute ? session.customerId : undefined}
+      />
+    );
   }
 
   const customer = customers.find(c => c.id === session.customerId);
-  const prefilledHours = parseFloat((session.elapsedSeconds / 3600).toFixed(2));
-  const prefilledPoints = Math.round(prefilledHours * AUTO_TRACK_RATE * 100) / 100;
-
-  const [form, setForm] = useState({
-    points: String(prefilledPoints),
-    hours: String(prefilledHours),
-    activityType: '',
-    okrId: '',
-    // Pre-fill from task description when timer was started on a specific task
-    comment: session.taskDescription || '',
-  });
-  const [errors, setErrors] = useState({});
-  const [showDiscard, setShowDiscard] = useState(false);
 
   const validate = () => {
     const e = {};
@@ -50,18 +62,18 @@ export default function SaveSessionModal({ session, onClose }) {
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
     addPoint({
-      customerId: session.customerId,
-      okrId: form.okrId || null,
-      points: Number(form.points),
-      hours: Number(form.hours),
+      customerId:   session.customerId,
+      okrId:        form.okrId || null,
+      points:       Number(form.points),
+      hours:        Number(form.hours),
       activityType: form.activityType,
-      comment: form.comment.trim(),
+      comment:      form.comment.trim(),
     });
     onClose();
   };
 
   const field = (key) => ({
-    value: form[key],
+    value:    form[key],
     onChange: (e) => setForm(p => ({ ...p, [key]: e.target.value })),
   });
 
@@ -169,6 +181,17 @@ export default function SaveSessionModal({ session, onClose }) {
           >
             Save Points
           </Button>
+        </div>
+
+        {/* Distribute option — lets user split this session across multiple customers */}
+        <div className="text-center -mt-1">
+          <button
+            type="button"
+            onClick={() => setShowDistribute(true)}
+            className="text-xs text-muted-foreground hover:text-brand-lavender transition-colors underline underline-offset-2"
+          >
+            Split across multiple customers instead →
+          </button>
         </div>
       </form>
 

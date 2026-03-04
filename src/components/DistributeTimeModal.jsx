@@ -31,14 +31,22 @@ function equalSplit(ids) {
   return result;
 }
 
-export default function DistributeTimeModal({ session, onClose }) {
+export default function DistributeTimeModal({ session, onClose, initialCustomerId }) {
   const { addPoint, customers, okrs } = useAppStore();
 
   const totalHours  = parseFloat((session.elapsedSeconds / 3600).toFixed(2));
   const totalPoints = Math.round(totalHours * AUTO_TRACK_RATE * 100) / 100;
 
-  const [selectedIds,  setSelectedIds]  = useState(new Set());
-  const [percentages,  setPercentages]  = useState({});   // { [customerId]: number | '' }
+  // If initialCustomerId is provided (switching from a task session to distribute mode),
+  // pre-select that customer so the user just adds more and adjusts percentages.
+  const [selectedIds, setSelectedIds] = useState(() => {
+    if (initialCustomerId) return new Set([initialCustomerId]);
+    return new Set();
+  });
+  const [percentages, setPercentages] = useState(() => {   // { [customerId]: number | '' }
+    if (initialCustomerId) return equalSplit(new Set([initialCustomerId]));
+    return {};
+  });
   const [activityType, setActivityType] = useState('');
   const [okrId,        setOkrId]        = useState('');
   const [comment,      setComment]      = useState(session.taskDescription || '');
@@ -153,7 +161,9 @@ export default function DistributeTimeModal({ session, onClose }) {
 
       {/* Session summary */}
       <div className="mb-4 rounded-xl border border-brand-lavender/30 bg-brand-lavender/10 px-4 py-3">
-        <p className="text-xs text-brand-lavender font-medium mb-0.5">General Focus Time Session</p>
+        <p className="text-xs text-brand-lavender font-medium mb-0.5">
+          {initialCustomerId ? 'Task Focus Session — Distribute Across Customers' : 'General Focus Time Session'}
+        </p>
         <p className="font-mono text-2xl font-bold text-brand-lavender tabular-nums">
           {formatHMS(session.elapsedSeconds)}
         </p>
