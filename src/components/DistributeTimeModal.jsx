@@ -12,19 +12,22 @@ function formatHMS(totalSeconds) {
   return [h, m, s].map(n => String(n).padStart(2, '0')).join(':');
 }
 
-// Given a new set of selected IDs and existing percentages, preserve edited values
-// and distribute remaining pool equally among newly-added customers.
-function recalcPercentages(nextIds, existingPcts) {
-  if (nextIds.size === 0) return {};
-  const newIds  = [...nextIds].filter(id => !(id in existingPcts));
-  const keptIds = [...nextIds].filter(id =>   id in existingPcts);
-  const keptSum = keptIds.reduce((s, id) => s + (parseFloat(existingPcts[id]) || 0), 0);
-  const newShare = newIds.length > 0
-    ? parseFloat(((100 - keptSum) / newIds.length).toFixed(2))
-    : 0;
+// Always distribute equally across all selected customers.
+// The last customer absorbs any floating-point remainder so total always = 100.
+function equalSplit(ids) {
+  if (ids.size === 0) return {};
+  const arr   = [...ids];
+  const share = parseFloat((100 / arr.length).toFixed(2));
   const result = {};
-  keptIds.forEach(id => { result[id] = existingPcts[id]; });
-  newIds.forEach(id  => { result[id] = newShare; });
+  let assigned = 0;
+  arr.forEach((id, i) => {
+    if (i === arr.length - 1) {
+      result[id] = parseFloat((100 - assigned).toFixed(2));
+    } else {
+      result[id] = share;
+      assigned   = parseFloat((assigned + share).toFixed(2));
+    }
+  });
   return result;
 }
 
@@ -89,7 +92,7 @@ export default function DistributeTimeModal({ session, onClose }) {
     setSelectedIds(prev => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
-      setPercentages(recalcPercentages(next, percentages));
+      setPercentages(equalSplit(next));
       return next;
     });
     setError('');
@@ -98,7 +101,7 @@ export default function DistributeTimeModal({ session, onClose }) {
   const selectAll = () => {
     const next = new Set(customers.map(c => c.id));
     setSelectedIds(next);
-    setPercentages(recalcPercentages(next, percentages));
+    setPercentages(equalSplit(next));
     setError('');
   };
 
