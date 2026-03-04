@@ -7,11 +7,15 @@ const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
 export function GoogleAuthProvider({ children }) {
   const [googleToken, setGoogleToken] = useState(null);
-  const logout = () => setGoogleToken(null);
+  const [gmailToken,  setGmailToken]  = useState(null);
+  const logout      = () => setGoogleToken(null);
+  const gmailLogout = () => setGmailToken(null);
 
   return (
     <GoogleOAuthProvider clientId={CLIENT_ID}>
-      <GoogleAuthContext.Provider value={{ googleToken, setGoogleToken, logout }}>
+      <GoogleAuthContext.Provider
+        value={{ googleToken, setGoogleToken, logout, gmailToken, setGmailToken, gmailLogout }}
+      >
         {children}
       </GoogleAuthContext.Provider>
     </GoogleOAuthProvider>

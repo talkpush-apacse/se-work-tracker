@@ -13,6 +13,7 @@ const KEYS = {
   aiSettings: 'gpt-ai-settings',
   annotations: 'gpt-annotations',
   meetingVOUs: 'gpt-meeting-vous',
+  weeklyReports: 'gpt-weekly-reports',
 };
 
 const MIGRATION_FLAG = 'gpt-migrated-to-neon';
@@ -20,8 +21,8 @@ const V2_MIGRATION_FLAG = 'gpt-v2-migrated';
 
 // Default AI settings shape — empty string means "use built-in default prompt"
 const DEFAULT_AI_SETTINGS = {
-  prompts: { email: '', slack: '', troubleshooting: '', configuration: '', summary: '' },
-  providers: { email: 'openai', slack: 'openai', troubleshooting: 'openai', configuration: 'openai', summary: 'openai' },
+  prompts: { email: '', slack: '', troubleshooting: '', configuration: '', summary: '', weeklyEmail: '' },
+  providers: { email: 'openai', slack: 'openai', troubleshooting: 'openai', configuration: 'openai', summary: 'openai', weeklyEmail: 'claude' },
   openaiModel: 'gpt-4o',
   claudeModel: 'claude-sonnet-4-6',
 };
@@ -189,6 +190,7 @@ export function useStore() {
   const [aiOutputs, setAiOutputs] = useState(() => load(KEYS.aiOutputs));
   const [annotations, setAnnotations] = useState(() => load(KEYS.annotations));
   const [meetingVOUs, setMeetingVOUs] = useState(() => load(KEYS.meetingVOUs));
+  const [weeklyReports, setWeeklyReports] = useState(() => load(KEYS.weeklyReports));
   const [aiSettings, setAiSettings] = useState(() => {
     const stored = load(KEYS.aiSettings, null);
     if (!stored) return DEFAULT_AI_SETTINGS;
@@ -215,6 +217,7 @@ export function useStore() {
   useEffect(() => { save(KEYS.aiSettings, aiSettings); }, [aiSettings]);
   useEffect(() => { save(KEYS.annotations, annotations); }, [annotations]);
   useEffect(() => { save(KEYS.meetingVOUs, meetingVOUs); }, [meetingVOUs]);
+  useEffect(() => { save(KEYS.weeklyReports, weeklyReports); }, [weeklyReports]);
 
   // ─── Neon save effects (debounced, only after mount-fetch) ───
   useEffect(() => { if (mountedRef.current) debouncedSave('okrs', okrs); }, [okrs]);
@@ -227,9 +230,10 @@ export function useStore() {
   useEffect(() => { if (mountedRef.current) debouncedSave('aiSettings', aiSettings); }, [aiSettings]);
   useEffect(() => { if (mountedRef.current) debouncedSave('annotations', annotations); }, [annotations]);
   useEffect(() => { if (mountedRef.current) debouncedSave('meetingVOUs', meetingVOUs); }, [meetingVOUs]);
+  useEffect(() => { if (mountedRef.current) debouncedSave('weeklyReports', weeklyReports); }, [weeklyReports]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (mountedRef.current) setSyncStatus('saving'); }, [okrs, customers, points, meetingEntries, tasks, milestones, aiOutputs, aiSettings, annotations, meetingVOUs]);
+  useEffect(() => { if (mountedRef.current) setSyncStatus('saving'); }, [okrs, customers, points, meetingEntries, tasks, milestones, aiOutputs, aiSettings, annotations, meetingVOUs, weeklyReports]);
 
   useEffect(() => {
     if (syncStatus === 'saving') {
@@ -289,6 +293,7 @@ export function useStore() {
         setMilestones(rMilestones);
         if (remote.annotations) setAnnotations(remote.annotations);
         if (remote.meetingVOUs) setMeetingVOUs(remote.meetingVOUs);
+        if (remote.weeklyReports) setWeeklyReports(remote.weeklyReports);
         if (remote.aiOutputs) setAiOutputs(remote.aiOutputs);
         if (remote.aiSettings && Object.keys(remote.aiSettings).length > 0) {
           setAiSettings(prev => ({
@@ -465,6 +470,20 @@ export function useStore() {
     return meetingVOUs.filter(v => v.customerId === customerId);
   }, [meetingVOUs]);
 
+  // ─── Weekly Report actions ───
+  // Shape: { id, createdAt, weekStart (ISO), weekEnd (ISO), emailText, provider, model, promptUsed }
+  const addWeeklyReport = useCallback((data) => {
+    const r = { id: uid(), createdAt: new Date().toISOString(), ...data };
+    setWeeklyReports(prev => [...prev, r]);
+    return r;
+  }, []);
+  const updateWeeklyReport = useCallback((id, data) => {
+    setWeeklyReports(prev => prev.map(r => r.id === id ? { ...r, ...data } : r));
+  }, []);
+  const deleteWeeklyReport = useCallback((id) => {
+    setWeeklyReports(prev => prev.filter(r => r.id !== id));
+  }, []);
+
   // ─── AI output actions ───
   const addAiOutput = useCallback((data) => {
     const output = { id: uid(), createdAt: new Date().toISOString(), ...data };
@@ -539,7 +558,7 @@ export function useStore() {
 
   return {
     okrs, customers, points, meetingEntries, tasks, milestones, aiOutputs,
-    annotations, meetingVOUs,
+    annotations, meetingVOUs, weeklyReports,
     addOkr, updateOkr, deleteOkr,
     addCustomer, updateCustomer, deleteCustomer, reorderCustomers,
     addPoint, deletePoint, updatePoint,
@@ -549,6 +568,7 @@ export function useStore() {
     addMilestone, updateMilestone, deleteMilestone, getCustomerMilestones,
     addAnnotation, updateAnnotation, deleteAnnotation, getCustomerAnnotations,
     addMeetingVOU, updateMeetingVOU, deleteMeetingVOU, getCustomerMeetingVOUs,
+    addWeeklyReport, updateWeeklyReport, deleteWeeklyReport,
     addAiOutput, getTaskAiOutputs, updateAiOutput,
     aiSettings, updateAiSettings,
     exportData, importData,

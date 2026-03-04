@@ -3,7 +3,7 @@ import { useGoogleLogin } from '@react-oauth/google';
 import { useGoogleAuth } from '../context/GoogleAuthContext';
 import { useAppStore } from '../context/StoreContext';
 import { AUTO_TRACK_RATE } from '../constants';
-import { Calendar, LogIn, LogOut, RefreshCw, Check } from 'lucide-react';
+import { Calendar, LogIn, LogOut, RefreshCw, Check, Mail } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { format, subDays, parseISO } from 'date-fns';
 
@@ -20,7 +20,7 @@ function calcDurationHours(event) {
 const HAS_CLIENT_ID = !!import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 export default function Integrations() {
-  const { googleToken, setGoogleToken, logout } = useGoogleAuth();
+  const { googleToken, setGoogleToken, logout, gmailToken, setGmailToken, gmailLogout } = useGoogleAuth();
   const { customers, addPoint } = useAppStore();
 
   const [dateFrom, setDateFrom] = useState(toDateInput(subDays(new Date(), 7)));
@@ -42,6 +42,12 @@ export default function Integrations() {
     onSuccess: (res) => setGoogleToken(res.access_token),
     onError:   ()    => setFetchError('Google login failed. Please try again.'),
     scope: 'https://www.googleapis.com/auth/calendar.readonly',
+  });
+
+  const gmailLogin = useGoogleLogin({
+    onSuccess: (res) => setGmailToken(res.access_token),
+    onError:   ()    => console.warn('Gmail login failed'),
+    scope: 'https://www.googleapis.com/auth/gmail.readonly',
   });
 
   const fetchEvents = useCallback(async () => {
@@ -358,6 +364,76 @@ export default function Integrations() {
                 </div>
               </>
             )}
+          </div>
+        )}
+      </div>
+
+      {/* Gmail card */}
+      <div className="rounded-2xl border border-border bg-card overflow-hidden">
+
+        {/* Card header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-red-500/10 flex items-center justify-center flex-shrink-0">
+              <Mail size={18} className="text-red-500" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-foreground">Gmail</p>
+              <p className="text-xs text-muted-foreground">
+                {gmailToken ? 'Connected — used by Weekly Report to reference sent emails' : 'Not connected'}
+              </p>
+            </div>
+          </div>
+          {gmailToken ? (
+            <button
+              onClick={gmailLogout}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <LogOut size={13} />
+              Disconnect
+            </button>
+          ) : (
+            <Button size="sm" onClick={() => gmailLogin()} disabled={!HAS_CLIENT_ID}>
+              <LogIn size={14} className="mr-1.5" />
+              Connect
+            </Button>
+          )}
+        </div>
+
+        {/* Setup warning — shown when no client ID is configured */}
+        {!HAS_CLIENT_ID && (
+          <div className="px-5 py-3 bg-amber-500/10 border-b border-amber-500/20">
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              <strong>Setup required:</strong> Add{' '}
+              <code className="bg-amber-500/10 px-1 rounded font-mono">VITE_GOOGLE_CLIENT_ID</code>{' '}
+              to your Vercel environment variables, then redeploy.
+            </p>
+          </div>
+        )}
+
+        {/* Body */}
+        {!gmailToken && HAS_CLIENT_ID && (
+          <div className="px-5 py-10 text-center">
+            <Mail size={32} className="text-muted-foreground/30 mx-auto mb-3" />
+            <p className="text-sm text-muted-foreground mb-4 max-w-sm mx-auto">
+              Connect Gmail to let the Weekly Report reference your sent emails when generating the weekly status email.
+            </p>
+            <p className="text-xs text-muted-foreground/60 mb-4 max-w-sm mx-auto">
+              Only subject lines are read — email bodies are never accessed.
+            </p>
+            <Button onClick={() => gmailLogin()} size="sm">
+              <LogIn size={14} className="mr-1.5" />
+              Connect Gmail
+            </Button>
+          </div>
+        )}
+
+        {gmailToken && (
+          <div className="px-5 py-4">
+            <div className="flex items-center gap-2 text-sm text-brand-sage">
+              <Check size={14} />
+              Gmail connected. Go to <strong>Weekly Report</strong> to generate your weekly email.
+            </div>
           </div>
         )}
       </div>
