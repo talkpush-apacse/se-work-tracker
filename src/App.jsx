@@ -42,7 +42,7 @@ function AppContent() {
       <Navigation activeTab={activeTab} onTabChange={handleTabChange} />
 
       {/* Main content — offset matches sidebar: icon-only (md:w-16) at md, full (lg:w-56) at lg */}
-      <main className="md:ml-16 lg:ml-56 pt-16 md:pt-0">
+      <main className="md:ml-16 lg:ml-56 pt-16 mt-safe md:pt-0">
         <div className="max-w-6xl mx-auto px-4 py-6">
           {/* TimerWidget is global — appears on all tabs while a timer is running */}
           <TimerWidget />

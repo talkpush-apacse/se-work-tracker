@@ -150,6 +150,13 @@
   .brand-gradient-strip {
     background: linear-gradient(to right, #F2B457, #F1C1F3, #BBCAF0, #ACCDB5);
   }
+
+  /* iOS PWA safe area utilities */
+  .pt-safe { padding-top: env(safe-area-inset-top); }
+  .pr-safe { padding-right: env(safe-area-inset-right); }
+  .pl-safe { padding-left: env(safe-area-inset-left); }
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+  .mt-safe { margin-top: env(safe-area-inset-top); }
 }
 
 /* ─────────────────────────────────────────────

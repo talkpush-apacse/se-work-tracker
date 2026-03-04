@@ -150,7 +150,7 @@ export default function Navigation({ activeTab, onTabChange }) {
       </aside>
 
       {/* ── Mobile top bar ── */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-sidebar border-b border-sidebar-border flex items-center justify-between px-4 py-3">
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-sidebar border-b border-sidebar-border flex items-center justify-between px-4 py-3 pt-safe pr-safe pl-safe">
         <button
           onClick={() => { onTabChange('dashboard'); setMenuOpen(false); }}
           className="flex items-center gap-2"
@@ -184,7 +184,8 @@ export default function Navigation({ activeTab, onTabChange }) {
             onClick={() => setMenuOpen(false)}
           >
             <motion.div
-              className="absolute top-14 left-0 right-0 bg-sidebar border-b border-sidebar-border p-3 space-y-1"
+              className="absolute left-0 right-0 bg-sidebar border-b border-sidebar-border p-3 pr-safe pl-safe space-y-1"
+              style={{ top: 'calc(3.5rem + env(safe-area-inset-top, 0px))' }}
               initial={{ y: -8, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: -8, opacity: 0 }}
