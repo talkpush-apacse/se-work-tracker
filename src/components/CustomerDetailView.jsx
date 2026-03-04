@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import {
-  ArrowLeft, Plus, ChevronLeft, ChevronRight,
+  ArrowLeft, Plus, ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
   Pencil, Trash2, Flag, CheckCircle2, Circle, Ban,
   ClipboardList, Calendar, Check, Clock,
 } from 'lucide-react';
@@ -115,6 +115,7 @@ function MilestoneForm({ initial = {}, onSubmit, onCancel }) {
 function TasksTab({ tasks, addTask, customerId, okrs }) {
   const [subTab, setSubTab] = useState('active');
   const [showAddForm, setShowAddForm] = useState(false);
+  const [expandedTaskId, setExpandedTaskId] = useState(null);
   const [taskForm, setTaskForm] = useState({
     description: '', taskType: 'comms', status: 'open', assigneeOrTeam: '', okrId: '',
   });
@@ -258,39 +259,72 @@ function TasksTab({ tasks, addTask, customerId, okrs }) {
       ) : (
         <div className="space-y-2">
           {display.map(task => {
-            const typeColor  = TASK_TYPE_COLORS[task.taskType]   || {};
+            const typeColor   = TASK_TYPE_COLORS[task.taskType]  || {};
             const statusColor = TASK_STATUS_COLORS[task.status]  || {};
+            const isExpanded  = expandedTaskId === task.id;
+            const linkedOkr   = task.okrId ? (okrs || []).find(o => o.id === task.okrId) : null;
             return (
               <div
                 key={task.id}
-                className="bg-card border border-border rounded-xl px-4 py-3 flex items-start gap-3"
+                className="bg-card border border-border rounded-xl overflow-hidden"
               >
-                {/* Task type badge */}
-                <span className={`flex-shrink-0 mt-0.5 border rounded-full px-2 py-0.5 text-[10px] font-bold leading-tight ${typeColor.bg || 'bg-gray-500/15'} ${typeColor.text || 'text-gray-400'} ${typeColor.border || 'border-gray-500/20'}`}>
-                  {TASK_TYPE_LABELS[task.taskType] || task.taskType}
-                </span>
+                {/* Main row */}
+                <div className="px-4 py-3 flex items-start gap-3">
+                  {/* Task type badge */}
+                  <span className={`flex-shrink-0 mt-0.5 border rounded-full px-2 py-0.5 text-[10px] font-bold leading-tight ${typeColor.bg || 'bg-gray-500/15'} ${typeColor.text || 'text-gray-400'} ${typeColor.border || 'border-gray-500/20'}`}>
+                    {TASK_TYPE_LABELS[task.taskType] || task.taskType}
+                  </span>
 
-                {/* Description + date */}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-foreground leading-snug">{task.description}</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">
-                    {subTab === 'closed'
-                      ? `Closed ${formatDate(task.closedAt || task.createdAt)}`
-                      : `Added ${formatDate(task.createdAt)}`
-                    }
-                  </p>
+                  {/* Description + date */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-foreground leading-snug">{task.description}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      {subTab === 'closed'
+                        ? `Closed ${formatDate(task.closedAt || task.createdAt)}`
+                        : `Added ${formatDate(task.createdAt)}`
+                      }
+                    </p>
+                  </div>
+
+                  {/* Status badge */}
+                  <span className={`flex-shrink-0 border rounded-full px-2 py-0.5 text-[10px] font-bold leading-tight ${statusColor.bg || 'bg-gray-500/15'} ${statusColor.text || 'text-gray-400'} ${statusColor.border || 'border-gray-500/20'}`}>
+                    {TASK_STATUS_LABELS[task.status] || task.status}
+                  </span>
+
+                  {/* Points */}
+                  {task.points > 0 && (
+                    <span className="flex-shrink-0 text-xs font-bold text-brand-lavender whitespace-nowrap">
+                      {task.points} pt
+                    </span>
+                  )}
+
+                  {/* Expand toggle */}
+                  <button
+                    onClick={() => setExpandedTaskId(isExpanded ? null : task.id)}
+                    className="flex-shrink-0 mt-0.5 p-0.5 rounded text-muted-foreground/60 hover:text-foreground transition-colors"
+                    title={isExpanded ? 'Collapse' : 'Show details'}
+                  >
+                    {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                  </button>
                 </div>
 
-                {/* Status badge */}
-                <span className={`flex-shrink-0 border rounded-full px-2 py-0.5 text-[10px] font-bold leading-tight ${statusColor.bg || 'bg-gray-500/15'} ${statusColor.text || 'text-gray-400'} ${statusColor.border || 'border-gray-500/20'}`}>
-                  {TASK_STATUS_LABELS[task.status] || task.status}
-                </span>
-
-                {/* Points */}
-                {task.points > 0 && (
-                  <span className="flex-shrink-0 text-xs font-bold text-brand-lavender whitespace-nowrap">
-                    {task.points} pt
-                  </span>
+                {/* Expandable detail panel */}
+                {isExpanded && (
+                  <div className="border-t border-border/50 bg-secondary/20 px-4 py-3 space-y-1.5 text-xs text-muted-foreground">
+                    {task.assigneeOrTeam && (
+                      <p><span className="font-medium text-foreground/70">Assignee:</span> {task.assigneeOrTeam}</p>
+                    )}
+                    {task.interactionType && (
+                      <p><span className="font-medium text-foreground/70">Interaction:</span> {TASK_INTERACTION_TYPE_LABELS[task.interactionType] || task.interactionType}</p>
+                    )}
+                    {linkedOkr && (
+                      <p><span className="font-medium text-foreground/70">OKR:</span> {linkedOkr.quarter} — {linkedOkr.title}</p>
+                    )}
+                    <p><span className="font-medium text-foreground/70">Added:</span> {formatDate(task.createdAt)}</p>
+                    {task.closedAt && (
+                      <p><span className="font-medium text-foreground/70">Closed:</span> {formatDate(task.closedAt)}</p>
+                    )}
+                  </div>
                 )}
               </div>
             );
@@ -916,6 +950,10 @@ export default function CustomerDetailView({ customer, onBack }) {
     () => points.filter(p => p.customerId === customer.id).reduce((s, p) => s + p.points, 0),
     [points, customer.id]
   );
+  const totalHours = useMemo(
+    () => points.filter(p => p.customerId === customer.id).reduce((s, p) => s + (p.hours || 0), 0),
+    [points, customer.id]
+  );
   const openTasks   = customerTasks.filter(t => !['done', 'archived'].includes(t.status)).length;
   const closedTasks = customerTasks.filter(t =>  ['done', 'archived'].includes(t.status)).length;
 
@@ -960,8 +998,18 @@ export default function CustomerDetailView({ customer, onBack }) {
                 <span className="text-xs text-muted-foreground ml-1">closed</span>
               </div>
               <div>
+                <span className="text-lg font-bold text-foreground">{totalHours.toFixed(1)}</span>
+                <span className="text-xs text-muted-foreground ml-1">hrs logged</span>
+              </div>
+              <div className="relative group/pts">
                 <span className="text-lg font-bold text-foreground">{Number(totalPoints).toFixed(1)}</span>
                 <span className="text-xs text-muted-foreground ml-1">pts earned</span>
+                <span className="ml-1 text-[10px] text-muted-foreground/50 cursor-help select-none">(?)</span>
+                {/* Tooltip */}
+                <div className="absolute bottom-full left-0 mb-2 hidden group-hover/pts:block z-20 w-56 bg-popover border border-border rounded-lg px-3 py-2 text-xs text-muted-foreground shadow-xl pointer-events-none">
+                  ~{AUTO_TRACK_RATE.toFixed(1)} pts per hour logged<br />
+                  <span className="text-muted-foreground/60">(2,150 pts ÷ 160 hrs/month target)</span>
+                </div>
               </div>
               <div>
                 <span className="text-lg font-bold text-brand-amber">{customerMilestones.length}</span>
@@ -970,10 +1018,9 @@ export default function CustomerDetailView({ customer, onBack }) {
             </div>
           </div>
 
-          {/* Log Hours CTA */}
+          {/* Log Hours CTA — primary */}
           <Button
             size="sm"
-            variant="secondary"
             onClick={() => setShowLogHoursModal(true)}
             className="flex-shrink-0 self-end"
           >

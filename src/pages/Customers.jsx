@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, Users, ListPlus, Pin, PinOff, GripVertical, ChevronRight } from 'lucide-react';
+import { Plus, Pencil, Trash2, Users, ListPlus, Star, GripVertical, ChevronRight, Search } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -95,15 +95,17 @@ function SortableCustomerRow({ customer, taskCount, totalPoints, totalHours, tas
           : 'bg-card border border-border'
       } ${isDragging ? 'shadow-2xl shadow-black/40 z-10' : ''}`}
     >
-      {/* Colored left border stripe */}
+      {/* Entire row is clickable — opens detail view */}
       <div
-        className="flex items-center gap-3 p-4"
+        className="flex items-center gap-3 p-4 cursor-pointer group"
         style={{ borderLeft: `4px solid ${customer.color}`, borderRadius: 'inherit' }}
+        onClick={() => onView(customer)}
       >
-        {/* Drag grip */}
+        {/* Drag grip — stop propagation so drag doesn't navigate */}
         <button
           {...attributes}
           {...listeners}
+          onClick={e => e.stopPropagation()}
           className="cursor-grab active:cursor-grabbing text-muted-foreground/70 hover:text-muted-foreground transition-colors flex-shrink-0 touch-none"
           title="Drag to reorder"
           aria-label="Drag to reorder"
@@ -111,26 +113,21 @@ function SortableCustomerRow({ customer, taskCount, totalPoints, totalHours, tas
           <GripVertical size={16} />
         </button>
 
-        {/* Customer avatar — clickable, opens detail view */}
-        <button
-          onClick={() => onView(customer)}
-          className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center text-foreground font-bold text-sm hover:opacity-80 transition-opacity"
+        {/* Customer avatar */}
+        <div
+          className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center font-bold text-sm"
           style={{ backgroundColor: customer.color + '22', color: customer.color }}
-          title={`View ${customer.name}`}
         >
           {customer.name.slice(0, 2).toUpperCase()}
-        </button>
+        </div>
 
-        {/* Name + date — clickable, opens detail view */}
-        <button
-          onClick={() => onView(customer)}
-          className="flex-1 min-w-0 text-left group"
-        >
+        {/* Name + date */}
+        <div className="flex-1 min-w-0 text-left">
           <p className="font-semibold text-foreground truncate group-hover:text-brand-lavender transition-colors">
             {customer.name}
           </p>
           <p className="text-xs text-muted-foreground">Added: {formatDate(customer.createdAt)}</p>
-        </button>
+        </div>
 
         {/* Stats */}
         <div className="hidden sm:flex items-center gap-4 flex-shrink-0 text-center">
@@ -154,29 +151,23 @@ function SortableCustomerRow({ customer, taskCount, totalPoints, totalHours, tas
           )}
         </div>
 
-        {/* Action buttons */}
+        {/* Action buttons — all stop propagation to prevent row click */}
         <div className="flex gap-1 items-center flex-shrink-0 ml-2">
           <button
-            onClick={() => onPin(customer.id, !customer.pinned)}
-            title={customer.pinned ? 'Unpin customer' : 'Pin to top'}
+            onClick={(e) => { e.stopPropagation(); onPin(customer.id, !customer.pinned); }}
+            title={customer.pinned ? 'Remove from priority' : 'Mark as priority'}
             className={`p-1.5 rounded-lg transition-colors ${
               customer.pinned
-                ? 'text-brand-amber hover:text-amber-300 hover:bg-amber-900/40'
-                : 'text-muted-foreground hover:text-brand-amber hover:bg-secondary'
+                ? 'text-amber-400 hover:text-amber-300 hover:bg-amber-900/40'
+                : 'text-muted-foreground hover:text-amber-400 hover:bg-secondary'
             }`}
           >
-            {customer.pinned ? <PinOff size={13} /> : <Pin size={13} />}
+            <Star size={13} className={customer.pinned ? 'fill-amber-400' : ''} />
           </button>
-          <button onClick={() => onEdit(customer)}  className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground   hover:bg-secondary transition-colors"><Pencil     size={13} /></button>
-          <button onClick={() => onDelete(customer)} className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-secondary transition-colors"><Trash2     size={13} /></button>
-          {/* Open detail view */}
-          <button
-            onClick={() => onView(customer)}
-            title="View customer details"
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-brand-lavender hover:bg-secondary transition-colors"
-          >
-            <ChevronRight size={14} />
-          </button>
+          <button onClick={(e) => { e.stopPropagation(); onEdit(customer); }}   className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"><Pencil size={13} /></button>
+          <button onClick={(e) => { e.stopPropagation(); onDelete(customer); }} className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-secondary transition-colors"><Trash2 size={13} /></button>
+          {/* Visual chevron — row click handles navigation */}
+          <ChevronRight size={14} className="text-muted-foreground/40 ml-1 flex-shrink-0" />
         </div>
       </div>
     </div>
@@ -190,15 +181,17 @@ export default function Customers() {
   const [bulkModal,   setBulkModal]   = useState(false);
   const [editTarget,   setEditTarget]   = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [search, setSearch] = useState('');
 
   // Customer detail view state
   const [selectedCustomer, setSelectedCustomer] = useState(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
-  // Split into pinned / unpinned while preserving store order within each group
-  const pinnedCustomers   = customers.filter(c => !!c.pinned);
-  const unpinnedCustomers = customers.filter(c => !c.pinned);
+  // Split into pinned / unpinned, filtered by search
+  const searchLower = search.trim().toLowerCase();
+  const pinnedCustomers   = customers.filter(c => !!c.pinned  && (!searchLower || c.name.toLowerCase().includes(searchLower)));
+  const unpinnedCustomers = customers.filter(c => !c.pinned  && (!searchLower || c.name.toLowerCase().includes(searchLower)));
 
   const handlePin = (id, value) => updateCustomer(id, { pinned: value });
 
@@ -299,11 +292,27 @@ export default function Customers() {
         </div>
       ) : (
         <div className="space-y-6">
+          {/* Search / filter */}
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/60 pointer-events-none" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search customers…"
+              className="w-full bg-card border border-border rounded-xl pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+            />
+          </div>
+
+          {/* No results */}
+          {searchLower && pinnedCustomers.length === 0 && unpinnedCustomers.length === 0 && (
+            <p className="text-center text-sm text-muted-foreground py-8">No customers match "{search}"</p>
+          )}
+
           {/* Priority section */}
           {pinnedCustomers.length > 0 && (
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <Pin size={13} className="text-brand-amber" />
+                <Star size={13} className="fill-amber-400 text-amber-400" />
                 <span className="text-sm font-semibold text-amber-300">Priority</span>
                 <span className="text-xs text-muted-foreground/70">({pinnedCustomers.length})</span>
               </div>
