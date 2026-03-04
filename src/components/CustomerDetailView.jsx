@@ -111,8 +111,12 @@ function MilestoneForm({ initial = {}, onSubmit, onCancel }) {
 }
 
 // ── Tasks tab ─────────────────────────────────────────────────────────────────
-function TasksTab({ tasks }) {
+function TasksTab({ tasks, addTask, customerId, okrs }) {
   const [subTab, setSubTab] = useState('active');
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [taskForm, setTaskForm] = useState({
+    description: '', taskType: 'comms', status: 'open', assigneeOrTeam: '', okrId: '',
+  });
 
   const activeTasks = useMemo(
     () => [...tasks]
@@ -130,8 +134,95 @@ function TasksTab({ tasks }) {
 
   const display = subTab === 'active' ? activeTasks : closedTasks;
 
+  const handleAddTask = (e) => {
+    e.preventDefault();
+    if (!taskForm.description.trim() || !addTask) return;
+    addTask({
+      customerId,
+      description:    taskForm.description.trim(),
+      taskType:       taskForm.taskType,
+      status:         taskForm.status,
+      assigneeOrTeam: taskForm.assigneeOrTeam.trim() || undefined,
+      okrId:          taskForm.okrId || undefined,
+    });
+    setTaskForm({ description: '', taskType: 'comms', status: 'open', assigneeOrTeam: '', okrId: '' });
+    setShowAddForm(false);
+  };
+
   return (
     <div>
+      {/* Add Task button / inline form */}
+      <div className="mb-4">
+        {!showAddForm ? (
+          <Button size="sm" variant="outline" onClick={() => setShowAddForm(true)} className="flex items-center gap-1.5">
+            <Plus size={13} /> Add Task
+          </Button>
+        ) : (
+          <form onSubmit={handleAddTask} className="rounded-xl border border-border bg-secondary/30 p-3 space-y-2">
+            <textarea
+              rows={2}
+              value={taskForm.description}
+              onChange={e => setTaskForm(p => ({ ...p, description: e.target.value }))}
+              placeholder="Task description *"
+              className="w-full rounded-lg border border-border bg-input px-2.5 py-1.5 text-xs resize-none text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+              autoFocus
+              required
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <select
+                value={taskForm.taskType}
+                onChange={e => setTaskForm(p => ({ ...p, taskType: e.target.value }))}
+                className="rounded-lg border border-border bg-input px-2 py-1.5 text-xs text-foreground focus:outline-none focus:border-ring"
+              >
+                {Object.entries(TASK_TYPE_LABELS).map(([v, l]) => (
+                  <option key={v} value={v}>{l}</option>
+                ))}
+              </select>
+              <select
+                value={taskForm.status}
+                onChange={e => setTaskForm(p => ({ ...p, status: e.target.value }))}
+                className="rounded-lg border border-border bg-input px-2 py-1.5 text-xs text-foreground focus:outline-none focus:border-ring"
+              >
+                {Object.entries(TASK_STATUS_LABELS).map(([v, l]) => (
+                  <option key={v} value={v}>{l}</option>
+                ))}
+              </select>
+            </div>
+            <input
+              type="text"
+              value={taskForm.assigneeOrTeam}
+              onChange={e => setTaskForm(p => ({ ...p, assigneeOrTeam: e.target.value }))}
+              placeholder="Assignee / Team (optional)"
+              className="w-full rounded-lg border border-border bg-input px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-ring"
+            />
+            <select
+              value={taskForm.okrId}
+              onChange={e => setTaskForm(p => ({ ...p, okrId: e.target.value }))}
+              className="w-full rounded-lg border border-border bg-input px-2 py-1.5 text-xs text-foreground focus:outline-none focus:border-ring"
+            >
+              <option value="">No OKR linked</option>
+              {(okrs || []).map(o => <option key={o.id} value={o.id}>{o.title}</option>)}
+            </select>
+            <div className="flex gap-2">
+              <Button type="submit" size="sm" disabled={!taskForm.description.trim()}>
+                Add Task
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setShowAddForm(false);
+                  setTaskForm({ description: '', taskType: 'comms', status: 'open', assigneeOrTeam: '', okrId: '' });
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
+        )}
+      </div>
+
       {/* Sub-tab switcher */}
       <div className="flex gap-1 bg-secondary/50 rounded-xl p-1 mb-4 w-fit">
         <button
@@ -989,7 +1080,7 @@ function LogHoursModal({ okrs, onSubmit, onCancel }) {
 // ── Main CustomerDetailView ───────────────────────────────────────────────────
 export default function CustomerDetailView({ customer, onBack }) {
   const {
-    tasks, milestones, points, addPoint, okrs,
+    tasks, milestones, points, addPoint, addTask, okrs,
     addMilestone, updateMilestone, deleteMilestone,
     annotations, updateAnnotation, deleteAnnotation,
     meetingVOUs, addMeetingVOU, updateMeetingVOU, deleteMeetingVOU,
@@ -1142,7 +1233,12 @@ export default function CustomerDetailView({ customer, onBack }) {
 
       {/* ── Tab content ── */}
       {activeTab === 'tasks' && (
-        <TasksTab tasks={customerTasks} />
+        <TasksTab
+          tasks={customerTasks}
+          addTask={addTask}
+          customerId={customer.id}
+          okrs={okrs}
+        />
       )}
 
       {activeTab === 'timeline' && (

@@ -25,6 +25,7 @@ import {
   AUTO_TRACK_RATE,
   AUTO_TRACK_MIN_SECONDS,
   ANNOTATION_TAGS, ANNOTATION_TAG_LABELS, ANNOTATION_TAG_COLORS,
+  WEEKLY_UPDATE_LOG_TYPES, WEEKLY_UPDATE_LOG_LABELS, WEEKLY_UPDATE_LOG_COLORS,
 } from '../constants';
 import Modal from '../components/Modal';
 import { stripHtml } from '../lib/utils';
@@ -1904,6 +1905,7 @@ export default function Triage() {
     meetingEntries, tasks, customers, updateTask, addTask, reorderTasks, addPoint, okrs,
     annotations, addAnnotation, updateAnnotation, deleteAnnotation,
     meetingVOUs, addMeetingVOU, updateMeetingVOU, deleteMeetingVOU,
+    weeklyUpdateLogs, addWeeklyUpdateLog, deleteWeeklyUpdateLog,
   } = useAppStore();
   const { isRunning, taskId: runningTaskId, startTimer, stopTimer } = useTimerContext();
   const [taskDetailId, setTaskDetailId] = useState(null);
@@ -1931,6 +1933,10 @@ export default function Triage() {
   const [deleteAnnotationTarget, setDeleteAnnotationTarget] = useState(null);
   const [filterAnnotationCustomer, setFilterAnnotationCustomer] = useState('');
   const [filterAnnotationTag, setFilterAnnotationTag] = useState('');
+
+  // Weekly Update Log section state
+  const [logForm, setLogForm] = useState({ type: 'highlight', text: '', customerId: '' });
+  const [logDeleteTarget, setLogDeleteTarget] = useState(null);
 
   // Meeting VOU section state
   const [showVouModal, setShowVouModal] = useState(false);
@@ -2159,6 +2165,18 @@ export default function Triage() {
     setAnnotationForm({ customerId: a.customerId, date: a.date, tag: a.tag, text: a.text });
     setAnnotationErrors({});
     setShowAnnotationForm(true);
+  };
+
+  // ─── Weekly Update Log handlers ───────────────────────────────────────────────
+  const handleAddLog = (e) => {
+    e.preventDefault();
+    if (!logForm.text.trim()) return;
+    addWeeklyUpdateLog({
+      type:       logForm.type,
+      text:       logForm.text.trim(),
+      customerId: logForm.customerId || undefined,
+    });
+    setLogForm({ type: 'highlight', text: '', customerId: '' });
   };
 
   const handleCancelAnnotation = () => {
@@ -2661,6 +2679,127 @@ export default function Triage() {
               />
             ))}
           </div>
+        )}
+      </div>
+
+      {/* ── Weekly Update Log Section ─────────────────────────────────────────── */}
+      <div>
+        {/* Section header */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Bookmark size={15} className="text-brand-lavender" />
+            <h2 className="text-sm font-semibold text-foreground">Weekly Update Log</h2>
+            <span className="text-[10px] text-muted-foreground/60">Highlights &amp; Lowlights</span>
+            {weeklyUpdateLogs.length > 0 && (
+              <span className="bg-brand-lavender/20 text-brand-lavender border border-brand-lavender/20 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                {weeklyUpdateLogs.length}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Add form */}
+        <form onSubmit={handleAddLog} className="bg-card border border-border rounded-2xl p-4 mb-3 space-y-3">
+          {/* Customer (optional) */}
+          <select
+            value={logForm.customerId}
+            onChange={e => setLogForm(p => ({ ...p, customerId: e.target.value }))}
+            className="w-full rounded-xl border border-border bg-input px-3 py-2 text-sm text-foreground"
+          >
+            <option value="">No specific customer</option>
+            {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+
+          {/* Type toggle (Highlight / Lowlight) */}
+          <div className="flex gap-2">
+            {WEEKLY_UPDATE_LOG_TYPES.map(type => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => setLogForm(p => ({ ...p, type }))}
+                className="flex-1 py-1.5 rounded-xl border text-xs font-medium transition-all"
+                style={logForm.type === type ? {
+                  backgroundColor: WEEKLY_UPDATE_LOG_COLORS[type] + '25',
+                  color: WEEKLY_UPDATE_LOG_COLORS[type],
+                  borderColor: WEEKLY_UPDATE_LOG_COLORS[type] + '60',
+                } : { borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}
+              >
+                {WEEKLY_UPDATE_LOG_LABELS[type]}
+              </button>
+            ))}
+          </div>
+
+          {/* Text */}
+          <textarea
+            rows={2}
+            value={logForm.text}
+            onChange={e => setLogForm(p => ({ ...p, text: e.target.value }))}
+            placeholder="What happened this week? (max 300 chars)"
+            maxLength={300}
+            className="w-full rounded-xl border border-border bg-input px-3 py-2 text-sm resize-none text-foreground placeholder:text-muted-foreground/50"
+          />
+
+          <button
+            type="submit"
+            disabled={!logForm.text.trim()}
+            className="px-4 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-medium disabled:opacity-40 hover:bg-primary/90 transition-all"
+          >
+            Add Log
+          </button>
+        </form>
+
+        {/* Log list — last 20, newest first */}
+        {weeklyUpdateLogs.length > 0 ? (
+          <div className="bg-card border border-border rounded-2xl px-4 py-1 space-y-0">
+            {[...weeklyUpdateLogs]
+              .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+              .slice(0, 20)
+              .map((log, idx, arr) => {
+                const customer = log.customerId ? customers.find(c => c.id === log.customerId) : null;
+                return (
+                  <div
+                    key={log.id}
+                    className={`flex items-start gap-2 py-3 ${idx < arr.length - 1 ? 'border-b border-border' : ''}`}
+                  >
+                    <span
+                      className="text-[10px] font-semibold px-2 py-0.5 rounded-lg flex-shrink-0 mt-0.5"
+                      style={{
+                        backgroundColor: WEEKLY_UPDATE_LOG_COLORS[log.type] + '20',
+                        color: WEEKLY_UPDATE_LOG_COLORS[log.type],
+                      }}
+                    >
+                      {WEEKLY_UPDATE_LOG_LABELS[log.type]}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-foreground leading-relaxed">{log.text}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        {log.date}{customer ? ` · ${customer.name}` : ''}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setLogDeleteTarget(log.id)}
+                      className="text-muted-foreground/40 hover:text-destructive transition-colors flex-shrink-0 mt-0.5"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                );
+              })}
+          </div>
+        ) : (
+          <div className="bg-card border border-border rounded-2xl p-6 text-center">
+            <p className="text-xs text-muted-foreground">No update logs yet. Add your first highlight or lowlight above.</p>
+          </div>
+        )}
+
+        {/* Confirm delete log */}
+        {logDeleteTarget && (
+          <ConfirmDialog
+            title="Delete log?"
+            message="This log entry will be permanently removed."
+            onConfirm={() => { deleteWeeklyUpdateLog(logDeleteTarget); setLogDeleteTarget(null); }}
+            onCancel={() => setLogDeleteTarget(null)}
+          />
         )}
       </div>
 

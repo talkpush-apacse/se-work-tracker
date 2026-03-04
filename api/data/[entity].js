@@ -11,6 +11,7 @@ const ALLOWED_ENTITIES = new Set([
   'aiOutputs', 'aiSettings',
   'annotations', 'meetingVOUs',   // were missing — bug fix
   'weeklyReports',                // new
+  'weeklyUpdateLogs',             // new
 ]);
 
 export default async function handler(req, res) {

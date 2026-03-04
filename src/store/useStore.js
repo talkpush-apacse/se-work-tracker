@@ -14,6 +14,7 @@ const KEYS = {
   annotations: 'gpt-annotations',
   meetingVOUs: 'gpt-meeting-vous',
   weeklyReports: 'gpt-weekly-reports',
+  weeklyUpdateLogs: 'gpt-weekly-update-logs',
 };
 
 const MIGRATION_FLAG = 'gpt-migrated-to-neon';
@@ -191,6 +192,7 @@ export function useStore() {
   const [annotations, setAnnotations] = useState(() => load(KEYS.annotations));
   const [meetingVOUs, setMeetingVOUs] = useState(() => load(KEYS.meetingVOUs));
   const [weeklyReports, setWeeklyReports] = useState(() => load(KEYS.weeklyReports));
+  const [weeklyUpdateLogs, setWeeklyUpdateLogs] = useState(() => load(KEYS.weeklyUpdateLogs));
   const [aiSettings, setAiSettings] = useState(() => {
     const stored = load(KEYS.aiSettings, null);
     if (!stored) return DEFAULT_AI_SETTINGS;
@@ -218,6 +220,7 @@ export function useStore() {
   useEffect(() => { save(KEYS.annotations, annotations); }, [annotations]);
   useEffect(() => { save(KEYS.meetingVOUs, meetingVOUs); }, [meetingVOUs]);
   useEffect(() => { save(KEYS.weeklyReports, weeklyReports); }, [weeklyReports]);
+  useEffect(() => { save(KEYS.weeklyUpdateLogs, weeklyUpdateLogs); }, [weeklyUpdateLogs]);
 
   // ─── Neon save effects (debounced, only after mount-fetch) ───
   useEffect(() => { if (mountedRef.current) debouncedSave('okrs', okrs); }, [okrs]);
@@ -231,9 +234,10 @@ export function useStore() {
   useEffect(() => { if (mountedRef.current) debouncedSave('annotations', annotations); }, [annotations]);
   useEffect(() => { if (mountedRef.current) debouncedSave('meetingVOUs', meetingVOUs); }, [meetingVOUs]);
   useEffect(() => { if (mountedRef.current) debouncedSave('weeklyReports', weeklyReports); }, [weeklyReports]);
+  useEffect(() => { if (mountedRef.current) debouncedSave('weeklyUpdateLogs', weeklyUpdateLogs); }, [weeklyUpdateLogs]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (mountedRef.current) setSyncStatus('saving'); }, [okrs, customers, points, meetingEntries, tasks, milestones, aiOutputs, aiSettings, annotations, meetingVOUs, weeklyReports]);
+  useEffect(() => { if (mountedRef.current) setSyncStatus('saving'); }, [okrs, customers, points, meetingEntries, tasks, milestones, aiOutputs, aiSettings, annotations, meetingVOUs, weeklyReports, weeklyUpdateLogs]);
 
   useEffect(() => {
     if (syncStatus === 'saving') {
@@ -294,6 +298,7 @@ export function useStore() {
         if (remote.annotations) setAnnotations(remote.annotations);
         if (remote.meetingVOUs) setMeetingVOUs(remote.meetingVOUs);
         if (remote.weeklyReports) setWeeklyReports(remote.weeklyReports);
+        if (remote.weeklyUpdateLogs) setWeeklyUpdateLogs(remote.weeklyUpdateLogs);
         if (remote.aiOutputs) setAiOutputs(remote.aiOutputs);
         if (remote.aiSettings && Object.keys(remote.aiSettings).length > 0) {
           setAiSettings(prev => ({
@@ -351,6 +356,7 @@ export function useStore() {
     setMilestones(prev => prev.filter(m => m.customerId !== id));
     setAnnotations(prev => prev.filter(a => a.customerId !== id));
     setMeetingVOUs(prev => prev.filter(v => v.customerId !== id));
+    setWeeklyUpdateLogs(prev => prev.filter(l => l.customerId !== id));
   }, []);
   const reorderCustomers = useCallback((orderedIds) => {
     setCustomers(prev => orderedIds.map(id => prev.find(c => c.id === id)).filter(Boolean));
@@ -484,6 +490,20 @@ export function useStore() {
     setWeeklyReports(prev => prev.filter(r => r.id !== id));
   }, []);
 
+  // ─── Weekly Update Log actions ───
+  // Shape: { id, createdAt, date (YYYY-MM-DD), type: 'highlight'|'lowlight', text, customerId? }
+  const addWeeklyUpdateLog = useCallback((data) => {
+    const log = { id: uid(), createdAt: new Date().toISOString(), date: new Date().toISOString().slice(0, 10), ...data };
+    setWeeklyUpdateLogs(prev => [...prev, log]);
+    return log;
+  }, []);
+  const updateWeeklyUpdateLog = useCallback((id, data) => {
+    setWeeklyUpdateLogs(prev => prev.map(l => l.id === id ? { ...l, ...data } : l));
+  }, []);
+  const deleteWeeklyUpdateLog = useCallback((id) => {
+    setWeeklyUpdateLogs(prev => prev.filter(l => l.id !== id));
+  }, []);
+
   // ─── AI output actions ───
   const addAiOutput = useCallback((data) => {
     const output = { id: uid(), createdAt: new Date().toISOString(), ...data };
@@ -558,7 +578,7 @@ export function useStore() {
 
   return {
     okrs, customers, points, meetingEntries, tasks, milestones, aiOutputs,
-    annotations, meetingVOUs, weeklyReports,
+    annotations, meetingVOUs, weeklyReports, weeklyUpdateLogs,
     addOkr, updateOkr, deleteOkr,
     addCustomer, updateCustomer, deleteCustomer, reorderCustomers,
     addPoint, deletePoint, updatePoint,
@@ -569,6 +589,7 @@ export function useStore() {
     addAnnotation, updateAnnotation, deleteAnnotation, getCustomerAnnotations,
     addMeetingVOU, updateMeetingVOU, deleteMeetingVOU, getCustomerMeetingVOUs,
     addWeeklyReport, updateWeeklyReport, deleteWeeklyReport,
+    addWeeklyUpdateLog, updateWeeklyUpdateLog, deleteWeeklyUpdateLog,
     addAiOutput, getTaskAiOutputs, updateAiOutput,
     aiSettings, updateAiSettings,
     exportData, importData,

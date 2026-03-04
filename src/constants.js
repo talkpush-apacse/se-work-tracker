@@ -111,6 +111,14 @@ export const ANNOTATION_TAG_COLORS = {
   learning: '#f59e0b',  // amber yellow
 };
 
+// ─── Weekly Update Log ────────────────────────────────────────────────────────
+export const WEEKLY_UPDATE_LOG_TYPES = ['highlight', 'lowlight'];
+export const WEEKLY_UPDATE_LOG_LABELS = { highlight: 'Highlight', lowlight: 'Lowlight' };
+export const WEEKLY_UPDATE_LOG_COLORS = {
+  highlight: '#10b981',  // emerald green (positive)
+  lowlight:  '#f43f5e',  // rose red (negative)
+};
+
 // ─── Weekly Email Generator ───────────────────────────────────────────────────
 export const WEEKLY_REPORT_DEFAULT_PROMPT = `You are a Solutions Engineer at Talkpush, a hiring tech SaaS company. You support enterprise BPO clients like TaskUs, Inspiro, Accenture, Alorica, and Afni. Your manager and stakeholders expect a clear, concise, and professional weekly status email every Friday.
 

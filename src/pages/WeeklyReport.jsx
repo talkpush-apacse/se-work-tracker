@@ -7,7 +7,7 @@ import { format, addWeeks, parseISO } from 'date-fns';
 import { useAppStore } from '../context/StoreContext';
 import { useGoogleAuth } from '../context/GoogleAuthContext';
 import { getThisWeekRange, filterPointsByRange, isInRange } from '../utils/dateHelpers';
-import { WEEKLY_REPORT_DEFAULT_PROMPT } from '../constants';
+import { WEEKLY_REPORT_DEFAULT_PROMPT, WEEKLY_UPDATE_LOG_COLORS, WEEKLY_UPDATE_LOG_LABELS } from '../constants';
 import { Button } from '../components/ui/button';
 import ConfirmDialog from '../components/ConfirmDialog';
 
@@ -29,7 +29,7 @@ function formatWeekLabel(weekStart, weekEnd) {
   return `${format(weekStart, 'MMM d')} – ${format(weekEnd, 'MMM d, yyyy')}`;
 }
 
-function buildWeekContext({ weekStart, weekEnd, points, tasks, customers, okrs, annotations, meetingVOUs, calendarEvents, gmailEmails }) {
+function buildWeekContext({ weekStart, weekEnd, points, tasks, customers, okrs, annotations, meetingVOUs, weeklyUpdateLogs, calendarEvents, gmailEmails }) {
   const weekLabel = formatWeekLabel(weekStart, weekEnd);
   const lines = [];
 
@@ -130,6 +130,32 @@ function buildWeekContext({ weekStart, weekEnd, points, tasks, customers, okrs, 
     lines.push('');
   }
 
+  // ── Weekly Highlights & Lowlights ──
+  const weekLogs = (weeklyUpdateLogs || []).filter(l => {
+    try { return isInRange(parseISO(l.date + 'T00:00:00'), weekStart, weekEnd); }
+    catch { return false; }
+  });
+  if (weekLogs.length > 0) {
+    const highlights = weekLogs.filter(l => l.type === 'highlight');
+    const lowlights  = weekLogs.filter(l => l.type === 'lowlight');
+    lines.push('### Weekly Highlights & Lowlights');
+    if (highlights.length > 0) {
+      lines.push('**Highlights:**');
+      highlights.forEach(l => {
+        const cName = l.customerId ? customerMap.get(l.customerId)?.name : null;
+        lines.push(`  - ${l.text}${cName ? ` [${cName}]` : ''}`);
+      });
+    }
+    if (lowlights.length > 0) {
+      lines.push('**Lowlights / Challenges:**');
+      lowlights.forEach(l => {
+        const cName = l.customerId ? customerMap.get(l.customerId)?.name : null;
+        lines.push(`  - ${l.text}${cName ? ` [${cName}]` : ''}`);
+      });
+    }
+    lines.push('');
+  }
+
   // ── Open action items ──
   const openVOUs = meetingVOUs.filter(v => !v.resolved).slice(0, 15);
   if (openVOUs.length > 0) {
@@ -212,7 +238,7 @@ async function fetchGmailSent(gmailToken, weekStart, weekEnd) {
 
 export default function WeeklyReport({ onNavigate }) {
   const {
-    points, tasks, customers, okrs, annotations, meetingVOUs,
+    points, tasks, customers, okrs, annotations, meetingVOUs, weeklyUpdateLogs,
     weeklyReports, addWeeklyReport, deleteWeeklyReport,
     aiSettings, updateAiSettings,
   } = useAppStore();
@@ -244,6 +270,15 @@ export default function WeeklyReport({ onNavigate }) {
     [tasks, weekStart, weekEnd]
   );
 
+  // Weekly update logs for the selected week
+  const weekLogs = useMemo(
+    () => (weeklyUpdateLogs || []).filter(l => {
+      try { return isInRange(parseISO(l.date + 'T00:00:00'), weekStart, weekEnd); }
+      catch { return false; }
+    }),
+    [weeklyUpdateLogs, weekStart, weekEnd]
+  );
+
   const handleGenerate = useCallback(async () => {
     setIsGenerating(true);
     setGenError(null);
@@ -263,7 +298,7 @@ export default function WeeklyReport({ onNavigate }) {
 
     const context = buildWeekContext({
       weekStart, weekEnd, points, tasks, customers, okrs,
-      annotations, meetingVOUs, calendarEvents, gmailEmails,
+      annotations, meetingVOUs, weeklyUpdateLogs, calendarEvents, gmailEmails,
     });
 
     const systemPrompt = localPrompt.trim() || aiSettings.prompts?.weeklyEmail?.trim() || WEEKLY_REPORT_DEFAULT_PROMPT;
@@ -329,7 +364,7 @@ export default function WeeklyReport({ onNavigate }) {
     } finally {
       setIsGenerating(false);
     }
-  }, [provider, weekStart, weekEnd, points, tasks, customers, okrs, annotations, meetingVOUs, googleToken, gmailToken, localPrompt, aiSettings]);
+  }, [provider, weekStart, weekEnd, points, tasks, customers, okrs, annotations, meetingVOUs, weeklyUpdateLogs, googleToken, gmailToken, localPrompt, aiSettings]);
 
   const handleSave = useCallback(() => {
     const model = provider === 'claude'
@@ -433,6 +468,38 @@ export default function WeeklyReport({ onNavigate }) {
           onConnect={() => onNavigate('integrations')}
         />
       </div>
+
+      {/* ── B2: Weekly Highlights & Lowlights ── */}
+      {weekLogs.length > 0 && (
+        <div className="rounded-2xl border border-border bg-card px-5 py-4 space-y-3">
+          <h3 className="text-sm font-semibold text-foreground">
+            Highlights &amp; Lowlights this week
+            <span className="ml-2 text-xs font-normal text-muted-foreground">{weekLogs.length} logged</span>
+          </h3>
+          <div className="space-y-2 max-h-56 overflow-y-auto">
+            {weekLogs.map(log => {
+              const customer = log.customerId ? customers.find(c => c.id === log.customerId) : null;
+              return (
+                <div key={log.id} className="flex items-start gap-2">
+                  <span
+                    className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md flex-shrink-0 mt-0.5"
+                    style={{
+                      backgroundColor: WEEKLY_UPDATE_LOG_COLORS[log.type] + '20',
+                      color: WEEKLY_UPDATE_LOG_COLORS[log.type],
+                    }}
+                  >
+                    {WEEKLY_UPDATE_LOG_LABELS[log.type]}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-xs text-foreground leading-relaxed">{log.text}</p>
+                    {customer && <p className="text-[10px] text-muted-foreground">{customer.name}</p>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── C: Generate ── */}
       <div className="rounded-2xl border border-border bg-card px-5 py-4 space-y-3">
