@@ -42,15 +42,17 @@ function buildWeekContext({ weekStart, weekEnd, points, tasks, customers, okrs, 
   const totalHrs = Math.round(weekPoints.reduce((s, p) => s + (p.hours || 0), 0) * 100) / 100;
   const activeCustomerIds = [...new Set(weekPoints.map(p => p.customerId).filter(Boolean))];
   const weekTasks = tasks.filter(t => {
-    if (!t.closedAt) return false;
-    return isInRange(t.closedAt, weekStart, weekEnd);
+    if (!['done', 'archived'].includes(t.status)) return false;
+    const ts = t.closedAt || t.createdAt;
+    if (!ts) return false;
+    return isInRange(ts, weekStart, weekEnd);
   });
 
   lines.push('### Overview');
   lines.push(`- Total points logged: ${totalPts}`);
   lines.push(`- Total hours: ${totalHrs}h`);
   lines.push(`- Active customers: ${activeCustomerIds.length}`);
-  lines.push(`- Tasks completed: ${weekTasks.filter(t => t.status === 'done').length}`);
+  lines.push(`- Tasks completed: ${weekTasks.length}`);
   lines.push('');
 
   // ── Customer breakdown ──
@@ -79,9 +81,9 @@ function buildWeekContext({ weekStart, weekEnd, points, tasks, customers, okrs, 
 
   if (weekTasks.length > 0 || inProgressTasks.length > 0 || blockedTasks.length > 0) {
     lines.push('### Tasks This Week');
-    if (weekTasks.filter(t => t.status === 'done').length > 0) {
+    if (weekTasks.length > 0) {
       lines.push('**Completed:**');
-      weekTasks.filter(t => t.status === 'done').forEach(t => {
+      weekTasks.forEach(t => {
         const cName = customerMap.get(t.customerId)?.name || 'General';
         lines.push(`  - [${cName}] ${t.description}`);
       });
@@ -254,7 +256,11 @@ export default function WeeklyReport({ onNavigate }) {
   const totalHrs   = useMemo(() => Math.round(weekPoints.reduce((s, p) => s + (p.hours || 0), 0) * 100) / 100, [weekPoints]);
   const activeCustomers = useMemo(() => new Set(weekPoints.map(p => p.customerId).filter(Boolean)).size, [weekPoints]);
   const doneTasks = useMemo(
-    () => tasks.filter(t => t.status === 'done' && t.closedAt && isInRange(t.closedAt, weekStart, weekEnd)).length,
+    () => tasks.filter(t => {
+      if (!['done', 'archived'].includes(t.status)) return false;
+      const ts = t.closedAt || t.createdAt;
+      return ts && isInRange(ts, weekStart, weekEnd);
+    }).length,
     [tasks, weekStart, weekEnd]
   );
 
