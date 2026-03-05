@@ -7,7 +7,11 @@ import { format, addWeeks, parseISO } from 'date-fns';
 import { useAppStore } from '../context/StoreContext';
 import { useGoogleAuth } from '../context/GoogleAuthContext';
 import { getThisWeekRange, filterPointsByRange, isInRange } from '../utils/dateHelpers';
-import { WEEKLY_REPORT_DEFAULT_PROMPT, WEEKLY_UPDATE_LOG_COLORS, WEEKLY_UPDATE_LOG_LABELS } from '../constants';
+import {
+  WEEKLY_REPORT_DEFAULT_PROMPT, WEEKLY_UPDATE_LOG_COLORS, WEEKLY_UPDATE_LOG_LABELS,
+  ANNOTATION_TAG_LABELS, ANNOTATION_TAG_COLORS,
+  MILESTONE_STATUS_LABELS, MILESTONE_STATUS_COLORS,
+} from '../constants';
 import { Button } from '../components/ui/button';
 import ConfirmDialog from '../components/ConfirmDialog';
 
@@ -29,7 +33,7 @@ function formatWeekLabel(weekStart, weekEnd) {
   return `${format(weekStart, 'MMM d')} – ${format(weekEnd, 'MMM d, yyyy')}`;
 }
 
-function buildWeekContext({ weekStart, weekEnd, points, tasks, customers, okrs, annotations, weeklyUpdateLogs, calendarEvents, gmailEmails }) {
+function buildWeekContext({ weekStart, weekEnd, points, tasks, customers, okrs, annotations, weeklyUpdateLogs, milestones, calendarEvents, gmailEmails }) {
   const weekLabel = formatWeekLabel(weekStart, weekEnd);
   const lines = [];
 
@@ -112,6 +116,21 @@ function buildWeekContext({ weekStart, weekEnd, points, tasks, customers, okrs, 
     lines.push('### OKR Progress');
     relevantOkrs.forEach(o => {
       lines.push(`  - ${o.title}${o.quarter ? ` [${o.quarter}]` : ''}`);
+    });
+    lines.push('');
+  }
+
+  // ── Milestones ──
+  const weekMilestonesCtx = (milestones || []).filter(m => {
+    if (!m.targetDate) return false;
+    try { return isInRange(parseISO(m.targetDate + 'T00:00:00'), weekStart, weekEnd); }
+    catch { return false; }
+  });
+  if (weekMilestonesCtx.length > 0) {
+    lines.push('### Milestones');
+    weekMilestonesCtx.forEach(m => {
+      const cName = customerMap.get(m.customerId)?.name;
+      lines.push(`  - [${m.status}]${cName ? ` [${cName}]` : ''} ${m.title} (target: ${m.targetDate})`);
     });
     lines.push('');
   }
@@ -228,7 +247,7 @@ async function fetchGmailSent(gmailToken, weekStart, weekEnd) {
 
 export default function WeeklyReport({ onNavigate }) {
   const {
-    points, tasks, customers, okrs, annotations, weeklyUpdateLogs,
+    points, tasks, customers, okrs, annotations, weeklyUpdateLogs, milestones,
     weeklyReports, addWeeklyReport, deleteWeeklyReport,
     aiSettings, updateAiSettings,
   } = useAppStore();
@@ -273,6 +292,25 @@ export default function WeeklyReport({ onNavigate }) {
     [weeklyUpdateLogs, weekStart, weekEnd]
   );
 
+  // Milestones whose targetDate falls in the selected week
+  const weekMilestones = useMemo(
+    () => (milestones || []).filter(m => {
+      if (!m.targetDate) return false;
+      try { return isInRange(parseISO(m.targetDate + 'T00:00:00'), weekStart, weekEnd); }
+      catch { return false; }
+    }),
+    [milestones, weekStart, weekEnd]
+  );
+
+  // Annotations (wins/learnings) logged during the selected week
+  const weekAnnotations = useMemo(
+    () => (annotations || []).filter(a => {
+      try { return isInRange(parseISO(a.date + 'T00:00:00'), weekStart, weekEnd); }
+      catch { return false; }
+    }),
+    [annotations, weekStart, weekEnd]
+  );
+
   const handleGenerate = useCallback(async () => {
     setIsGenerating(true);
     setGenError(null);
@@ -292,7 +330,7 @@ export default function WeeklyReport({ onNavigate }) {
 
     const context = buildWeekContext({
       weekStart, weekEnd, points, tasks, customers, okrs,
-      annotations, weeklyUpdateLogs, calendarEvents, gmailEmails,
+      annotations, weeklyUpdateLogs, milestones, calendarEvents, gmailEmails,
     });
 
     const systemPrompt = localPrompt.trim() || aiSettings.prompts?.weeklyEmail?.trim() || WEEKLY_REPORT_DEFAULT_PROMPT;
@@ -486,6 +524,70 @@ export default function WeeklyReport({ onNavigate }) {
                   </span>
                   <div className="min-w-0">
                     <p className="text-xs text-foreground leading-relaxed">{log.text}</p>
+                    {customer && <p className="text-[10px] text-muted-foreground">{customer.name}</p>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── B3: Milestones this week ── */}
+      {weekMilestones.length > 0 && (
+        <div className="rounded-2xl border border-border bg-card px-5 py-4 space-y-3">
+          <h3 className="text-sm font-semibold text-foreground">
+            Milestones this week
+            <span className="ml-2 text-xs font-normal text-muted-foreground">{weekMilestones.length} milestone{weekMilestones.length !== 1 ? 's' : ''}</span>
+          </h3>
+          <div className="space-y-2 max-h-56 overflow-y-auto">
+            {weekMilestones.map(m => {
+              const customer = m.customerId ? customers.find(c => c.id === m.customerId) : null;
+              return (
+                <div key={m.id} className="flex items-start gap-2">
+                  <span
+                    className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md flex-shrink-0 mt-0.5"
+                    style={{
+                      backgroundColor: (MILESTONE_STATUS_COLORS[m.status] || '#6b7280') + '20',
+                      color: MILESTONE_STATUS_COLORS[m.status] || '#6b7280',
+                    }}
+                  >
+                    {MILESTONE_STATUS_LABELS[m.status] || m.status}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-xs text-foreground leading-relaxed">{m.title}</p>
+                    {customer && <p className="text-[10px] text-muted-foreground">{customer.name}</p>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── B4: Wins & Learnings (annotations) this week ── */}
+      {weekAnnotations.length > 0 && (
+        <div className="rounded-2xl border border-border bg-card px-5 py-4 space-y-3">
+          <h3 className="text-sm font-semibold text-foreground">
+            Wins &amp; Learnings this week
+            <span className="ml-2 text-xs font-normal text-muted-foreground">{weekAnnotations.length} logged</span>
+          </h3>
+          <div className="space-y-2 max-h-56 overflow-y-auto">
+            {weekAnnotations.map(a => {
+              const customer = a.customerId ? customers.find(c => c.id === a.customerId) : null;
+              return (
+                <div key={a.id} className="flex items-start gap-2">
+                  <span
+                    className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md flex-shrink-0 mt-0.5"
+                    style={{
+                      backgroundColor: (ANNOTATION_TAG_COLORS[a.tag] || '#6b7280') + '20',
+                      color: ANNOTATION_TAG_COLORS[a.tag] || '#6b7280',
+                    }}
+                  >
+                    {ANNOTATION_TAG_LABELS[a.tag] || a.tag}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-xs text-foreground leading-relaxed">{a.text}</p>
                     {customer && <p className="text-[10px] text-muted-foreground">{customer.name}</p>}
                   </div>
                 </div>
