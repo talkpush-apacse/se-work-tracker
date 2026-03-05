@@ -737,13 +737,16 @@ const AIWorkspace = memo(function AIWorkspace({ task, customer }) {
         formData.append('file', audioBlob, 'recording.webm');
         formData.append('model', 'whisper-1');
 
-        const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+        const res = await fetch('/api/transcribe', {
           method: 'POST',
-          headers: { Authorization: `Bearer ${import.meta.env.VITE_OPENAI_API_KEY}` },
+          headers: { Authorization: `Bearer ${import.meta.env.VITE_API_SECRET}` },
           body: formData,
         });
 
-        if (!res.ok) throw new Error(`Whisper error ${res.status}`);
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => ({}));
+          throw new Error(errBody.error || `Transcription failed (${res.status})`);
+        }
         const data = await res.json();
         setUserInput(prev => prev ? `${prev} ${data.text}` : data.text);
       } catch (err) {
