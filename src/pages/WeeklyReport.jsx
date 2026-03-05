@@ -1,7 +1,7 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
   ChevronLeft, ChevronRight, Copy, Check, Save, Trash2,
-  Loader2, ChevronDown, ChevronUp, Mail, RefreshCw, RotateCcw,
+  Loader2, ChevronDown, ChevronUp, Mail, RefreshCw, RotateCcw, AlertTriangle,
 } from 'lucide-react';
 import { format, addWeeks, parseISO } from 'date-fns';
 import { useAppStore } from '../context/StoreContext';
@@ -253,20 +253,34 @@ export default function WeeklyReport({ onNavigate }) {
   } = useAppStore();
   const { googleToken, gmailToken } = useGoogleAuth();
 
-  const [weekOffset, setWeekOffset]   = useState(0);
-  const [provider,   setProvider]     = useState(aiSettings.providers?.weeklyEmail || 'claude');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [genError, setGenError]       = useState(null);
-  const [emailText, setEmailText]     = useState('');
-  const [copied, setCopied]           = useState(false);
-  const [promptOpen, setPromptOpen]   = useState(false);
-  const [localPrompt, setLocalPrompt] = useState('');
-  const [promptSaved, setPromptSaved] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState(null);
+  // ── Existing state ──
+  const [weekOffset,    setWeekOffset]    = useState(0);
+  const [provider,      setProvider]      = useState(aiSettings.providers?.weeklyEmail || 'claude');
+  const [isGenerating,  setIsGenerating]  = useState(false);
+  const [genError,      setGenError]      = useState(null);
+  const [emailText,     setEmailText]     = useState('');
+  const [copied,        setCopied]        = useState(false);
+  const [promptOpen,    setPromptOpen]    = useState(false);
+  const [localPrompt,   setLocalPrompt]   = useState('');
+  const [promptSaved,   setPromptSaved]   = useState(false);
+  const [historyOpen,   setHistoryOpen]   = useState(false);
+  const [deleteTarget,  setDeleteTarget]  = useState(null);
 
+  // ── New state ──
+  const [expandedTile,   setExpandedTile]   = useState(null);          // 'tasks' | 'customers' | null
+  const [calendarEvents, setCalendarEvents] = useState(null);          // null = not yet fetched
+  const [gmailEmails,    setGmailEmails]    = useState(null);
+  const [isFetchingData, setIsFetchingData] = useState(false);
+  const [reviewOpen,     setReviewOpen]     = useState(true);          // "Week in Review" expanded by default
+  const [genSuccess,     setGenSuccess]     = useState(false);
+  const [genSummary,     setGenSummary]     = useState(null);          // { tasks, emails, meetings }
+  const [navError,       setNavError]       = useState(null);          // integration button error
+
+  const emailOutputRef = useRef(null);
+
+  // ── Derived values ──
   const { weekStart, weekEnd } = useMemo(() => getWeekRangeForOffset(weekOffset), [weekOffset]);
-  const weekLabel = useMemo(() => formatWeekLabel(weekStart, weekEnd), [weekStart, weekEnd]);
+  const weekLabel   = useMemo(() => formatWeekLabel(weekStart, weekEnd), [weekStart, weekEnd]);
   const offsetLabel = weekOffset === 0 ? 'Current week' : weekOffset === -1 ? 'Last week' : `${Math.abs(weekOffset)} weeks ago`;
 
   // Stats for the selected week
@@ -274,14 +288,35 @@ export default function WeeklyReport({ onNavigate }) {
   const totalPts   = useMemo(() => weekPoints.reduce((s, p) => s + (p.points || 0), 0), [weekPoints]);
   const totalHrs   = useMemo(() => Math.round(weekPoints.reduce((s, p) => s + (p.hours || 0), 0) * 100) / 100, [weekPoints]);
   const activeCustomers = useMemo(() => new Set(weekPoints.map(p => p.customerId).filter(Boolean)).size, [weekPoints]);
-  const doneTasks = useMemo(
+
+  // Full list of tasks closed this week (replaces doneTasks count)
+  const weekTasksList = useMemo(
     () => tasks.filter(t => {
       if (!['done', 'archived'].includes(t.status)) return false;
       const ts = t.closedAt || t.createdAt;
       return ts && isInRange(ts, weekStart, weekEnd);
-    }).length,
+    }),
     [tasks, weekStart, weekEnd]
   );
+
+  // Per-customer pts/hrs breakdown for the Customers expanded tile
+  const customerBreakdown = useMemo(() => {
+    const map = {};
+    weekPoints.forEach(p => {
+      if (!p.customerId) return;
+      if (!map[p.customerId]) map[p.customerId] = { pts: 0, hrs: 0 };
+      map[p.customerId].pts += (p.points || 0);
+      map[p.customerId].hrs += (p.hours || 0);
+    });
+    return Object.entries(map)
+      .map(([id, data]) => ({
+        id,
+        name: customers.find(c => c.id === id)?.name || 'Unknown',
+        pts:  data.pts,
+        hrs:  Math.round(data.hrs * 100) / 100,
+      }))
+      .sort((a, b) => b.pts - a.pts);
+  }, [weekPoints, customers]);
 
   // Weekly update logs for the selected week
   const weekLogs = useMemo(
@@ -311,23 +346,39 @@ export default function WeeklyReport({ onNavigate }) {
     [annotations, weekStart, weekEnd]
   );
 
+  // ── Prefetch calendar + Gmail whenever week or tokens change ──
+  useEffect(() => {
+    setCalendarEvents(null);
+    setGmailEmails(null);
+
+    const fetches = [];
+
+    if (googleToken) {
+      fetches.push(
+        fetchCalendarEvents(googleToken, weekStart, weekEnd)
+          .then(setCalendarEvents)
+          .catch(() => setCalendarEvents([]))
+      );
+    }
+    if (gmailToken) {
+      fetches.push(
+        fetchGmailSent(gmailToken, weekStart, weekEnd)
+          .then(setGmailEmails)
+          .catch(() => setGmailEmails([]))
+      );
+    }
+
+    if (fetches.length > 0) {
+      setIsFetchingData(true);
+      Promise.all(fetches).finally(() => setIsFetchingData(false));
+    }
+  }, [weekStart, weekEnd, googleToken, gmailToken]);
+
   const handleGenerate = useCallback(async () => {
     setIsGenerating(true);
     setGenError(null);
 
-    let calendarEvents = null;
-    let gmailEmails    = null;
-
-    if (googleToken) {
-      try { calendarEvents = await fetchCalendarEvents(googleToken, weekStart, weekEnd); }
-      catch (e) { console.warn('[WeeklyReport] Calendar fetch failed:', e.message); }
-    }
-
-    if (gmailToken) {
-      try { gmailEmails = await fetchGmailSent(gmailToken, weekStart, weekEnd); }
-      catch (e) { console.warn('[WeeklyReport] Gmail fetch failed:', e.message); }
-    }
-
+    // calendarEvents / gmailEmails now come from prefetched state
     const context = buildWeekContext({
       weekStart, weekEnd, points, tasks, customers, okrs,
       annotations, weeklyUpdateLogs, milestones, calendarEvents, gmailEmails,
@@ -391,12 +442,21 @@ export default function WeeklyReport({ onNavigate }) {
       }
 
       setEmailText(output);
+      setGenSummary({
+        tasks:    weekTasksList.length,
+        emails:   gmailEmails?.length || 0,
+        meetings: calendarEvents?.length || 0,
+      });
+      setGenSuccess(true);
+      setTimeout(() => setGenSuccess(false), 4000);
+      // Scroll to output after state updates settle
+      setTimeout(() => emailOutputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
     } catch (e) {
       setGenError(e.message);
     } finally {
       setIsGenerating(false);
     }
-  }, [provider, weekStart, weekEnd, points, tasks, customers, okrs, annotations, weeklyUpdateLogs, googleToken, gmailToken, localPrompt, aiSettings]);
+  }, [provider, weekStart, weekEnd, points, tasks, customers, okrs, annotations, weeklyUpdateLogs, milestones, calendarEvents, gmailEmails, localPrompt, aiSettings, weekTasksList]);
 
   const handleSave = useCallback(() => {
     const model = provider === 'claude'
@@ -432,7 +492,6 @@ export default function WeeklyReport({ onNavigate }) {
 
   const handlePromptPanelToggle = useCallback(() => {
     if (!promptOpen) {
-      // Populate from saved setting when opening
       setLocalPrompt(aiSettings.prompts?.weeklyEmail || '');
     }
     setPromptOpen(p => !p);
@@ -454,11 +513,18 @@ export default function WeeklyReport({ onNavigate }) {
         </p>
       </div>
 
+      {/* ── Success banner ── */}
+      {genSuccess && (
+        <div className="flex items-center gap-2 text-sm text-brand-sage bg-brand-sage/10 border border-brand-sage/20 rounded-xl px-4 py-2.5">
+          <Check size={14} /> Email generated from your week data
+        </div>
+      )}
+
       {/* ── A: Week Picker ── */}
       <div className="rounded-2xl border border-border bg-card px-5 py-4 flex items-center justify-between gap-4">
         <button
           onClick={() => setWeekOffset(o => o - 1)}
-          className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+          className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
           title="Previous week"
         >
           <ChevronLeft size={18} />
@@ -472,33 +538,241 @@ export default function WeeklyReport({ onNavigate }) {
         <button
           onClick={() => setWeekOffset(o => o + 1)}
           disabled={weekOffset >= 0}
-          className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
           title="Next week"
         >
           <ChevronRight size={18} />
         </button>
       </div>
 
-      {/* ── B: Stats chips ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatChip label="Points"    value={Number(totalPts).toFixed(1)} />
-        <StatChip label="Hours"     value={`${totalHrs}h`} />
-        <StatChip label="Customers" value={activeCustomers} />
-        <StatChip label="Tasks Done" value={doneTasks} />
+      {/* ── B: Stats chips — Tasks Done & Customers are expandable ── */}
+      <div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <StatChip label="Points"    value={Number(totalPts).toFixed(1)} />
+          <StatChip label="Hours"     value={`${totalHrs}h`} />
+          <ExpandableTile
+            label="Tasks Done"
+            value={weekTasksList.length}
+            isExpanded={expandedTile === 'tasks'}
+            onToggle={() => setExpandedTile(expandedTile === 'tasks' ? null : 'tasks')}
+          />
+          <ExpandableTile
+            label="Customers"
+            value={activeCustomers}
+            isExpanded={expandedTile === 'customers'}
+            onToggle={() => setExpandedTile(expandedTile === 'customers' ? null : 'customers')}
+          />
+        </div>
+
+        {/* Tasks expanded panel — full width below grid */}
+        {expandedTile === 'tasks' && (
+          <div className="mt-3 rounded-xl border border-brand-lavender/40 bg-card px-4 py-3 text-xs space-y-1.5 max-h-48 overflow-y-auto">
+            {weekTasksList.length === 0 ? (
+              <p className="text-muted-foreground">No tasks closed this week</p>
+            ) : (
+              weekTasksList.map(t => {
+                const cName = customers.find(c => c.id === t.customerId)?.name;
+                return (
+                  <div key={t.id} className="flex items-start gap-2">
+                    {cName && (
+                      <span className="text-muted-foreground flex-shrink-0 font-medium">[{cName}]</span>
+                    )}
+                    <span className="text-foreground flex-1 min-w-0">{t.description}</span>
+                    {t.points != null && (
+                      <span className="text-muted-foreground flex-shrink-0 ml-auto">{t.points}pts</span>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+
+        {/* Customers expanded panel — full width below grid */}
+        {expandedTile === 'customers' && (
+          <div className="mt-3 rounded-xl border border-brand-lavender/40 bg-card px-4 py-3 text-xs space-y-1.5 max-h-48 overflow-y-auto">
+            {customerBreakdown.length === 0 ? (
+              <p className="text-muted-foreground">No activity this week</p>
+            ) : (
+              customerBreakdown.map(c => (
+                <div key={c.id} className="flex items-center justify-between">
+                  <span className="text-foreground font-medium">{c.name}</span>
+                  <span className="text-muted-foreground">{c.pts} pts · {c.hrs}h</span>
+                </div>
+              ))
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Integration status chips */}
+      {/* ── Navigation error banner ── */}
+      {navError && (
+        <div className="flex items-center gap-2 text-sm text-amber-600 bg-amber-400/10 border border-amber-400/30 rounded-xl px-4 py-2.5">
+          <AlertTriangle size={14} /> {navError}
+        </div>
+      )}
+
+      {/* ── Integration buttons ── */}
       <div className="flex flex-wrap gap-2">
-        <IntegrationChip
+        <IntegrationButton
           label="Google Calendar"
           connected={!!googleToken}
-          onConnect={() => onNavigate('integrations')}
+          onNavigate={onNavigate}
+          onError={msg => { setNavError(msg); setTimeout(() => setNavError(null), 3000); }}
         />
-        <IntegrationChip
+        <IntegrationButton
           label="Gmail"
           connected={!!gmailToken}
-          onConnect={() => onNavigate('integrations')}
+          onNavigate={onNavigate}
+          onError={msg => { setNavError(msg); setTimeout(() => setNavError(null), 3000); }}
         />
+      </div>
+
+      {/* ── Week in Review ── */}
+      <div className="rounded-2xl border border-border bg-card overflow-hidden">
+        <button
+          onClick={() => setReviewOpen(o => !o)}
+          className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-secondary/30 transition-colors"
+        >
+          <span className="text-sm font-semibold text-foreground">Week in Review</span>
+          {reviewOpen
+            ? <ChevronUp size={16} className="text-muted-foreground" />
+            : <ChevronDown size={16} className="text-muted-foreground" />
+          }
+        </button>
+
+        {reviewOpen && (
+          <div className="border-t border-border px-5 pb-5 pt-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+
+              {/* Card A — Tasks Done */}
+              <div className="rounded-xl border border-border bg-secondary/20 p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <span
+                    className="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0"
+                    style={{ backgroundColor: weekTasksList.length > 0 ? '#4ade80' : '#6b7280' }}
+                  />
+                  <p className="text-xs font-semibold text-foreground">Tasks Done</p>
+                  <span className="text-xs text-muted-foreground ml-auto">{weekTasksList.length}</span>
+                </div>
+                {weekTasksList.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No tasks closed this week</p>
+                ) : (
+                  <div className="space-y-1 max-h-36 overflow-y-auto">
+                    {weekTasksList.map(t => {
+                      const cName = customers.find(c => c.id === t.customerId)?.name;
+                      return (
+                        <div key={t.id} className="text-xs text-foreground/80 leading-relaxed">
+                          {cName && (
+                            <span className="text-muted-foreground">[{cName}] </span>
+                          )}
+                          {t.description}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Card B — Emails Sent */}
+              <div className="rounded-xl border border-border bg-secondary/20 p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <span
+                    className="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0"
+                    style={{
+                      backgroundColor: !gmailToken
+                        ? '#ef4444'
+                        : (isFetchingData || gmailEmails === null)
+                          ? '#6b7280'
+                          : gmailEmails.length > 0
+                            ? '#4ade80'
+                            : '#f59e0b',
+                    }}
+                  />
+                  <p className="text-xs font-semibold text-foreground">Emails Sent</p>
+                  {gmailToken && gmailEmails !== null && (
+                    <span className="text-xs text-muted-foreground ml-auto">{gmailEmails.length}</span>
+                  )}
+                </div>
+                {!gmailToken ? (
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Gmail not connected</p>
+                    <button
+                      onClick={() => onNavigate('integrations')}
+                      className="text-xs text-brand-lavender hover:underline"
+                    >
+                      Connect →
+                    </button>
+                  </div>
+                ) : (isFetchingData || gmailEmails === null) ? (
+                  <p className="text-xs text-muted-foreground">Loading…</p>
+                ) : gmailEmails.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No emails sent this week</p>
+                ) : (
+                  <div className="space-y-1 max-h-36 overflow-y-auto">
+                    {gmailEmails.slice(0, 5).map((e, i) => (
+                      <p key={i} className="text-xs text-foreground/80 truncate">{e.subject}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Card C — Meetings */}
+              <div className="rounded-xl border border-border bg-secondary/20 p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <span
+                    className="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0"
+                    style={{
+                      backgroundColor: !googleToken
+                        ? '#ef4444'
+                        : (isFetchingData || calendarEvents === null)
+                          ? '#6b7280'
+                          : calendarEvents.length > 0
+                            ? '#4ade80'
+                            : '#f59e0b',
+                    }}
+                  />
+                  <p className="text-xs font-semibold text-foreground">Meetings</p>
+                  {googleToken && calendarEvents !== null && (
+                    <span className="text-xs text-muted-foreground ml-auto">{calendarEvents.length}</span>
+                  )}
+                </div>
+                {!googleToken ? (
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Google Calendar not connected</p>
+                    <button
+                      onClick={() => onNavigate('integrations')}
+                      className="text-xs text-brand-lavender hover:underline"
+                    >
+                      Connect →
+                    </button>
+                  </div>
+                ) : (isFetchingData || calendarEvents === null) ? (
+                  <p className="text-xs text-muted-foreground">Loading…</p>
+                ) : calendarEvents.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No meetings this week</p>
+                ) : (
+                  <div className="space-y-1 max-h-36 overflow-y-auto">
+                    {calendarEvents.slice(0, 5).map((e, i) => {
+                      const startTime = e.start?.dateTime
+                        ? format(parseISO(e.start.dateTime), 'EEE h:mm a')
+                        : '';
+                      return (
+                        <div key={i} className="text-xs text-foreground/80 leading-relaxed">
+                          {startTime && (
+                            <span className="text-muted-foreground">{startTime} — </span>
+                          )}
+                          {e.summary || '(no title)'}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── B2: Weekly Highlights & Lowlights ── */}
@@ -538,7 +812,9 @@ export default function WeeklyReport({ onNavigate }) {
         <div className="rounded-2xl border border-border bg-card px-5 py-4 space-y-3">
           <h3 className="text-sm font-semibold text-foreground">
             Milestones this week
-            <span className="ml-2 text-xs font-normal text-muted-foreground">{weekMilestones.length} milestone{weekMilestones.length !== 1 ? 's' : ''}</span>
+            <span className="ml-2 text-xs font-normal text-muted-foreground">
+              {weekMilestones.length} milestone{weekMilestones.length !== 1 ? 's' : ''}
+            </span>
           </h3>
           <div className="space-y-2 max-h-56 overflow-y-auto">
             {weekMilestones.map(m => {
@@ -632,10 +908,19 @@ export default function WeeklyReport({ onNavigate }) {
 
       {/* ── D: Output ── */}
       {emailText && (
-        <div className="rounded-2xl border border-border bg-card px-5 py-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-foreground">Generated Email</p>
-            <div className="flex items-center gap-2">
+        <div ref={emailOutputRef} className="rounded-2xl border border-border bg-card px-5 py-4 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-foreground">Generated Email</p>
+              {genSummary && (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Generated from: {genSummary.tasks} task{genSummary.tasks !== 1 ? 's' : ''},
+                  {' '}{genSummary.emails} email{genSummary.emails !== 1 ? 's' : ''},
+                  {' '}{genSummary.meetings} meeting{genSummary.meetings !== 1 ? 's' : ''}
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
               <button
                 onClick={handleCopy}
                 className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
@@ -654,7 +939,7 @@ export default function WeeklyReport({ onNavigate }) {
             value={emailText}
             onChange={e => setEmailText(e.target.value)}
             rows={16}
-            className="w-full bg-secondary/40 border border-border rounded-xl px-4 py-3 text-sm font-mono text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40 resize-y"
+            className="w-full bg-secondary/40 border border-border rounded-xl px-4 py-3 text-sm font-sans text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40 resize-y"
           />
           <p className="text-xs text-muted-foreground">You can edit the email above before saving or copying.</p>
         </div>
@@ -720,9 +1005,9 @@ export default function WeeklyReport({ onNavigate }) {
             ) : (
               <div className="divide-y divide-border">
                 {sortedHistory.map(r => {
-                  const rStart = parseISO(r.weekStart);
-                  const rEnd   = parseISO(r.weekEnd);
-                  const label  = formatWeekLabel(rStart, rEnd);
+                  const rStart  = parseISO(r.weekStart);
+                  const rEnd    = parseISO(r.weekEnd);
+                  const label   = formatWeekLabel(rStart, rEnd);
                   const savedAt = format(parseISO(r.createdAt), 'MMM d, h:mm a');
                   const preview = (r.emailText || '').replace(/\s+/g, ' ').trim().slice(0, 120);
                   return (
@@ -785,18 +1070,48 @@ function StatChip({ label, value }) {
   );
 }
 
-function IntegrationChip({ label, connected, onConnect }) {
+/** Stat tile with a chevron indicator — expanded content is rendered separately below the grid */
+function ExpandableTile({ label, value, isExpanded, onToggle }) {
+  return (
+    <div
+      className={`rounded-xl border bg-card transition-colors cursor-pointer ${
+        isExpanded ? 'border-brand-lavender/40' : 'border-border'
+      }`}
+    >
+      <button onClick={onToggle} className="w-full px-4 py-3 text-center">
+        <p className="text-lg font-bold text-foreground">{value}</p>
+        <p className="text-xs text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
+          {label}
+          {isExpanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+        </p>
+      </button>
+    </div>
+  );
+}
+
+/** Integration pill button — connected (green) or unconnected (amber warning). Navigates to Integrations tab. */
+function IntegrationButton({ label, connected, onNavigate: navigate, onError }) {
+  function handleClick() {
+    try {
+      navigate('integrations');
+    } catch (e) {
+      onError?.(`Could not navigate to Integrations: ${e.message}`);
+    }
+  }
+
   return connected ? (
-    <span className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-brand-sage/10 text-brand-sage border border-brand-sage/20">
-      <Check size={11} />
-      {label} connected
-    </span>
+    <button
+      onClick={handleClick}
+      className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-brand-sage/10 text-brand-sage border border-brand-sage/20 hover:bg-brand-sage/20 transition-colors"
+    >
+      <Check size={11} /> {label} connected
+    </button>
   ) : (
     <button
-      onClick={onConnect}
-      className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-secondary text-muted-foreground border border-border hover:text-foreground transition-colors"
+      onClick={handleClick}
+      className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border border-amber-400/50 text-amber-500 hover:bg-amber-400/10 transition-colors"
     >
-      {label} — connect in Integrations
+      <AlertTriangle size={11} /> Connect {label}
     </button>
   );
 }
