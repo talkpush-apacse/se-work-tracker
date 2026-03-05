@@ -153,6 +153,11 @@ Tone: professional, confident, direct. Not overly formal. No filler phrases like
 
 Length target: 250–400 words. Never exceed 500 words.`;
 
+// Pre-computed Object.entries() arrays — avoids creating a new array on every render
+// that calls Object.entries() inline inside JSX (e.g. dropdown maps in CustomerDetailView).
+export const TASK_TYPE_ENTRIES   = Object.entries(TASK_TYPE_LABELS);
+export const TASK_STATUS_ENTRIES = Object.entries(TASK_STATUS_LABELS);
+
 // Milestone statuses
 export const MILESTONE_STATUSES = ['pending', 'in-progress', 'completed', 'cancelled'];
 

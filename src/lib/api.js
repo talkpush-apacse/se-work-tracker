@@ -16,7 +16,11 @@ const headers = {
  */
 export async function fetchAllData() {
   try {
-    const res = await fetch('/api/data', { headers });
+    // 5-second timeout via AbortController — prevents indefinite hang on slow/hung Neon connections
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch('/api/data', { headers, signal: controller.signal });
+    clearTimeout(timeoutId);
     if (!res.ok) throw new Error(`GET /api/data → ${res.status}`);
     return await res.json();
   } catch (err) {

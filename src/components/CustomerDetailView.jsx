@@ -7,7 +7,9 @@ import {
 import { useAppStore } from '../context/StoreContext';
 import {
   TASK_TYPE_LABELS, TASK_TYPE_COLORS,
+  TASK_TYPE_ENTRIES,
   TASK_STATUS_LABELS, TASK_STATUS_COLORS,
+  TASK_STATUS_ENTRIES,
   MILESTONE_STATUSES, MILESTONE_STATUS_LABELS, MILESTONE_STATUS_COLORS,
   ANNOTATION_TAGS, ANNOTATION_TAG_LABELS, ANNOTATION_TAG_COLORS,
   ACTIVITY_TYPES, AUTO_TRACK_RATE,
@@ -176,7 +178,7 @@ function TasksTab({ tasks, addTask, customerId, okrs }) {
                 onChange={e => setTaskForm(p => ({ ...p, taskType: e.target.value }))}
                 className="rounded-lg border border-border bg-input px-2 py-1.5 text-xs text-foreground focus:outline-none focus:border-ring"
               >
-                {Object.entries(TASK_TYPE_LABELS).map(([v, l]) => (
+                {TASK_TYPE_ENTRIES.map(([v, l]) => (
                   <option key={v} value={v}>{l}</option>
                 ))}
               </select>
@@ -185,7 +187,7 @@ function TasksTab({ tasks, addTask, customerId, okrs }) {
                 onChange={e => setTaskForm(p => ({ ...p, status: e.target.value }))}
                 className="rounded-lg border border-border bg-input px-2 py-1.5 text-xs text-foreground focus:outline-none focus:border-ring"
               >
-                {Object.entries(TASK_STATUS_LABELS).map(([v, l]) => (
+                {TASK_STATUS_ENTRIES.map(([v, l]) => (
                   <option key={v} value={v}>{l}</option>
                 ))}
               </select>
@@ -394,20 +396,26 @@ function TimelineTab({ tasks, milestones, annotations, customer, onAdd, onEdit, 
     return map;
   }, [milestones, closedTasks, annotations]);
 
-  // Build calendar cells for the current month
-  const daysInMonth    = new Date(year, month + 1, 0).getDate();
-  const firstDayOfWeek = new Date(year, month, 1).getDay();       // 0=Sun
-  const totalCells     = Math.ceil((firstDayOfWeek + daysInMonth) / 7) * 7;
-  const todayStr       = todayLocalStr();
+  // Build calendar cells for the current month.
+  // Memoized on [year, month, eventsByDate] — the Date math + Array.from only
+  // re-runs when the month navigates or the underlying event data changes.
+  const todayStr = todayLocalStr();
+  const { cells } = useMemo(() => {
+    const daysInMonth    = new Date(year, month + 1, 0).getDate();
+    const firstDayOfWeek = new Date(year, month, 1).getDay(); // 0=Sun
+    const totalCells     = Math.ceil((firstDayOfWeek + daysInMonth) / 7) * 7;
 
-  const cells = Array.from({ length: totalCells }, (_, i) => {
-    const dayNum = i - firstDayOfWeek + 1;
-    if (dayNum < 1 || dayNum > daysInMonth) return null;
-    const mm      = String(month + 1).padStart(2, '0');
-    const dd      = String(dayNum).padStart(2, '0');
-    const dateStr = `${year}-${mm}-${dd}`;
-    return { dayNum, dateStr, events: eventsByDate[dateStr] || { milestones: [], tasks: [], annotations: [] } };
-  });
+    return {
+      cells: Array.from({ length: totalCells }, (_, i) => {
+        const dayNum = i - firstDayOfWeek + 1;
+        if (dayNum < 1 || dayNum > daysInMonth) return null;
+        const mm      = String(month + 1).padStart(2, '0');
+        const dd      = String(dayNum).padStart(2, '0');
+        const dateStr = `${year}-${mm}-${dd}`;
+        return { dayNum, dateStr, events: eventsByDate[dateStr] || { milestones: [], tasks: [], annotations: [] } };
+      }),
+    };
+  }, [year, month, eventsByDate]);
 
   // Click on a calendar day → open add modal with that date pre-filled
   const handleDayClick = (dateStr) => {

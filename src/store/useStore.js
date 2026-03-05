@@ -164,17 +164,47 @@ function migrateRemoteV2(remoteTasks, remotePoints, remoteMeetingEntries, remote
 }
 
 // ─── Debounce helper for API saves ───────────────────────────────
-function createBatchedSaver() {
+// getMounted: () => boolean — gates saves until after the init fetch completes
+// onError: (entity) => void — called when a Neon PUT fails, so the UI can show a sync error
+function createBatchedSaver(getMounted, onError) {
   let timer = null;
   const dirty = new Map();
-  return (entity, data) => {
+  // Saves that arrive before mountedRef is set are queued here and flushed after init
+  const pending = new Map();
+
+  const flush = async () => {
+    const toSave = Array.from(dirty.entries());
+    dirty.clear();
+    for (const [e, d] of toSave) {
+      const ok = await saveEntity(e, d);
+      if (!ok) {
+        console.warn(`[sync] Failed to save ${e} to Neon`);
+        onError?.(e);
+      }
+    }
+  };
+
+  const saver = (entity, data) => {
+    if (!getMounted()) {
+      // Queue the save — will be flushed once the init fetch completes
+      pending.set(entity, data);
+      return;
+    }
     dirty.set(entity, data);
     clearTimeout(timer);
-    timer = setTimeout(() => {
-      dirty.forEach((d, e) => saveEntity(e, d));
-      dirty.clear();
-    }, 500);
+    timer = setTimeout(flush, 500);
   };
+
+  // Called after mountedRef becomes true — pushes any pre-mount changes to Neon
+  saver.flushPending = () => {
+    if (pending.size === 0) return;
+    pending.forEach((d, e) => dirty.set(e, d));
+    pending.clear();
+    clearTimeout(timer);
+    timer = setTimeout(flush, 500);
+  };
+
+  return saver;
 }
 
 // ─── Run V2 migration before any component mounts ────────────────
@@ -203,8 +233,12 @@ export function useStore() {
   });
 
   const [syncStatus, setSyncStatus] = useState('loading');
-  const debouncedSave = useRef(createBatchedSaver()).current;
+  // mountedRef must be declared before debouncedSave so the closure captures it correctly
   const mountedRef = useRef(false);
+  const debouncedSave = useRef(createBatchedSaver(
+    () => mountedRef.current,
+    () => setSyncStatus('error'),
+  )).current;
 
   // ─── localStorage save effects ───
   useEffect(() => { save(KEYS.okrs, okrs); }, [okrs]);
@@ -307,8 +341,10 @@ export function useStore() {
       }
 
       if (!cancelled) {
-        setSyncStatus('synced');
         mountedRef.current = true;
+        // Flush any saves that arrived during the init fetch (pre-mount changes)
+        debouncedSave.flushPending();
+        setSyncStatus('synced');
       }
     }
 
@@ -338,7 +374,7 @@ export function useStore() {
   const updateCustomer = useCallback((id, data) => {
     setCustomers(prev => prev.map(c => c.id === id ? { ...c, ...data } : c));
   }, []);
-  // Cascade delete: points, meeting entries, tasks (+ their AI outputs), milestones, annotations
+  // Cascade delete: points, meeting entries, tasks (+ their AI outputs), milestones, annotations, weekly reports + logs
   const deleteCustomer = useCallback((id) => {
     setCustomers(prev => prev.filter(c => c.id !== id));
     setPoints(prev => prev.filter(pt => pt.customerId !== id));
@@ -350,6 +386,7 @@ export function useStore() {
     });
     setMilestones(prev => prev.filter(m => m.customerId !== id));
     setAnnotations(prev => prev.filter(a => a.customerId !== id));
+    setWeeklyReports(prev => prev.filter(r => r.customerId !== id));
     setWeeklyUpdateLogs(prev => prev.filter(l => l.customerId !== id));
   }, []);
   const reorderCustomers = useCallback((orderedIds) => {

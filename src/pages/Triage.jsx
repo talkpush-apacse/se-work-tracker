@@ -87,7 +87,7 @@ Be concise and scannable. Bullet points within sections are fine.`,
 // ─── Inline customer creation form ──────────────────────────────────────────
 // Used by both TriageForm and QuickAddTaskForm to allow creating a new customer
 // without leaving the current form.
-function InlineCustomerCreate({ onCustomerCreated }) {
+const InlineCustomerCreate = memo(function InlineCustomerCreate({ onCustomerCreated }) {
   const { addCustomer } = useAppStore();
   const [newCustomer, setNewCustomer] = useState({ name: '', color: CUSTOMER_COLORS[0].value });
 
@@ -129,7 +129,7 @@ function InlineCustomerCreate({ onCustomerCreated }) {
       </button>
     </div>
   );
-}
+});
 
 // ─── Inline triage form (shown below an untriaged entry) ──────────────────────
 function TriageForm({ entry, customer, customers, onSubmit, onCancel }) {
@@ -301,7 +301,7 @@ function TriageForm({ entry, customer, customers, onSubmit, onCancel }) {
 }
 
 // ─── Triage queue entry card ──────────────────────────────────────────────────
-function TriageEntryCard({ entry, customer, onTriaged }) {
+const TriageEntryCard = memo(function TriageEntryCard({ entry, customer, onTriaged }) {
   const { addTask, markMeetingEntryTriaged, customers } = useAppStore();
   const [expanded, setExpanded] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -382,7 +382,7 @@ function TriageEntryCard({ entry, customer, onTriaged }) {
       )}
     </div>
   );
-}
+});
 
 // ─── Jira URL parser ──────────────────────────────────────────────────────────
 /** Strips Atlassian ticket URLs from text and returns the clean text + ticket array. */
@@ -398,7 +398,7 @@ function extractJiraLinks(text = '') {
 }
 
 // ─── Task card (in the board) ─────────────────────────────────────────────────
-function TaskCard({ task, customer, isSelected, onSelect, onStatusChange, onArchive }) {
+const TaskCard = memo(function TaskCard({ task, customer, isSelected, onSelect, onStatusChange, onArchive }) {
   const { updateTask } = useAppStore();
   const typeColors = TASK_TYPE_COLORS[task.taskType] || TASK_TYPE_COLORS.mine;
   const statusColors = TASK_STATUS_COLORS[task.status] || TASK_STATUS_COLORS.open;
@@ -415,6 +415,11 @@ function TaskCard({ task, customer, isSelected, onSelect, onStatusChange, onArch
   const [isEditing, setIsEditing] = useState(false);
   const [draftDesc, setDraftDesc] = useState(task.description);
   const editRef = useRef(null);
+  // Pre-parse Jira URLs once per description change — avoids regex exec on every keystroke/render
+  const { cleanText: descCleanText, tickets: descTickets } = useMemo(
+    () => extractJiraLinks(task.description),
+    [task.description]
+  );
 
   const commitEdit = () => {
     const trimmed = draftDesc.trim();
@@ -462,34 +467,31 @@ function TaskCard({ task, customer, isSelected, onSelect, onStatusChange, onArch
               onClick={e => e.stopPropagation()}
               className="w-full bg-muted/60 border border-indigo-500/50 rounded-lg px-2 py-1 text-xs text-foreground resize-none focus:outline-none focus:border-indigo-400 leading-snug"
             />
-          ) : (() => {
-              const { cleanText, tickets } = extractJiraLinks(task.description);
-              return (
-                <div
-                  className="group/desc flex items-start gap-1"
-                  onClick={e => { if (!isArchived) { e.stopPropagation(); setIsEditing(true); } }}
-                >
-                  <p className={`flex-1 text-xs font-medium leading-snug line-clamp-2 ${isArchived ? 'text-muted-foreground line-through' : 'text-foreground group-hover/desc:text-indigo-200 cursor-text'}`}>
-                    {cleanText}
-                    {tickets.map(t => (
-                      <a
-                        key={t.id}
-                        href={t.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={e => e.stopPropagation()}
-                        className="inline-block ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded border border-brand-lavender/30 bg-brand-lavender/10 text-brand-lavender hover:bg-brand-lavender/20 transition-colors"
-                      >
-                        {t.id}
-                      </a>
-                    ))}
-                  </p>
-                  {!isArchived && (
-                    <Pencil size={10} className="flex-shrink-0 mt-0.5 text-muted-foreground/70 opacity-0 group-hover/desc:opacity-100 transition-opacity" />
-                  )}
-                </div>
-              );
-            })()
+          ) : (
+              <div
+                className="group/desc flex items-start gap-1"
+                onClick={e => { if (!isArchived) { e.stopPropagation(); setIsEditing(true); } }}
+              >
+                <p className={`flex-1 text-xs font-medium leading-snug line-clamp-2 ${isArchived ? 'text-muted-foreground line-through' : 'text-foreground group-hover/desc:text-indigo-200 cursor-text'}`}>
+                  {descCleanText}
+                  {descTickets.map(t => (
+                    <a
+                      key={t.id}
+                      href={t.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={e => e.stopPropagation()}
+                      className="inline-block ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded border border-brand-lavender/30 bg-brand-lavender/10 text-brand-lavender hover:bg-brand-lavender/20 transition-colors"
+                    >
+                      {t.id}
+                    </a>
+                  ))}
+                </p>
+                {!isArchived && (
+                  <Pencil size={10} className="flex-shrink-0 mt-0.5 text-muted-foreground/70 opacity-0 group-hover/desc:opacity-100 transition-opacity" />
+                )}
+              </div>
+          )
           }
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
@@ -574,10 +576,10 @@ function TaskCard({ task, customer, isSelected, onSelect, onStatusChange, onArch
       )}
     </div>
   );
-}
+});
 
 // ─── History item (editable previous AI output) ───────────────────────────────
-function HistoryItem({ h }) {
+const HistoryItem = memo(function HistoryItem({ h }) {
   const { updateAiOutput } = useAppStore();
   const [draft,  setDraft]  = useState(h.outputText);
   const [copied, setCopied] = useState(false);
@@ -659,10 +661,10 @@ function HistoryItem({ h }) {
       </div>
     </details>
   );
-}
+});
 
 // ─── AI Workspace (right panel) ───────────────────────────────────────────────
-function AIWorkspace({ task, customer }) {
+const AIWorkspace = memo(function AIWorkspace({ task, customer }) {
   const { addAiOutput, getTaskAiOutputs, aiSettings, updateAiSettings } = useAppStore();
   const [outputType, setOutputType] = useState('message-draft');
   const [emailNature, setEmailNature] = useState('generic-ack');
@@ -1208,7 +1210,7 @@ function AIWorkspace({ task, customer }) {
       )}
     </div>
   );
-}
+});
 
 // ─── Quick add task form (no meeting entry, just description + customer link) ───
 function QuickAddTaskForm({ customers, onSubmit, onCancel }) {
@@ -1392,6 +1394,11 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, customer, onOpenDe
     : ageDays < 14
       ? 'text-amber-400'
       : 'text-red-400';
+  // Pre-parse Jira URLs once per description change — avoids regex exec on every render
+  const { cleanText: descCleanText, tickets: descTickets } = useMemo(
+    () => extractJiraLinks(task.description),
+    [task.description]
+  );
 
   return (
     <div
@@ -1443,26 +1450,21 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, customer, onOpenDe
               {customer.name}
             </span>
           )}
-          {(() => {
-            const { cleanText, tickets } = extractJiraLinks(task.description);
-            return (
-              <>
-                <span className="text-sm text-foreground/90 truncate">{cleanText}</span>
-                {tickets.map(t => (
-                  <a
-                    key={t.id}
-                    href={t.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={e => e.stopPropagation()}
-                    className="flex-shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded border border-brand-lavender/30 bg-brand-lavender/10 text-brand-lavender hover:bg-brand-lavender/20 transition-colors"
-                  >
-                    {t.id}
-                  </a>
-                ))}
-              </>
-            );
-          })()}
+          <>
+            <span className="text-sm text-foreground/90 truncate">{descCleanText}</span>
+            {descTickets.map(t => (
+              <a
+                key={t.id}
+                href={t.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={e => e.stopPropagation()}
+                className="flex-shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded border border-brand-lavender/30 bg-brand-lavender/10 text-brand-lavender hover:bg-brand-lavender/20 transition-colors"
+              >
+                {t.id}
+              </a>
+            ))}
+          </>
         </div>
         <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
           <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${typeColors.bg} ${typeColors.text} ${typeColors.border}`}>
@@ -1807,7 +1809,7 @@ function TaskDetailView({ task, customer, onBack }) {
 }
 
 // ─── Annotation row ──────────────────────────────────────────────────────────
-function AnnotationRow({ annotation, customer, onEdit, onDelete }) {
+const AnnotationRow = memo(function AnnotationRow({ annotation, customer, onEdit, onDelete }) {
   return (
     <div className="flex items-start gap-3 py-2.5 border-b border-border/50 last:border-b-0">
       {/* Tag dot */}
@@ -1861,7 +1863,7 @@ function AnnotationRow({ annotation, customer, onEdit, onDelete }) {
       </div>
     </div>
   );
-}
+});
 
 // ─── Main Triage page ──────────────────────────────────────────────────────────
 export default function Triage() {
@@ -2024,7 +2026,8 @@ export default function Triage() {
   };
 
   // ── Auto-timer: start on task open, stop + auto-save points on close ───
-  const autoSaveSession = (session) => {
+  // Wrapped in useCallback so handleOpenDetail's own useCallback dep array stays stable
+  const autoSaveSession = useCallback((session) => {
     if (!session || session.elapsedSeconds < AUTO_TRACK_MIN_SECONDS) return;
     const hours = session.elapsedSeconds / 3600;
     const pts = Math.round(hours * AUTO_TRACK_RATE * 100) / 100;
@@ -2035,7 +2038,7 @@ export default function Triage() {
       activityType: 'General Admin',
       comment: `Auto-tracked: ${session.taskDescription || 'Task review'}`,
     });
-  };
+  }, [addPoint]);
 
   const handleOpenDetail = useCallback((task) => {
     // Auto-stop previous timer if running for a different task
