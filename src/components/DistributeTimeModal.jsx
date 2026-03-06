@@ -432,7 +432,7 @@ export default function DistributeTimeModal({ session, onClose, initialCustomerI
       </div>
 
       {/* Buttons */}
-      <div className="flex gap-3 pt-1">
+      <div className="flex gap-3 pt-3 sticky bottom-0 bg-background -mx-6 px-6 -mb-5 pb-5 border-t border-border/50">
         <Button
           type="button"
           variant="secondary"

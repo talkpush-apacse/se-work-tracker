@@ -16,13 +16,13 @@ const sizeClasses = {
 export default function Modal({ title, onClose, children, size = 'md' }) {
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className={cn(sizeClasses[size], 'gap-0 p-0')}>
+      <DialogContent className={cn(sizeClasses[size], 'gap-0 p-0 flex flex-col')}>
         {title && (
-          <DialogHeader className="px-6 py-4 border-b border-border">
+          <DialogHeader className="px-6 py-4 border-b border-border flex-shrink-0">
             <DialogTitle className="text-lg font-semibold text-foreground">{title}</DialogTitle>
           </DialogHeader>
         )}
-        <div className="px-6 py-5">{children}</div>
+        <div className="px-6 py-5 overflow-y-auto overscroll-contain flex-1 min-h-0">{children}</div>
       </DialogContent>
     </Dialog>
   );
