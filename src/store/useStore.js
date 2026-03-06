@@ -431,19 +431,29 @@ export function useStore() {
     return task;
   }, []);
   const updateTask = useCallback((id, data) => {
-    setTasks(prev => prev.map(t => {
-      if (t.id !== id) return t;
-      const next = { ...t, ...data };
-      if ('status' in data) {
-        const wasOpen = !['done', 'archived'].includes(t.status);
-        const nowClosed = ['done', 'archived'].includes(data.status);
-        if (nowClosed && wasOpen) next.closedAt = new Date().toISOString();
-        else if (!nowClosed) next.closedAt = null;
-        if (data.status === 'done') next.points = TASK_TYPE_POINTS[next.taskType] || 0;
-        else if (t.status === 'done') next.points = 0;
-      }
+    let updatedTasks;
+    setTasks(prev => {
+      const next = prev.map(t => {
+        if (t.id !== id) return t;
+        const updated = { ...t, ...data };
+        if ('status' in data) {
+          const wasOpen = !['done', 'archived'].includes(t.status);
+          const nowClosed = ['done', 'archived'].includes(data.status);
+          if (nowClosed && wasOpen) updated.closedAt = new Date().toISOString();
+          else if (!nowClosed) updated.closedAt = null;
+          if (data.status === 'done') updated.points = TASK_TYPE_POINTS[updated.taskType] || 0;
+          else if (t.status === 'done') updated.points = 0;
+        }
+        return updated;
+      });
+      updatedTasks = next;
       return next;
-    }));
+    });
+    // Bypass the 500ms debounce for critical status transitions — prevents data loss if the
+    // user reloads before the debounce fires (Neon would otherwise overwrite with stale status)
+    if ('status' in data && ['done', 'archived'].includes(data.status) && mountedRef.current) {
+      saveEntity('tasks', updatedTasks).catch(() => {});
+    }
   }, []);
   const deleteTask = useCallback((id) => {
     setTasks(prev => prev.filter(t => t.id !== id));
