@@ -24,7 +24,6 @@ import {
   TASK_TYPE_POINTS,
   AUTO_TRACK_RATE,
   AUTO_TRACK_MIN_SECONDS,
-  ANNOTATION_TAGS, ANNOTATION_TAG_LABELS, ANNOTATION_TAG_COLORS,
   WEEKLY_UPDATE_LOG_TYPES, WEEKLY_UPDATE_LOG_LABELS, WEEKLY_UPDATE_LOG_COLORS,
   TASK_INTERACTION_TYPES, TASK_INTERACTION_TYPE_LABELS,
 } from '../constants';
@@ -1812,69 +1811,12 @@ function TaskDetailView({ task, customer, onBack }) {
   );
 }
 
-// ─── Annotation row ──────────────────────────────────────────────────────────
-const AnnotationRow = memo(function AnnotationRow({ annotation, customer, onEdit, onDelete }) {
-  return (
-    <div className="flex items-start gap-3 py-2.5 border-b border-border/50 last:border-b-0">
-      {/* Tag dot */}
-      <div
-        className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1.5"
-        style={{ backgroundColor: ANNOTATION_TAG_COLORS[annotation.tag] }}
-        title={ANNOTATION_TAG_LABELS[annotation.tag]}
-      />
-      {/* Customer badge + date */}
-      <div className="flex-shrink-0 min-w-[110px]">
-        {customer && (
-          <span
-            className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-full border mb-0.5"
-            style={{
-              backgroundColor: customer.color + '22',
-              color: customer.color,
-              borderColor: customer.color + '55',
-            }}
-          >
-            {customer.name}
-          </span>
-        )}
-        <p className="text-[10px] text-muted-foreground">{annotation.date}</p>
-      </div>
-      {/* Tag badge */}
-      <span
-        className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 mt-0.5"
-        style={{
-          backgroundColor: ANNOTATION_TAG_COLORS[annotation.tag] + '22',
-          color: ANNOTATION_TAG_COLORS[annotation.tag],
-        }}
-      >
-        {ANNOTATION_TAG_LABELS[annotation.tag]}
-      </span>
-      {/* Text */}
-      <p className="flex-1 text-sm text-foreground leading-relaxed min-w-0">{annotation.text}</p>
-      {/* Actions */}
-      <div className="flex gap-1 flex-shrink-0">
-        <button
-          onClick={() => onEdit(annotation)}
-          className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-        >
-          <Pencil size={12} />
-        </button>
-        <button
-          onClick={() => onDelete(annotation)}
-          className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-secondary transition-colors"
-        >
-          <Trash2 size={12} />
-        </button>
-      </div>
-    </div>
-  );
-});
-
 // ─── Main Triage page ──────────────────────────────────────────────────────────
 export default function Triage() {
   const {
     meetingEntries, tasks, customers, updateTask, addTask, reorderTasks, addPoint, okrs,
-    annotations, addAnnotation, updateAnnotation, deleteAnnotation,
-    weeklyUpdateLogs, addWeeklyUpdateLog, deleteWeeklyUpdateLog,
+    weeklyUpdateLogs, addWeeklyUpdateLog, updateWeeklyUpdateLog, deleteWeeklyUpdateLog,
+    migrateAnnotationsToLogs,
   } = useAppStore();
   const { isRunning, taskId: runningTaskId, startTimer, stopTimer } = useTimerContext();
   const [taskDetailId, setTaskDetailId] = useState(null);
@@ -1899,18 +1841,16 @@ export default function Triage() {
   // Bulk selection state
   const [selectedTaskIds, setSelectedTaskIds] = useState(new Set());
 
-  // Annotation section state
-  const [showAnnotationForm, setShowAnnotationForm] = useState(false);
-  const [annotationForm, setAnnotationForm] = useState({ customerId: '', date: new Date().toISOString().slice(0, 10), tag: 'good', text: '' });
-  const [annotationErrors, setAnnotationErrors] = useState({});
-  const [editAnnotation, setEditAnnotation] = useState(null);
-  const [deleteAnnotationTarget, setDeleteAnnotationTarget] = useState(null);
-  const [filterAnnotationCustomer, setFilterAnnotationCustomer] = useState('');
-  const [filterAnnotationTag, setFilterAnnotationTag] = useState('');
-
   // Weekly Update Log section state
-  const [logForm, setLogForm] = useState({ type: 'highlight', text: '', customerId: '' });
+  const [logForm, setLogForm]             = useState({ type: 'highlight', text: '', customerId: '' });
+  const [logDate, setLogDate]             = useState(new Date().toISOString().slice(0, 10));
+  const [logEditId, setLogEditId]         = useState(null);
   const [logDeleteTarget, setLogDeleteTarget] = useState(null);
+  const [filterLogType, setFilterLogType]             = useState('');
+  const [filterLogCustomer, setFilterLogCustomer]     = useState('');
+  const [filterLogDateFrom, setFilterLogDateFrom]     = useState('');
+  const [filterLogDateTo, setFilterLogDateTo]         = useState('');
+  const [migrationBanner, setMigrationBanner]         = useState(0); // count of migrated entries
 
   // dnd-kit sensors
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
@@ -1953,14 +1893,16 @@ export default function Triage() {
     [untriagedEntries, customerMap]
   );
 
-  // Filtered annotations (newest first)
-  const filteredAnnotations = useMemo(() => {
-    return annotations
-      .filter(a => (!filterAnnotationCustomer || a.customerId === filterAnnotationCustomer))
-      .filter(a => (!filterAnnotationTag || a.tag === filterAnnotationTag))
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-      .slice(0, 30);
-  }, [annotations, filterAnnotationCustomer, filterAnnotationTag]);
+  // Filtered + sorted Weekly Update Logs
+  const filteredLogs = useMemo(() => {
+    return weeklyUpdateLogs
+      .filter(l => !filterLogType || l.type === filterLogType)
+      .filter(l => !filterLogCustomer || l.customerId === filterLogCustomer)
+      .filter(l => !filterLogDateFrom || l.date >= filterLogDateFrom)
+      .filter(l => !filterLogDateTo   || l.date <= filterLogDateTo)
+      .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt))
+      .slice(0, 50);
+  }, [weeklyUpdateLogs, filterLogType, filterLogCustomer, filterLogDateFrom, filterLogDateTo]);
 
   // Active tasks: open, in-progress, blocked (excludes done and archived)
   const activeTasks = useMemo(
@@ -2101,58 +2043,48 @@ export default function Triage() {
     reorderTasks(reordered.map(t => t.id));
   };
 
-  // ─── Annotation handlers ─────────────────────────────────────────────────────
-  const handleAnnotationSubmit = () => {
-    const errs = {};
-    if (!annotationForm.customerId) errs.customerId = 'Required';
-    if (!annotationForm.text.trim()) errs.text = 'Required';
-    if (Object.keys(errs).length) { setAnnotationErrors(errs); return; }
-    if (editAnnotation) {
-      updateAnnotation(editAnnotation.id, {
-        customerId: annotationForm.customerId,
-        date: annotationForm.date,
-        tag: annotationForm.tag,
-        text: annotationForm.text.trim(),
-      });
-      setEditAnnotation(null);
-    } else {
-      addAnnotation({
-        customerId: annotationForm.customerId,
-        date: annotationForm.date,
-        tag: annotationForm.tag,
-        text: annotationForm.text.trim(),
-      });
-    }
-    setAnnotationForm({ customerId: '', date: new Date().toISOString().slice(0, 10), tag: 'good', text: '' });
-    setAnnotationErrors({});
-    setShowAnnotationForm(false);
-  };
-
-  const handleEditAnnotation = (a) => {
-    setEditAnnotation(a);
-    setAnnotationForm({ customerId: a.customerId, date: a.date, tag: a.tag, text: a.text });
-    setAnnotationErrors({});
-    setShowAnnotationForm(true);
-  };
-
   // ─── Weekly Update Log handlers ───────────────────────────────────────────────
   const handleAddLog = (e) => {
     e.preventDefault();
     if (!logForm.text.trim()) return;
-    addWeeklyUpdateLog({
-      type:       logForm.type,
-      text:       logForm.text.trim(),
-      customerId: logForm.customerId || undefined,
-    });
+    if (logEditId) {
+      updateWeeklyUpdateLog(logEditId, {
+        type:       logForm.type,
+        text:       logForm.text.trim(),
+        customerId: logForm.customerId || undefined,
+        date:       logDate,
+      });
+      setLogEditId(null);
+    } else {
+      addWeeklyUpdateLog({
+        type:       logForm.type,
+        text:       logForm.text.trim(),
+        customerId: logForm.customerId || undefined,
+        date:       logDate,
+      });
+    }
     setLogForm({ type: 'highlight', text: '', customerId: '' });
   };
 
-  const handleCancelAnnotation = () => {
-    setEditAnnotation(null);
-    setAnnotationForm({ customerId: '', date: new Date().toISOString().slice(0, 10), tag: 'good', text: '' });
-    setAnnotationErrors({});
-    setShowAnnotationForm(false);
+  const handleEditLog = (log) => {
+    setLogEditId(log.id);
+    setLogDate(log.date);
+    setLogForm({ type: log.type, text: log.text, customerId: log.customerId || '' });
+    document.getElementById('section-log')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
+
+  const handleCancelLogEdit = () => {
+    setLogEditId(null);
+    setLogDate(new Date().toISOString().slice(0, 10));
+    setLogForm({ type: 'highlight', text: '', customerId: '' });
+  };
+
+  // ─── One-time annotation migration (auto, on mount) ──────────────────────────
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const count = migrateAnnotationsToLogs();
+    if (count > 0) setMigrationBanner(count);
+  }, []);
 
   // ── Task Detail sub-view ───────────────────────────────────────────────────
   if (taskDetailId) {
@@ -2169,10 +2101,9 @@ export default function Triage() {
     <div className="sticky top-0 z-30 -mx-4 px-4 bg-background/95 backdrop-blur-sm border-b border-border/40 mb-4">
       <div className="flex gap-0.5 py-1 overflow-x-auto scrollbar-none">
         {[
-          { href: 'section-queue',       label: 'Queue',       badge: untriagedEntries.length || null },
-          { href: 'section-board',       label: 'Task Board',  badge: null },
-          { href: 'section-annotations', label: 'Annotations', badge: null },
-          { href: 'section-log',         label: 'Weekly Log',  badge: null },
+          { href: 'section-queue', label: 'Queue',      badge: untriagedEntries.length || null },
+          { href: 'section-board', label: 'Task Board', badge: null },
+          { href: 'section-log',   label: 'Weekly Log', badge: null },
         ].map(({ href, label, badge }) => (
           <button
             key={href}
@@ -2514,287 +2445,225 @@ export default function Triage() {
         )}
       </div>
 
-      {/* ── Annotations Section ──────────────────────────────────────────────── */}
-      <div id="section-annotations">
-        {/* Section header */}
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Bookmark size={15} className="text-emerald-400" />
-            <h2 className="text-sm font-semibold text-foreground">Annotations</h2>
-            {annotations.length > 0 && (
-              <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                {annotations.length}
-              </span>
-            )}
-          </div>
-          <button
-            onClick={() => { setEditAnnotation(null); setAnnotationErrors({}); setShowAnnotationForm(v => !v); }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-secondary hover:bg-muted border border-border text-xs font-medium text-foreground/80 hover:text-foreground transition-all"
-          >
-            {showAnnotationForm ? <X size={13} /> : <Plus size={13} />}
-            {showAnnotationForm ? 'Cancel' : 'Add'}
-          </button>
-        </div>
-
-        {/* Inline add / edit form */}
-        {showAnnotationForm && (
-          <div className="mb-3 bg-card border border-border rounded-2xl p-4 space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              {/* Customer */}
-              <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1.5">Customer *</label>
-                <select
-                  value={annotationForm.customerId}
-                  onChange={e => setAnnotationForm(p => ({ ...p, customerId: e.target.value }))}
-                  className="w-full h-10 bg-secondary border border-border rounded-lg px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
-                >
-                  <option value="">Select customer…</option>
-                  {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-                {annotationErrors.customerId && <p className="mt-1 text-xs text-destructive">{annotationErrors.customerId}</p>}
-              </div>
-              {/* Date */}
-              <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1.5">Date</label>
-                <input
-                  type="date"
-                  value={annotationForm.date}
-                  onChange={e => setAnnotationForm(p => ({ ...p, date: e.target.value }))}
-                  className="w-full h-10 bg-secondary border border-border rounded-lg px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
-                />
-              </div>
-            </div>
-
-            {/* Tag radio */}
-            <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-2">Tag *</label>
-              <div className="flex gap-2">
-                {ANNOTATION_TAGS.map(tag => (
-                  <button
-                    key={tag}
-                    type="button"
-                    onClick={() => setAnnotationForm(p => ({ ...p, tag }))}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
-                      annotationForm.tag === tag ? 'border-transparent' : 'border-border bg-secondary text-muted-foreground hover:text-foreground'
-                    }`}
-                    style={annotationForm.tag === tag ? {
-                      backgroundColor: ANNOTATION_TAG_COLORS[tag] + '25',
-                      color: ANNOTATION_TAG_COLORS[tag],
-                      borderColor: ANNOTATION_TAG_COLORS[tag] + '60',
-                    } : {}}
-                  >
-                    <span
-                      className="w-2 h-2 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: ANNOTATION_TAG_COLORS[tag] }}
-                    />
-                    {ANNOTATION_TAG_LABELS[tag]}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Text */}
-            <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Note *</label>
-              <textarea
-                placeholder="What happened? What did you observe?"
-                rows={2}
-                value={annotationForm.text}
-                onChange={e => setAnnotationForm(p => ({ ...p, text: e.target.value }))}
-                className="w-full bg-secondary border border-border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40 resize-none"
-              />
-              {annotationErrors.text && <p className="mt-1 text-xs text-destructive">{annotationErrors.text}</p>}
-            </div>
-
-            <div className="flex gap-3">
-              <button onClick={handleCancelAnnotation} className="flex-1 py-2 rounded-xl bg-muted hover:bg-gray-600 text-sm font-medium transition-colors">Cancel</button>
-              <button onClick={handleAnnotationSubmit} className="flex-1 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-sm font-bold text-white transition-colors">
-                {editAnnotation ? 'Save Changes' : 'Add Annotation'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Filter bar */}
-        {annotations.length > 0 && (
-          <div className="flex gap-2 mb-3 flex-wrap">
-            <select
-              value={filterAnnotationCustomer}
-              onChange={e => setFilterAnnotationCustomer(e.target.value)}
-              className="h-8 bg-secondary border border-border rounded-lg px-2 text-xs text-foreground focus:outline-none focus:border-ring"
-            >
-              <option value="">All Customers</option>
-              {customers.filter(c => annotations.some(a => a.customerId === c.id)).map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-            <select
-              value={filterAnnotationTag}
-              onChange={e => setFilterAnnotationTag(e.target.value)}
-              className="h-8 bg-secondary border border-border rounded-lg px-2 text-xs text-foreground focus:outline-none focus:border-ring"
-            >
-              <option value="">All Tags</option>
-              {ANNOTATION_TAGS.map(t => <option key={t} value={t}>{ANNOTATION_TAG_LABELS[t]}</option>)}
-            </select>
-          </div>
-        )}
-
-        {/* Annotation list */}
-        {annotations.length === 0 && !showAnnotationForm ? (
-          <div className="bg-card border border-border rounded-2xl px-5 py-10 text-center">
-            <Bookmark size={24} className="text-muted-foreground/60 mx-auto mb-2" />
-            <p className="text-muted-foreground text-sm">No annotations yet.</p>
-            <p className="text-muted-foreground/70 text-xs mt-1">Add observations tagged as Good, Bad, or Learnings.</p>
-          </div>
-        ) : filteredAnnotations.length === 0 ? (
-          <div className="bg-card border border-border rounded-2xl px-5 py-6 text-center">
-            <p className="text-muted-foreground text-sm">No annotations match this filter.</p>
-          </div>
-        ) : (
-          <div className="bg-card border border-border rounded-2xl px-4 py-1">
-            {filteredAnnotations.map(a => (
-              <AnnotationRow
-                key={a.id}
-                annotation={a}
-                customer={customerMap.get(a.customerId)}
-                onEdit={handleEditAnnotation}
-                onDelete={setDeleteAnnotationTarget}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-
       {/* ── Weekly Update Log Section ─────────────────────────────────────────── */}
       <div id="section-log">
-        {/* Section header */}
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Bookmark size={15} className="text-brand-lavender" />
-            <h2 className="text-sm font-semibold text-foreground">Weekly Update Log</h2>
-            <span className="text-[10px] text-muted-foreground/60">Highlights &amp; Lowlights</span>
-            {weeklyUpdateLogs.length > 0 && (
-              <span className="bg-brand-lavender/20 text-brand-lavender border border-brand-lavender/20 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                {weeklyUpdateLogs.length}
-              </span>
-            )}
+
+        {/* Migration banner */}
+        {migrationBanner > 0 && (
+          <div className="flex items-center gap-2 px-4 py-2.5 mb-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-medium">
+            <Check size={13} className="flex-shrink-0" />
+            <span>{migrationBanner} annotation{migrationBanner > 1 ? 's' : ''} migrated into Weekly Log</span>
+            <button onClick={() => setMigrationBanner(0)} className="ml-auto text-amber-400/60 hover:text-amber-400 transition-colors"><X size={13} /></button>
           </div>
+        )}
+
+        {/* Section header */}
+        <div className="flex items-center gap-2 mb-3">
+          <Bookmark size={15} className="text-brand-lavender" />
+          <h2 className="text-sm font-semibold text-foreground">Weekly Update Log</h2>
+          {weeklyUpdateLogs.length > 0 && (
+            <span className="bg-brand-lavender/20 text-brand-lavender border border-brand-lavender/20 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+              {weeklyUpdateLogs.length}
+            </span>
+          )}
         </div>
 
-        {/* Add form */}
+        {/* ── Add / Edit form ── */}
         <form onSubmit={handleAddLog} className="bg-card border border-border rounded-2xl p-4 mb-3 space-y-3">
-          {/* Customer (optional) */}
-          <select
-            value={logForm.customerId}
-            onChange={e => setLogForm(p => ({ ...p, customerId: e.target.value }))}
-            className="w-full rounded-xl border border-border bg-input px-3 py-2 text-sm text-foreground"
-          >
-            <option value="">No specific customer</option>
-            {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          {logEditId && (
+            <p className="text-xs font-semibold text-brand-lavender">Editing entry</p>
+          )}
 
-          {/* Type toggle (Highlight / Lowlight) */}
-          <div className="flex gap-2">
+          {/* Row 1: Date + Customer */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[10px] font-medium text-muted-foreground mb-1">Date</label>
+              <input
+                type="date"
+                value={logDate}
+                onChange={e => setLogDate(e.target.value)}
+                className="w-full h-9 bg-secondary border border-border rounded-lg px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-medium text-muted-foreground mb-1">Client (optional)</label>
+              <select
+                value={logForm.customerId}
+                onChange={e => setLogForm(p => ({ ...p, customerId: e.target.value }))}
+                className="w-full h-9 bg-secondary border border-border rounded-lg px-2 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+              >
+                <option value="">No specific client</option>
+                {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Row 2: Type pills */}
+          <div className="flex gap-1.5 flex-wrap">
             {WEEKLY_UPDATE_LOG_TYPES.map(type => (
               <button
                 key={type}
                 type="button"
                 onClick={() => setLogForm(p => ({ ...p, type }))}
-                className="flex-1 py-1.5 rounded-xl border text-xs font-medium transition-all"
+                className="px-3 py-1 rounded-full text-[11px] font-semibold border transition-all"
                 style={logForm.type === type ? {
                   backgroundColor: WEEKLY_UPDATE_LOG_COLORS[type] + '25',
                   color: WEEKLY_UPDATE_LOG_COLORS[type],
                   borderColor: WEEKLY_UPDATE_LOG_COLORS[type] + '60',
-                } : { borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}
+                } : { borderColor: 'var(--border)', color: 'var(--muted-foreground)', backgroundColor: 'transparent' }}
               >
                 {WEEKLY_UPDATE_LOG_LABELS[type]}
               </button>
             ))}
           </div>
 
-          {/* Text */}
+          {/* Row 3: Text + actions */}
           <textarea
             rows={2}
             value={logForm.text}
             onChange={e => setLogForm(p => ({ ...p, text: e.target.value }))}
-            placeholder="What happened this week? (max 300 chars)"
+            placeholder="What happened? (max 300 chars)"
             maxLength={300}
-            className="w-full rounded-xl border border-border bg-input px-3 py-2 text-sm resize-none text-foreground placeholder:text-muted-foreground/50"
+            className="w-full rounded-xl border border-border bg-input px-3 py-2 text-sm resize-none text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
           />
 
-          <button
-            type="submit"
-            disabled={!logForm.text.trim()}
-            className="px-4 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-medium disabled:opacity-40 hover:bg-primary/90 transition-all"
-          >
-            Add Log
-          </button>
+          <div className="flex gap-2">
+            {logEditId && (
+              <button type="button" onClick={handleCancelLogEdit} className="px-4 py-1.5 rounded-xl bg-secondary border border-border text-xs font-medium text-muted-foreground hover:text-foreground transition-all">
+                Cancel
+              </button>
+            )}
+            <button
+              type="submit"
+              disabled={!logForm.text.trim()}
+              className="flex-1 px-4 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-medium disabled:opacity-40 hover:bg-primary/90 transition-all"
+            >
+              {logEditId ? 'Save Changes' : 'Add Log'}
+            </button>
+          </div>
         </form>
 
-        {/* Log list — last 20, newest first */}
-        {weeklyUpdateLogs.length > 0 ? (
-          <div className="bg-card border border-border rounded-2xl px-4 py-1 space-y-0">
-            {[...weeklyUpdateLogs]
-              .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-              .slice(0, 20)
-              .map((log, idx, arr) => {
-                const customer = log.customerId ? customers.find(c => c.id === log.customerId) : null;
-                return (
-                  <div
-                    key={log.id}
-                    className={`flex items-start gap-2 py-3 ${idx < arr.length - 1 ? 'border-b border-border' : ''}`}
+        {/* ── Filters ── */}
+        <div className="flex gap-2 mb-3 flex-wrap">
+          <select
+            value={filterLogType}
+            onChange={e => setFilterLogType(e.target.value)}
+            className="h-8 bg-secondary border border-border rounded-lg px-2 text-xs text-foreground focus:outline-none focus:border-ring"
+          >
+            <option value="">All Types</option>
+            {WEEKLY_UPDATE_LOG_TYPES.map(t => <option key={t} value={t}>{WEEKLY_UPDATE_LOG_LABELS[t]}</option>)}
+          </select>
+          <select
+            value={filterLogCustomer}
+            onChange={e => setFilterLogCustomer(e.target.value)}
+            className="h-8 bg-secondary border border-border rounded-lg px-2 text-xs text-foreground focus:outline-none focus:border-ring"
+          >
+            <option value="">All Clients</option>
+            {customers.filter(c => weeklyUpdateLogs.some(l => l.customerId === c.id)).map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+          <input
+            type="date"
+            value={filterLogDateFrom}
+            onChange={e => setFilterLogDateFrom(e.target.value)}
+            title="From date"
+            className="h-8 bg-secondary border border-border rounded-lg px-2 text-xs text-foreground focus:outline-none focus:border-ring"
+          />
+          <input
+            type="date"
+            value={filterLogDateTo}
+            onChange={e => setFilterLogDateTo(e.target.value)}
+            title="To date"
+            className="h-8 bg-secondary border border-border rounded-lg px-2 text-xs text-foreground focus:outline-none focus:border-ring"
+          />
+          {(filterLogType || filterLogCustomer || filterLogDateFrom || filterLogDateTo) && (
+            <button
+              onClick={() => { setFilterLogType(''); setFilterLogCustomer(''); setFilterLogDateFrom(''); setFilterLogDateTo(''); }}
+              className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+            >
+              <X size={11} /> Clear
+            </button>
+          )}
+        </div>
+
+        {/* ── Entry list ── */}
+        {weeklyUpdateLogs.length === 0 ? (
+          <div className="bg-card border border-border rounded-2xl p-6 text-center">
+            <Bookmark size={24} className="text-muted-foreground/60 mx-auto mb-2" />
+            <p className="text-xs text-muted-foreground">No entries yet. Log your first highlight, lowlight, or learning above.</p>
+          </div>
+        ) : filteredLogs.length === 0 ? (
+          <div className="bg-card border border-border rounded-2xl px-5 py-6 text-center">
+            <p className="text-xs text-muted-foreground">No entries match these filters.</p>
+          </div>
+        ) : (
+          <div className="bg-card border border-border rounded-2xl px-4 py-1">
+            {filteredLogs.map((log, idx, arr) => {
+              const customer = log.customerId ? customerMap.get(log.customerId) : null;
+              return (
+                <div
+                  key={log.id}
+                  className={`flex items-start gap-2 py-3 ${idx < arr.length - 1 ? 'border-b border-border' : ''}`}
+                >
+                  {/* Type badge */}
+                  <span
+                    className="text-[10px] font-semibold px-2 py-0.5 rounded-lg flex-shrink-0 mt-0.5 whitespace-nowrap"
+                    style={{
+                      backgroundColor: WEEKLY_UPDATE_LOG_COLORS[log.type] + '20',
+                      color: WEEKLY_UPDATE_LOG_COLORS[log.type],
+                    }}
                   >
-                    <span
-                      className="text-[10px] font-semibold px-2 py-0.5 rounded-lg flex-shrink-0 mt-0.5"
-                      style={{
-                        backgroundColor: WEEKLY_UPDATE_LOG_COLORS[log.type] + '20',
-                        color: WEEKLY_UPDATE_LOG_COLORS[log.type],
-                      }}
+                    {WEEKLY_UPDATE_LOG_LABELS[log.type]}
+                  </span>
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-foreground leading-relaxed">{log.text}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      {log.date}
+                      {customer && (
+                        <span
+                          className="ml-1.5 px-1.5 py-0.5 rounded-full text-[9px] font-semibold"
+                          style={{ backgroundColor: customer.color + '22', color: customer.color }}
+                        >
+                          {customer.name}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-1 flex-shrink-0 mt-0.5">
+                    <button
+                      onClick={() => handleEditLog(log)}
+                      className="p-1 rounded text-muted-foreground/50 hover:text-foreground hover:bg-secondary transition-colors"
                     >
-                      {WEEKLY_UPDATE_LOG_LABELS[log.type]}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-foreground leading-relaxed">{log.text}</p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">
-                        {log.date}{customer ? ` · ${customer.name}` : ''}
-                      </p>
-                    </div>
+                      <Pencil size={12} />
+                    </button>
                     <button
                       onClick={() => setLogDeleteTarget(log.id)}
-                      className="text-muted-foreground/40 hover:text-destructive transition-colors flex-shrink-0 mt-0.5"
+                      className="p-1 rounded text-muted-foreground/50 hover:text-destructive hover:bg-secondary transition-colors"
                     >
                       <Trash2 size={12} />
                     </button>
                   </div>
-                );
-              })}
-          </div>
-        ) : (
-          <div className="bg-card border border-border rounded-2xl p-6 text-center">
-            <p className="text-xs text-muted-foreground">No update logs yet. Add your first highlight or lowlight above.</p>
+                </div>
+              );
+            })}
           </div>
         )}
 
         {/* Confirm delete log */}
         {logDeleteTarget && (
           <ConfirmDialog
-            title="Delete log?"
-            message="This log entry will be permanently removed."
+            title="Delete log entry?"
+            message="This entry will be permanently removed."
             onConfirm={() => { deleteWeeklyUpdateLog(logDeleteTarget); setLogDeleteTarget(null); }}
             onCancel={() => setLogDeleteTarget(null)}
           />
         )}
       </div>
-
-      {/* Annotation delete confirm */}
-      {deleteAnnotationTarget && (
-        <ConfirmDialog
-          title="Delete Annotation"
-          message={`Delete this ${ANNOTATION_TAG_LABELS[deleteAnnotationTarget.tag]} annotation? This cannot be undone.`}
-          onConfirm={() => { deleteAnnotation(deleteAnnotationTarget.id); setDeleteAnnotationTarget(null); }}
-          onCancel={() => setDeleteAnnotationTarget(null)}
-        />
-      )}
     </div>
 
     {/* Auto-save toast — appears bottom-right when timer session is saved */}

@@ -518,6 +518,31 @@ export function useStore() {
     setWeeklyUpdateLogs(prev => prev.filter(l => l.id !== id));
   }, []);
 
+  // ─── One-time migration: Annotations → Weekly Update Logs ───
+  // Maps good→highlight, bad→lowlight, learning→learning.
+  // Guarded by a localStorage flag so it only runs once ever.
+  const MIGRATION_FLAG_KEY = 'gpt-annotations-migrated';
+  const migrateAnnotationsToLogs = useCallback(() => {
+    if (localStorage.getItem(MIGRATION_FLAG_KEY)) return 0;
+    if (!annotations.length) {
+      localStorage.setItem(MIGRATION_FLAG_KEY, 'true');
+      return 0;
+    }
+    const TAG_MAP = { good: 'highlight', bad: 'lowlight', learning: 'learning' };
+    const migrated = annotations.map(a => ({
+      id:         uid(),
+      createdAt:  a.createdAt,
+      date:       a.date,
+      customerId: a.customerId || undefined,
+      type:       TAG_MAP[a.tag] || 'neutral',
+      text:       a.text,
+    }));
+    setWeeklyUpdateLogs(prev => [...prev, ...migrated]);
+    setAnnotations([]);
+    localStorage.setItem(MIGRATION_FLAG_KEY, 'true');
+    return migrated.length;
+  }, [annotations]);
+
   // ─── AI output actions ───
   const addAiOutput = useCallback((data) => {
     const output = { id: uid(), createdAt: new Date().toISOString(), ...data };
@@ -601,7 +626,7 @@ export function useStore() {
     addMilestone, updateMilestone, deleteMilestone, getCustomerMilestones,
     addAnnotation, updateAnnotation, deleteAnnotation, getCustomerAnnotations,
     addWeeklyReport, updateWeeklyReport, deleteWeeklyReport,
-    addWeeklyUpdateLog, updateWeeklyUpdateLog, deleteWeeklyUpdateLog,
+    addWeeklyUpdateLog, updateWeeklyUpdateLog, deleteWeeklyUpdateLog, migrateAnnotationsToLogs,
     addAiOutput, getTaskAiOutputs, updateAiOutput,
     aiSettings, updateAiSettings,
     exportData, importData,

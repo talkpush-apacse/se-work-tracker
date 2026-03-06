@@ -9,7 +9,6 @@ import { useGoogleAuth } from '../context/GoogleAuthContext';
 import { getThisWeekRange, filterPointsByRange, isInRange } from '../utils/dateHelpers';
 import {
   WEEKLY_REPORT_DEFAULT_PROMPT, WEEKLY_UPDATE_LOG_COLORS, WEEKLY_UPDATE_LOG_LABELS,
-  ANNOTATION_TAG_LABELS, ANNOTATION_TAG_COLORS,
   MILESTONE_STATUS_LABELS, MILESTONE_STATUS_COLORS,
 } from '../constants';
 import { Button } from '../components/ui/button';
@@ -33,7 +32,7 @@ function formatWeekLabel(weekStart, weekEnd) {
   return `${format(weekStart, 'MMM d')} – ${format(weekEnd, 'MMM d, yyyy')}`;
 }
 
-function buildWeekContext({ weekStart, weekEnd, points, tasks, customers, okrs, annotations, weeklyUpdateLogs, milestones, calendarEvents, gmailEmails }) {
+function buildWeekContext({ weekStart, weekEnd, points, tasks, customers, okrs, weeklyUpdateLogs, milestones, calendarEvents, gmailEmails }) {
   const weekLabel = formatWeekLabel(weekStart, weekEnd);
   const lines = [];
 
@@ -135,31 +134,18 @@ function buildWeekContext({ weekStart, weekEnd, points, tasks, customers, okrs, 
     lines.push('');
   }
 
-  // ── Wins & learnings ──
-  const weekAnnotations = annotations.filter(a => {
-    try {
-      return isInRange(parseISO(a.date + 'T00:00:00'), weekStart, weekEnd);
-    } catch { return false; }
-  });
-  if (weekAnnotations.length > 0) {
-    lines.push('### Wins & Learnings');
-    weekAnnotations.forEach(a => {
-      const prefix = a.tag === 'good' ? '✓' : a.tag === 'bad' ? '✗' : '→';
-      const cName = customerMap.get(a.customerId)?.name;
-      lines.push(`  - ${prefix}${cName ? ` [${cName}]` : ''} ${a.text}`);
-    });
-    lines.push('');
-  }
-
-  // ── Weekly Highlights & Lowlights ──
+  // ── Weekly Highlights, Learnings & Shoutouts ──
   const weekLogs = (weeklyUpdateLogs || []).filter(l => {
     try { return isInRange(parseISO(l.date + 'T00:00:00'), weekStart, weekEnd); }
     catch { return false; }
   });
-  if (weekLogs.length > 0) {
-    const highlights = weekLogs.filter(l => l.type === 'highlight');
-    const lowlights  = weekLogs.filter(l => l.type === 'lowlight');
-    lines.push('### Weekly Highlights & Lowlights');
+  const reportLogs = weekLogs.filter(l => ['highlight', 'lowlight', 'learning', 'shoutout'].includes(l.type));
+  if (reportLogs.length > 0) {
+    const highlights = reportLogs.filter(l => l.type === 'highlight');
+    const lowlights  = reportLogs.filter(l => l.type === 'lowlight');
+    const learnings  = reportLogs.filter(l => l.type === 'learning');
+    const shoutouts  = reportLogs.filter(l => l.type === 'shoutout');
+    lines.push('### Weekly Highlights & Notes');
     if (highlights.length > 0) {
       lines.push('**Highlights:**');
       highlights.forEach(l => {
@@ -170,6 +156,20 @@ function buildWeekContext({ weekStart, weekEnd, points, tasks, customers, okrs, 
     if (lowlights.length > 0) {
       lines.push('**Lowlights / Challenges:**');
       lowlights.forEach(l => {
+        const cName = l.customerId ? customerMap.get(l.customerId)?.name : null;
+        lines.push(`  - ${l.text}${cName ? ` [${cName}]` : ''}`);
+      });
+    }
+    if (learnings.length > 0) {
+      lines.push('**Learnings:**');
+      learnings.forEach(l => {
+        const cName = l.customerId ? customerMap.get(l.customerId)?.name : null;
+        lines.push(`  - ${l.text}${cName ? ` [${cName}]` : ''}`);
+      });
+    }
+    if (shoutouts.length > 0) {
+      lines.push('**Shoutouts:**');
+      shoutouts.forEach(l => {
         const cName = l.customerId ? customerMap.get(l.customerId)?.name : null;
         lines.push(`  - ${l.text}${cName ? ` [${cName}]` : ''}`);
       });
@@ -247,7 +247,7 @@ async function fetchGmailSent(gmailToken, weekStart, weekEnd) {
 
 export default function WeeklyReport({ onNavigate }) {
   const {
-    points, tasks, customers, okrs, annotations, weeklyUpdateLogs, milestones,
+    points, tasks, customers, okrs, weeklyUpdateLogs, milestones,
     weeklyReports, addWeeklyReport, deleteWeeklyReport,
     aiSettings, updateAiSettings,
   } = useAppStore();
@@ -327,6 +327,18 @@ export default function WeeklyReport({ onNavigate }) {
     [weeklyUpdateLogs, weekStart, weekEnd]
   );
 
+  // Report-worthy types (Neutral excluded from Weekly Report display)
+  const REPORT_TYPES = ['highlight', 'lowlight', 'learning', 'shoutout'];
+  const reportLogs = useMemo(
+    () => weekLogs.filter(l => REPORT_TYPES.includes(l.type)),
+    [weekLogs] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const logsByType = useMemo(() => {
+    const groups = {};
+    REPORT_TYPES.forEach(t => { groups[t] = weekLogs.filter(l => l.type === t); });
+    return groups;
+  }, [weekLogs]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Milestones whose targetDate falls in the selected week
   const weekMilestones = useMemo(
     () => (milestones || []).filter(m => {
@@ -335,15 +347,6 @@ export default function WeeklyReport({ onNavigate }) {
       catch { return false; }
     }),
     [milestones, weekStart, weekEnd]
-  );
-
-  // Annotations (wins/learnings) logged during the selected week
-  const weekAnnotations = useMemo(
-    () => (annotations || []).filter(a => {
-      try { return isInRange(parseISO(a.date + 'T00:00:00'), weekStart, weekEnd); }
-      catch { return false; }
-    }),
-    [annotations, weekStart, weekEnd]
   );
 
   // ── Prefetch calendar + Gmail whenever week or tokens change ──
@@ -381,7 +384,7 @@ export default function WeeklyReport({ onNavigate }) {
     // calendarEvents / gmailEmails now come from prefetched state
     const context = buildWeekContext({
       weekStart, weekEnd, points, tasks, customers, okrs,
-      annotations, weeklyUpdateLogs, milestones, calendarEvents, gmailEmails,
+      weeklyUpdateLogs, milestones, calendarEvents, gmailEmails,
     });
 
     const systemPrompt = localPrompt.trim() || aiSettings.prompts?.weeklyEmail?.trim() || WEEKLY_REPORT_DEFAULT_PROMPT;
@@ -456,7 +459,7 @@ export default function WeeklyReport({ onNavigate }) {
     } finally {
       setIsGenerating(false);
     }
-  }, [provider, weekStart, weekEnd, points, tasks, customers, okrs, annotations, weeklyUpdateLogs, milestones, calendarEvents, gmailEmails, localPrompt, aiSettings, weekTasksList]);
+  }, [provider, weekStart, weekEnd, points, tasks, customers, okrs, weeklyUpdateLogs, milestones, calendarEvents, gmailEmails, localPrompt, aiSettings, weekTasksList]);
 
   const handleSave = useCallback(() => {
     const model = provider === 'claude'
@@ -775,35 +778,43 @@ export default function WeeklyReport({ onNavigate }) {
         )}
       </div>
 
-      {/* ── B2: Weekly Highlights & Lowlights ── */}
-      {weekLogs.length > 0 && (
-        <div className="rounded-2xl border border-border bg-card px-5 py-4 space-y-3">
+      {/* ── B2: Highlights, Learnings & Shoutouts ── */}
+      {reportLogs.length > 0 && (
+        <div className="rounded-2xl border border-border bg-card px-5 py-4 space-y-4">
           <h3 className="text-sm font-semibold text-foreground">
-            Highlights &amp; Lowlights this week
-            <span className="ml-2 text-xs font-normal text-muted-foreground">{weekLogs.length} logged</span>
+            Highlights, Learnings &amp; Shoutouts this week
+            <span className="ml-2 text-xs font-normal text-muted-foreground">{reportLogs.length} logged</span>
           </h3>
-          <div className="space-y-2 max-h-56 overflow-y-auto">
-            {weekLogs.map(log => {
-              const customer = log.customerId ? customers.find(c => c.id === log.customerId) : null;
-              return (
-                <div key={log.id} className="flex items-start gap-2">
-                  <span
-                    className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md flex-shrink-0 mt-0.5"
-                    style={{
-                      backgroundColor: WEEKLY_UPDATE_LOG_COLORS[log.type] + '20',
-                      color: WEEKLY_UPDATE_LOG_COLORS[log.type],
-                    }}
-                  >
-                    {WEEKLY_UPDATE_LOG_LABELS[log.type]}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-xs text-foreground leading-relaxed">{log.text}</p>
-                    {customer && <p className="text-[10px] text-muted-foreground">{customer.name}</p>}
+          {REPORT_TYPES.filter(t => logsByType[t]?.length > 0).map(t => (
+            <div key={t} className="space-y-1.5">
+              <p
+                className="text-[11px] font-semibold uppercase tracking-wide"
+                style={{ color: WEEKLY_UPDATE_LOG_COLORS[t] }}
+              >
+                {WEEKLY_UPDATE_LOG_LABELS[t]}
+              </p>
+              {logsByType[t].map(log => {
+                const customer = log.customerId ? customers.find(c => c.id === log.customerId) : null;
+                return (
+                  <div key={log.id} className="flex items-start gap-2">
+                    <span
+                      className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md flex-shrink-0 mt-0.5"
+                      style={{
+                        backgroundColor: WEEKLY_UPDATE_LOG_COLORS[t] + '20',
+                        color: WEEKLY_UPDATE_LOG_COLORS[t],
+                      }}
+                    >
+                      {WEEKLY_UPDATE_LOG_LABELS[t]}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-xs text-foreground leading-relaxed">{log.text}</p>
+                      {customer && <p className="text-[10px] text-muted-foreground">{customer.name}</p>}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          ))}
         </div>
       )}
 
@@ -832,38 +843,6 @@ export default function WeeklyReport({ onNavigate }) {
                   </span>
                   <div className="min-w-0">
                     <p className="text-xs text-foreground leading-relaxed">{m.title}</p>
-                    {customer && <p className="text-[10px] text-muted-foreground">{customer.name}</p>}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* ── B4: Wins & Learnings (annotations) this week ── */}
-      {weekAnnotations.length > 0 && (
-        <div className="rounded-2xl border border-border bg-card px-5 py-4 space-y-3">
-          <h3 className="text-sm font-semibold text-foreground">
-            Wins &amp; Learnings this week
-            <span className="ml-2 text-xs font-normal text-muted-foreground">{weekAnnotations.length} logged</span>
-          </h3>
-          <div className="space-y-2 max-h-56 overflow-y-auto">
-            {weekAnnotations.map(a => {
-              const customer = a.customerId ? customers.find(c => c.id === a.customerId) : null;
-              return (
-                <div key={a.id} className="flex items-start gap-2">
-                  <span
-                    className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md flex-shrink-0 mt-0.5"
-                    style={{
-                      backgroundColor: (ANNOTATION_TAG_COLORS[a.tag] || '#6b7280') + '20',
-                      color: ANNOTATION_TAG_COLORS[a.tag] || '#6b7280',
-                    }}
-                  >
-                    {ANNOTATION_TAG_LABELS[a.tag] || a.tag}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-xs text-foreground leading-relaxed">{a.text}</p>
                     {customer && <p className="text-[10px] text-muted-foreground">{customer.name}</p>}
                   </div>
                 </div>

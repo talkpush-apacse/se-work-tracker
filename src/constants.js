@@ -131,11 +131,20 @@ export const ANNOTATION_TAG_COLORS = {
 };
 
 // ─── Weekly Update Log ────────────────────────────────────────────────────────
-export const WEEKLY_UPDATE_LOG_TYPES = ['highlight', 'lowlight'];
-export const WEEKLY_UPDATE_LOG_LABELS = { highlight: 'Highlight', lowlight: 'Lowlight' };
+export const WEEKLY_UPDATE_LOG_TYPES = ['highlight', 'lowlight', 'neutral', 'learning', 'shoutout'];
+export const WEEKLY_UPDATE_LOG_LABELS = {
+  highlight: 'Highlight',
+  lowlight:  'Lowlight',
+  neutral:   'Neutral',
+  learning:  'Learning',
+  shoutout:  'Shoutout',
+};
 export const WEEKLY_UPDATE_LOG_COLORS = {
-  highlight: '#10b981',  // emerald green (positive)
-  lowlight:  '#f43f5e',  // rose red (negative)
+  highlight: '#10b981',  // emerald green
+  lowlight:  '#f43f5e',  // rose red
+  neutral:   '#6b7280',  // gray
+  learning:  '#3b82f6',  // blue
+  shoutout:  '#f59e0b',  // amber/gold
 };
 
 // ─── Weekly Email Generator ───────────────────────────────────────────────────
