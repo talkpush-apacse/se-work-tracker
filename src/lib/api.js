@@ -33,13 +33,15 @@ export async function fetchAllData() {
  * Save a single entity to Neon.
  * @param {string} entity - Entity name (e.g. 'tasks', 'projects')
  * @param {any} data - The full data array/object for this entity
+ * @param {{ keepalive?: boolean }} options - keepalive: true lets the request complete after page unload
  */
-export async function saveEntity(entity, data) {
+export async function saveEntity(entity, data, { keepalive = false } = {}) {
   try {
     const res = await fetch(`/api/data/${entity}`, {
       method: 'PUT',
       headers,
       body: JSON.stringify({ data }),
+      ...(keepalive ? { keepalive: true } : {}),
     });
     if (!res.ok) throw new Error(`PUT /api/data/${entity} → ${res.status}`);
     return true;

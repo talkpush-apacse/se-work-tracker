@@ -204,6 +204,17 @@ function createBatchedSaver(getMounted, onError) {
     timer = setTimeout(flush, 500);
   };
 
+  // Synchronously flushes all pending dirty entities with keepalive=true.
+  // Called from the beforeunload handler so in-flight saves survive page unload.
+  saver.flushSync = () => {
+    clearTimeout(timer);
+    if (dirty.size === 0) return;
+    for (const [entity, data] of dirty.entries()) {
+      saveEntity(entity, data, { keepalive: true }).catch(() => {});
+    }
+    dirty.clear();
+  };
+
   return saver;
 }
 
@@ -265,6 +276,14 @@ export function useStore() {
   useEffect(() => { if (mountedRef.current) debouncedSave('annotations', annotations); }, [annotations]);
   useEffect(() => { if (mountedRef.current) debouncedSave('weeklyReports', weeklyReports); }, [weeklyReports]);
   useEffect(() => { if (mountedRef.current) debouncedSave('weeklyUpdateLogs', weeklyUpdateLogs); }, [weeklyUpdateLogs]);
+
+  // Flush any pending Neon writes when the user reloads or navigates away.
+  // keepalive: true tells the browser to complete the fetch even after the page unloads.
+  useEffect(() => {
+    const handleBeforeUnload = () => debouncedSave.flushSync();
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (mountedRef.current) setSyncStatus('saving'); }, [okrs, customers, points, meetingEntries, tasks, milestones, aiOutputs, aiSettings, annotations, weeklyReports, weeklyUpdateLogs]);
