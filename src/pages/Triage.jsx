@@ -29,6 +29,7 @@ import {
   TASK_INTERACTION_TYPES, TASK_INTERACTION_TYPE_LABELS,
 } from '../constants';
 import Modal from '../components/Modal';
+import AIAssistModal from '../components/AIAssistModal';
 import { stripHtml } from '../lib/utils';
 
 // ─── Helper: resolve recipient label from value key ───────────────────────────
@@ -1879,6 +1880,8 @@ export default function Triage() {
   const [taskDetailId, setTaskDetailId] = useState(null);
   const [triageRefresh, setTriageRefresh] = useState(0);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [autoSaveToast, setAutoSaveToast] = useState(null); // { pts, customerName } | null
+  const [aiAssistOpen, setAiAssistOpen] = useState(false);
 
   // Filter state
   const [filterCustomerId, setFilterCustomerId] = useState('');
@@ -2041,7 +2044,11 @@ export default function Triage() {
       activityType: 'General Admin',
       comment: `Auto-tracked: ${session.taskDescription || 'Task review'}`,
     });
-  }, [addPoint]);
+    // Toast feedback so user knows points were captured
+    const cName = customers.find(c => c.id === session.customerId)?.name || 'task';
+    setAutoSaveToast({ pts, customerName: cName });
+    setTimeout(() => setAutoSaveToast(null), 3000);
+  }, [addPoint, customers]);
 
   const handleOpenDetail = useCallback((task) => {
     // Auto-stop previous timer if running for a different task
@@ -2269,6 +2276,12 @@ export default function Triage() {
               Focus Time
             </button>
           )}
+          <button
+            onClick={() => setAiAssistOpen(true)}
+            className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border border-border bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors font-semibold"
+          >
+            <Sparkles size={12} /> AI Assist
+          </button>
           <button
             onClick={() => setShowQuickAdd(v => !v)}
             className={`${isRunning ? 'ml-auto' : ''} flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
@@ -2783,6 +2796,21 @@ export default function Triage() {
         />
       )}
     </div>
+
+    {/* Auto-save toast — appears bottom-right when timer session is saved */}
+    {autoSaveToast && (
+      <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 text-sm
+                      text-emerald-400 bg-card border border-emerald-500/20 rounded-xl
+                      px-4 py-2.5 shadow-lg pointer-events-none">
+        <Check size={14} />
+        Auto-saved {autoSaveToast.pts} pts · {autoSaveToast.customerName}
+      </div>
+    )}
+
+    {/* AI Assist standalone modal */}
+    {aiAssistOpen && (
+      <AIAssistModal onClose={() => setAiAssistOpen(false)} />
+    )}
     </>
   );
 }
