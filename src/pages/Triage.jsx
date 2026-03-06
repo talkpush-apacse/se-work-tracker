@@ -4,7 +4,7 @@ import {
   Loader2, ClipboardList, Sparkles, ChevronRight,
   Calendar, User, Tag, AlertCircle, Archive, ArchiveX, Trash2,
   Settings, RotateCcw, Pencil, GripVertical, ExternalLink, ArrowLeft,
-  Timer, Square, Pin, CheckSquare, Paperclip,
+  Timer, Square, Pin, CheckSquare, Paperclip, Clock,
   Bookmark, Table2, X,
 } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
@@ -2003,6 +2003,21 @@ export default function Triage() {
     [tasks, customerMap, filterCustomerId, filterTaskType, filterPriorityClients]
   );
 
+  // Dedicated in-progress list — respects customer/taskType/priority filters but NOT filterStatus
+  const inProgressTasks = useMemo(
+    () => tasks.filter(t => {
+      if (t.status !== 'in-progress') return false;
+      if (filterCustomerId && t.customerId !== filterCustomerId) return false;
+      if (filterTaskType && t.taskType !== filterTaskType) return false;
+      if (filterPriorityClients) {
+        const cust = customerMap.get(t.customerId);
+        if (!cust?.pinned) return false;
+      }
+      return true;
+    }),
+    [tasks, customerMap, filterCustomerId, filterTaskType, filterPriorityClients]
+  );
+
   const filtersActive = filterCustomerId || filterTaskType || filterStatus || filterPriorityClients;
 
   // Bulk action helpers
@@ -2428,6 +2443,21 @@ export default function Triage() {
             Active ({activeTasks.length})
           </button>
           <button
+            onClick={() => { setBoardTab('in-progress'); setFilterStatus(''); setFilterCustomerId(''); setFilterTaskType(''); setFilterPriorityClients(false); clearSelection(); }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              boardTab === 'in-progress' ? 'bg-muted text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            In Progress
+            {inProgressTasks.length > 0 && (
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                boardTab === 'in-progress' ? 'bg-indigo-500/20 text-indigo-400' : 'bg-muted text-muted-foreground'
+              }`}>
+                {inProgressTasks.length}
+              </span>
+            )}
+          </button>
+          <button
             onClick={() => { setBoardTab('closed'); setFilterStatus(''); setFilterCustomerId(''); setFilterTaskType(''); setFilterPriorityClients(false); clearSelection(); }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
               boardTab === 'closed' ? 'bg-muted text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
@@ -2499,6 +2529,40 @@ export default function Triage() {
               <SortableContext items={activeTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
                 <div className="space-y-2">
                   {activeTasks.map(task => {
+                    const customer = customerMap.get(task.customerId);
+                    return (
+                      <SortableTaskRow
+                        key={task.id}
+                        task={task}
+                        customer={customer}
+                        onOpenDetail={handleOpenDetail}
+                        isSelected={selectedTaskIds.has(task.id)}
+                        onToggleSelect={toggleSelect}
+                        onStatusChange={handleTaskStatusChange}
+                      />
+                    );
+                  })}
+                </div>
+              </SortableContext>
+            </DndContext>
+          )
+        )}
+
+        {/* In Progress tab — draggable task list */}
+        {boardTab === 'in-progress' && (
+          inProgressTasks.length === 0 ? (
+            <div className="bg-card border border-border rounded-2xl px-5 py-10 text-center">
+              <Clock size={24} className="text-muted-foreground/60 mx-auto mb-2" />
+              <p className="text-muted-foreground text-sm">{filtersActive ? 'No in-progress tasks match this filter.' : 'No tasks in progress.'}</p>
+              <p className="text-muted-foreground/70 text-xs mt-1">
+                {filtersActive ? 'Try a different filter.' : 'Set a task\'s status to In Progress to track active work here.'}
+              </p>
+            </div>
+          ) : (
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={inProgressTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+                <div className="space-y-2">
+                  {inProgressTasks.map(task => {
                     const customer = customerMap.get(task.customerId);
                     return (
                       <SortableTaskRow
