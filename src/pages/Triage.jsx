@@ -1215,6 +1215,73 @@ const AIWorkspace = memo(function AIWorkspace({ task, customer }) {
   );
 });
 
+// ─── Timer quick task form — minimal form to create a task and start the timer ───
+function TimerQuickTaskForm({ customers, onSubmit, onStartWithoutTask, onCancel }) {
+  const [description, setDescription] = useState('');
+  const [customerId, setCustomerId]   = useState('');
+  const canSubmit = description.trim().length > 0;
+
+  return (
+    <div className="mb-3 bg-secondary/60 border border-emerald-500/30 rounded-xl p-3 space-y-3">
+      <p className="text-xs font-semibold text-emerald-400/80 uppercase tracking-wide">Focus Task</p>
+
+      <div>
+        <label className="block text-xs text-muted-foreground mb-1">What are you working on? *</label>
+        <input
+          type="text"
+          autoFocus
+          value={description}
+          onChange={e => setDescription(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && canSubmit && onSubmit(description.trim(), customerId)}
+          placeholder="e.g. Review onboarding deck for Accenture"
+          className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+        />
+      </div>
+
+      <div>
+        <label className="block text-xs text-muted-foreground mb-1">
+          Customer <span className="opacity-60">(optional)</span>
+        </label>
+        <select
+          value={customerId}
+          onChange={e => setCustomerId(e.target.value)}
+          className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+        >
+          <option value="">— No specific client —</option>
+          {customers.map(c => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="flex gap-2 pt-1">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="py-2 px-3 rounded-xl bg-muted hover:bg-gray-600 text-xs font-medium transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={onStartWithoutTask}
+          className="flex-1 py-2 rounded-xl bg-secondary border border-border text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Start without task
+        </button>
+        <button
+          type="button"
+          disabled={!canSubmit}
+          onClick={() => onSubmit(description.trim(), customerId)}
+          className="flex-1 py-2 rounded-xl bg-emerald-700/40 hover:bg-emerald-700/60 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-emerald-300 border border-emerald-700/40 transition-colors"
+        >
+          Create &amp; Start Timer
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Quick add task form (no meeting entry, just description + customer link) ───
 function QuickAddTaskForm({ customers, onSubmit, onCancel }) {
   const { okrs } = useAppStore();
@@ -1822,6 +1889,7 @@ export default function Triage() {
   const [taskDetailId, setTaskDetailId] = useState(null);
   const [triageRefresh, setTriageRefresh] = useState(0);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [showTimerTaskForm, setShowTimerTaskForm] = useState(false);
   const [autoSaveToast, setAutoSaveToast] = useState(null); // { pts, customerName } | null
   const [aiAssistOpen, setAiAssistOpen] = useState(false);
 
@@ -2086,6 +2154,11 @@ export default function Triage() {
     if (count > 0) setMigrationBanner(count);
   }, []);
 
+  // ─── Close timer task form when timer starts from elsewhere ───────────────
+  useEffect(() => {
+    if (isRunning) setShowTimerTaskForm(false);
+  }, [isRunning]);
+
   // ── Task Detail sub-view ───────────────────────────────────────────────────
   if (taskDetailId) {
     const task = tasks.find(t => t.id === taskDetailId);
@@ -2196,12 +2269,16 @@ export default function Triage() {
               filtered ↓
             </button>
           )}
-          {/* General Focus Time button — starts timer with no customer */}
+          {/* Focus Time button — opens quick task form, or starts unlinked timer */}
           {!isRunning && (
             <button
-              onClick={() => startTimer(null, null, null)}
-              className="ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all bg-secondary border-border text-muted-foreground hover:text-brand-sage hover:border-emerald-500/40"
-              title="Start a General Focus Time timer (not tied to a specific customer)"
+              onClick={() => { setShowTimerTaskForm(v => !v); setShowQuickAdd(false); }}
+              className={`ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
+                showTimerTaskForm
+                  ? 'bg-emerald-700/20 border-emerald-500/40 text-emerald-400'
+                  : 'bg-secondary border-border text-muted-foreground hover:text-brand-sage hover:border-emerald-500/40'
+              }`}
+              title="Create a focus task and start timer"
             >
               <Timer size={12} />
               Focus Time
@@ -2214,7 +2291,7 @@ export default function Triage() {
             <Sparkles size={12} /> AI Assist
           </button>
           <button
-            onClick={() => setShowQuickAdd(v => !v)}
+            onClick={() => { setShowQuickAdd(v => !v); setShowTimerTaskForm(false); }}
             className={`${isRunning ? 'ml-auto' : ''} flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
               showQuickAdd
                 ? 'bg-brand-lavender/20 border-indigo-500/40 text-brand-lavender/80'
@@ -2225,6 +2302,29 @@ export default function Triage() {
             Task
           </button>
         </div>
+
+        {/* Focus timer quick-create form */}
+        {showTimerTaskForm && (
+          <TimerQuickTaskForm
+            customers={customers}
+            onSubmit={(description, customerId) => {
+              const newTask = addTask({
+                customerId: customerId || null,
+                description,
+                taskType: 'focus-time',
+                assigneeOrTeam: null,
+                status: 'open',
+              });
+              startTimer(customerId || null, newTask.id, newTask.description);
+              setShowTimerTaskForm(false);
+            }}
+            onStartWithoutTask={() => {
+              startTimer(null, null, null);
+              setShowTimerTaskForm(false);
+            }}
+            onCancel={() => setShowTimerTaskForm(false)}
+          />
+        )}
 
         {/* Quick add task form */}
         {showQuickAdd && (
