@@ -22,7 +22,7 @@ const V2_MIGRATION_FLAG = 'gpt-v2-migrated';
 // Default AI settings shape — empty string means "use built-in default prompt"
 const DEFAULT_AI_SETTINGS = {
   prompts: { email: '', slack: '', troubleshooting: '', configuration: '', summary: '', weeklyEmail: '' },
-  providers: { email: 'openai', slack: 'openai', troubleshooting: 'openai', configuration: 'openai', summary: 'openai', weeklyEmail: 'claude' },
+  providers: { email: 'openai', slack: 'openai', troubleshooting: 'openai', configuration: 'openai', summary: 'openai', weeklyEmail: 'claude', knowledge: 'claude' },
   openaiModel: 'gpt-4o',
   claudeModel: 'claude-sonnet-4-6',
 };

@@ -15,6 +15,7 @@ const Customers    = lazy(() => import('./pages/Customers'));
 const Triage       = lazy(() => import('./pages/Triage'));
 const Integrations = lazy(() => import('./pages/Integrations'));
 const WeeklyReport = lazy(() => import('./pages/WeeklyReport'));
+const Knowledge    = lazy(() => import('./pages/Knowledge'));
 
 const pageVariants = {
   hidden: { opacity: 0, y: 16 },
@@ -61,6 +62,7 @@ function AppContent() {
                 {activeTab === 'okrs'         && <OKRs />}
                 {activeTab === 'customers'    && <Customers />}
                 {activeTab === 'weekly'       && <WeeklyReport onNavigate={handleTabChange} />}
+                {activeTab === 'knowledge'    && <Knowledge />}
                 {activeTab === 'integrations' && <Integrations />}
               </motion.div>
             </AnimatePresence>

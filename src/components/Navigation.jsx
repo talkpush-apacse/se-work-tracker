@@ -1,4 +1,4 @@
-import { LayoutDashboard, Target, Users, Menu, X, Download, Upload, ListTodo, Cloud, CloudOff, Loader2, Plug, Mail } from 'lucide-react';
+import { LayoutDashboard, Target, Users, Menu, X, Download, Upload, ListTodo, Cloud, CloudOff, Loader2, Plug, Mail, Brain } from 'lucide-react';
 import { useState, useRef, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAppStore } from '../context/StoreContext';
@@ -12,6 +12,7 @@ const tabs = [
   { id: 'okrs',         label: 'OKRs',           icon: Target },
   { id: 'dashboard',    label: 'Dashboard',      icon: LayoutDashboard },
   { id: 'weekly',       label: 'Weekly Report',  icon: Mail },
+  { id: 'knowledge',    label: 'Knowledge',      icon: Brain },
   { id: 'integrations', label: 'Integrations',   icon: Plug },
 ];
 

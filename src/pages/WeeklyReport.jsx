@@ -13,6 +13,7 @@ import {
 } from '../constants';
 import { Button } from '../components/ui/button';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { fetchCalendarEvents, fetchGmailSent } from '../lib/googleApi';
 
 // ─── Module-level helpers ─────────────────────────────────────────────────────
 
@@ -177,6 +178,17 @@ function buildWeekContext({ weekStart, weekEnd, points, tasks, customers, okrs, 
     lines.push('');
   }
 
+  // ── Next Week Priorities ──
+  const nextWeekPriorities = weekLogs.filter(l => l.type === 'next-week-priority');
+  if (nextWeekPriorities.length > 0) {
+    lines.push('### NEXT WEEK PRIORITIES');
+    nextWeekPriorities.forEach(l => {
+      const cName = l.customerId ? customerMap.get(l.customerId)?.name : null;
+      lines.push(`  - ${cName ? `[${cName}] ` : ''}${l.text}`);
+    });
+    lines.push('');
+  }
+
   // ── Calendar meetings ──
   if (calendarEvents && calendarEvents.length > 0) {
     lines.push('### Calendar Meetings');
@@ -199,49 +211,7 @@ function buildWeekContext({ weekStart, weekEnd, points, tasks, customers, okrs, 
   return lines.join('\n');
 }
 
-async function fetchCalendarEvents(googleToken, weekStart, weekEnd) {
-  const url = new URL('https://www.googleapis.com/calendar/v3/calendars/primary/events');
-  url.searchParams.set('timeMin',      weekStart.toISOString());
-  url.searchParams.set('timeMax',      weekEnd.toISOString());
-  url.searchParams.set('singleEvents', 'true');
-  url.searchParams.set('orderBy',      'startTime');
-  url.searchParams.set('maxResults',   '50');
-
-  const res = await fetch(url.toString(), {
-    headers: { Authorization: `Bearer ${googleToken}` },
-  });
-  if (!res.ok) throw new Error(`Calendar API ${res.status}`);
-  const data = await res.json();
-  return (data.items || []).filter(e => e.status !== 'cancelled' && e.start?.dateTime);
-}
-
-async function fetchGmailSent(gmailToken, weekStart, weekEnd) {
-  const after  = format(weekStart, 'yyyy/MM/dd');
-  const before = format(weekEnd,   'yyyy/MM/dd');
-  const url = new URL('https://www.googleapis.com/gmail/v1/users/me/messages');
-  url.searchParams.set('q',          `in:sent after:${after} before:${before}`);
-  url.searchParams.set('maxResults', '30');
-
-  const res = await fetch(url.toString(), {
-    headers: { Authorization: `Bearer ${gmailToken}` },
-  });
-  if (!res.ok) throw new Error(`Gmail API ${res.status}`);
-  const data = await res.json();
-  const msgs = (data.messages || []).slice(0, 10);
-
-  const details = await Promise.all(msgs.map(async (m) => {
-    const mUrl = new URL(`https://www.googleapis.com/gmail/v1/users/me/messages/${m.id}`);
-    mUrl.searchParams.set('format',          'METADATA');
-    mUrl.searchParams.set('metadataHeaders', 'Subject');
-    const mr = await fetch(mUrl.toString(), { headers: { Authorization: `Bearer ${gmailToken}` } });
-    if (!mr.ok) return null;
-    const md = await mr.json();
-    const subjectHeader = (md.payload?.headers || []).find(h => h.name === 'Subject');
-    return { subject: subjectHeader?.value || '(no subject)' };
-  }));
-
-  return details.filter(Boolean);
-}
+// fetchCalendarEvents and fetchGmailSent imported from ../lib/googleApi
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -328,7 +298,7 @@ export default function WeeklyReport({ onNavigate }) {
   );
 
   // Report-worthy types (Neutral excluded from Weekly Report display)
-  const REPORT_TYPES = ['highlight', 'lowlight', 'learning', 'shoutout'];
+  const REPORT_TYPES = ['highlight', 'lowlight', 'learning', 'shoutout', 'next-week-priority'];
   const reportLogs = useMemo(
     () => weekLogs.filter(l => REPORT_TYPES.includes(l.type)),
     [weekLogs] // eslint-disable-line react-hooks/exhaustive-deps
@@ -782,7 +752,7 @@ export default function WeeklyReport({ onNavigate }) {
       {reportLogs.length > 0 && (
         <div className="rounded-2xl border border-border bg-card px-5 py-4 space-y-4">
           <h3 className="text-sm font-semibold text-foreground">
-            Highlights, Learnings &amp; Shoutouts this week
+            Weekly Log Entries
             <span className="ml-2 text-xs font-normal text-muted-foreground">{reportLogs.length} logged</span>
           </h3>
           {REPORT_TYPES.filter(t => logsByType[t]?.length > 0).map(t => (

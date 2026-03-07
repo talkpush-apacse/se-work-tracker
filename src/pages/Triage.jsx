@@ -30,6 +30,7 @@ import {
 import Modal from '../components/Modal';
 import AIAssistModal from '../components/AIAssistModal';
 import { stripHtml } from '../lib/utils';
+import CalendarEmailImport from '../components/CalendarEmailImport';
 
 // ─── Helper: resolve recipient label from value key ───────────────────────────
 function recipientLabel(value) {
@@ -1883,7 +1884,7 @@ export default function Triage() {
   const {
     meetingEntries, tasks, customers, updateTask, addTask, reorderTasks, addPoint, okrs,
     weeklyUpdateLogs, addWeeklyUpdateLog, updateWeeklyUpdateLog, deleteWeeklyUpdateLog,
-    migrateAnnotationsToLogs,
+    migrateAnnotationsToLogs, aiSettings,
   } = useAppStore();
   const { isRunning, taskId: runningTaskId, startTimer, stopTimer } = useTimerContext();
   const [taskDetailId, setTaskDetailId] = useState(null);
@@ -2632,6 +2633,13 @@ export default function Triage() {
           )}
         </div>
 
+        {/* ── Import from Calendar & Email ── */}
+        <CalendarEmailImport
+          customers={customers}
+          addWeeklyUpdateLog={addWeeklyUpdateLog}
+          aiSettings={aiSettings}
+        />
+
         {/* ── Add / Edit form ── */}
         <form onSubmit={handleAddLog} className="bg-card border border-border rounded-2xl p-4 mb-3 space-y-3">
           {logEditId && (
@@ -2755,7 +2763,7 @@ export default function Triage() {
         {weeklyUpdateLogs.length === 0 ? (
           <div className="bg-card border border-border rounded-2xl p-6 text-center">
             <Bookmark size={24} className="text-muted-foreground/60 mx-auto mb-2" />
-            <p className="text-xs text-muted-foreground">No entries yet. Log your first highlight, lowlight, or learning above.</p>
+            <p className="text-xs text-muted-foreground">No entries yet. Log your first highlight, lowlight, learning, or next week priority above.</p>
           </div>
         ) : filteredLogs.length === 0 ? (
           <div className="bg-card border border-border rounded-2xl px-5 py-6 text-center">
