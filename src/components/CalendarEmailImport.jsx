@@ -37,6 +37,10 @@ export default function CalendarEmailImport({ customers, addWeeklyUpdateLog, aiS
   // Panel open/closed
   const [isOpen, setIsOpen]     = useState(false);
 
+  // Date range — defaults to current week (Mon–Sun)
+  const [dateFrom, setDateFrom] = useState(() => format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd'));
+  const [dateTo, setDateTo]     = useState(() => format(endOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd'));
+
   // Fetched data
   const [events, setEvents]     = useState([]);
   const [emails, setEmails]     = useState([]);
@@ -71,7 +75,7 @@ export default function CalendarEmailImport({ customers, addWeeklyUpdateLog, aiS
     return match?.id || '';
   }, [customerNames]);
 
-  /** Fetch calendar events and emails for this week */
+  /** Fetch calendar events and emails for the selected date range */
   const handleFetch = useCallback(async () => {
     setIsFetching(true);
     setFetchError(null);
@@ -79,9 +83,9 @@ export default function CalendarEmailImport({ customers, addWeeklyUpdateLog, aiS
     setItemState({});
     setSummaryError(null);
 
-    const now = new Date();
-    const weekStart = startOfWeek(now, { weekStartsOn: 1 }); // Monday
-    const weekEnd   = endOfWeek(now, { weekStartsOn: 1 });    // Sunday
+    // Use the user-selected date range
+    const weekStart = new Date(dateFrom + 'T00:00:00');
+    const weekEnd   = new Date(dateTo   + 'T23:59:59');
 
     const merged = [];
 
@@ -132,7 +136,7 @@ export default function CalendarEmailImport({ customers, addWeeklyUpdateLog, aiS
       if (merged.length === 0 && !googleToken && !gmailToken) {
         setFetchError('connect');
       } else if (merged.length === 0) {
-        setFetchError('No events or emails found for this week.');
+        setFetchError(`No events or emails found for ${format(weekStart, 'MMM d')} – ${format(weekEnd, 'MMM d')}.`);
       }
 
       setItems(merged);
@@ -155,7 +159,7 @@ export default function CalendarEmailImport({ customers, addWeeklyUpdateLog, aiS
     } finally {
       setIsFetching(false);
     }
-  }, [googleToken, gmailToken, autoMatchCustomer]);
+  }, [googleToken, gmailToken, autoMatchCustomer, dateFrom, dateTo]);
 
   /** Batch AI-summarise all items */
   const handleSummarise = useCallback(async () => {
@@ -360,13 +364,33 @@ export default function CalendarEmailImport({ customers, addWeeklyUpdateLog, aiS
             <div className="px-4 py-3 space-y-3">
               {/* Toolbar */}
               <div className="flex items-center gap-2 flex-wrap">
+                {/* Date range pickers */}
+                <label className="flex items-center gap-1 text-[10px] text-muted-foreground font-medium">
+                  From
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    onChange={e => setDateFrom(e.target.value)}
+                    className="h-7 bg-secondary border border-border rounded-lg px-1.5 text-[11px] text-foreground focus:outline-none focus:border-ring"
+                  />
+                </label>
+                <label className="flex items-center gap-1 text-[10px] text-muted-foreground font-medium">
+                  To
+                  <input
+                    type="date"
+                    value={dateTo}
+                    onChange={e => setDateTo(e.target.value)}
+                    className="h-7 bg-secondary border border-border rounded-lg px-1.5 text-[11px] text-foreground focus:outline-none focus:border-ring"
+                  />
+                </label>
+
                 <button
                   onClick={handleFetch}
                   disabled={isFetching}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-secondary border border-border text-xs font-medium text-foreground hover:bg-secondary/80 disabled:opacity-40 transition-all"
                 >
                   {isFetching ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
-                  {hasFetched ? 'Refresh' : 'Fetch This Week'}
+                  {hasFetched ? 'Refresh' : 'Fetch'}
                 </button>
 
                 {items.length > 0 && (
@@ -564,7 +588,7 @@ export default function CalendarEmailImport({ customers, addWeeklyUpdateLog, aiS
               {!isFetching && hasFetched && items.length === 0 && !fetchError && (
                 <div className="py-6 text-center">
                   <Calendar size={20} className="text-muted-foreground/40 mx-auto mb-2" />
-                  <p className="text-xs text-muted-foreground">No events or emails found for this week.</p>
+                  <p className="text-xs text-muted-foreground">No events or emails found for {dateFrom && dateTo ? `${format(new Date(dateFrom + 'T00:00:00'), 'MMM d')} – ${format(new Date(dateTo + 'T00:00:00'), 'MMM d')}` : 'the selected dates'}.</p>
                 </div>
               )}
             </div>
