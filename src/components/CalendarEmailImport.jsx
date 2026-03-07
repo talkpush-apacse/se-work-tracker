@@ -1,16 +1,16 @@
 /**
  * CalendarEmailImport — collapsible panel for the Weekly Update Log section.
- * Fetches this week's calendar events and sent emails, provides AI summaries,
- * and lets the user tag/promote items into the Weekly Update Log.
+ * Fetches calendar events and emails (starred + sent), provides body-aware
+ * AI executive summaries, and lets the user tag/promote items into the Weekly Update Log.
  */
 import { useState, useMemo, useCallback } from 'react';
 import {
   Calendar, Mail, ChevronDown, ChevronUp, Loader2, AlertCircle,
-  Sparkles, Check, X, Download, Pencil,
+  Sparkles, Check, X, Download, Pencil, Star,
 } from 'lucide-react';
 import { format, parseISO, startOfWeek, endOfWeek } from 'date-fns';
 import { useGoogleAuth } from '../context/GoogleAuthContext';
-import { fetchCalendarEvents, fetchGmailSent } from '../lib/googleApi';
+import { fetchCalendarEvents, fetchGmailMessages } from '../lib/googleApi';
 import { WEEKLY_UPDATE_LOG_TYPES, WEEKLY_UPDATE_LOG_LABELS, WEEKLY_UPDATE_LOG_COLORS } from '../constants';
 
 // Log types available for tagging (exclude 'neutral' — not useful for promoted items)
@@ -27,8 +27,8 @@ const TAG_COLORS = {
   skip: '#6b7280',
 };
 
-// System prompt for batch AI summaries
-const SUMMARY_SYSTEM_PROMPT = `You are a concise summariser for a Solutions Engineer's work log. Given a list of calendar event titles and sent email subjects, produce a 1-2 sentence plain text summary for each item that captures what work was done and why it matters. Be specific and outcome-focused. Format your response as a JSON array of strings, one summary per input item, in the same order. Return ONLY the JSON array, no other text.`;
+// System prompt for batch AI summaries (uses email body content for executive-quality output)
+const SUMMARY_SYSTEM_PROMPT = `You are a concise summariser for a Solutions Engineer's work log. Given a list of calendar events and emails (with body content when available), produce a 1-2 sentence executive-summary-style plain text summary for each item. Focus on: what action was taken, what the outcome or next step is, and why it matters. Be specific and outcome-focused — avoid generic descriptions. Format your response as a JSON array of strings, one summary per input item, in the same order. Return ONLY the JSON array, no other text.`;
 
 
 export default function CalendarEmailImport({ customers, addWeeklyUpdateLog, aiSettings }) {
@@ -40,6 +40,9 @@ export default function CalendarEmailImport({ customers, addWeeklyUpdateLog, aiS
   // Date range — defaults to current week (Mon–Sun)
   const [dateFrom, setDateFrom] = useState(() => format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd'));
   const [dateTo, setDateTo]     = useState(() => format(endOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd'));
+
+  // Email source filter: starred, sent, or both (starred shown first)
+  const [emailSource, setEmailSource] = useState('both');
 
   // Fetched data
   const [events, setEvents]     = useState([]);
@@ -113,21 +116,24 @@ export default function CalendarEmailImport({ customers, addWeeklyUpdateLog, aiS
         }
       }
 
-      // Fetch Gmail sent emails if token available
+      // Fetch Gmail emails (starred and/or sent, with body content)
       if (gmailToken) {
         try {
-          const sentEmails = await fetchGmailSent(gmailToken, weekStart, weekEnd);
-          sentEmails.forEach(e => {
+          const emailResults = await fetchGmailMessages(gmailToken, weekStart, weekEnd, emailSource);
+          emailResults.forEach(e => {
             merged.push({
-              id:     `mail-${e.id}`,
-              source: 'email',
-              title:  e.subject || '(no subject)',
+              id:       `mail-${e.id}`,
+              source:   'email',
+              title:    e.subject || '(no subject)',
               datetime: e.date ? e.date : '',
-              to:     e.to || '',
+              to:       e.to || '',
+              from:     e.from || '',
+              body:     e.body || '',
+              starred:  e.starred || false,
               raw: e,
             });
           });
-          setEmails(sentEmails);
+          setEmails(emailResults);
         } catch (err) {
           console.warn('Gmail fetch failed:', err.message);
         }
@@ -159,7 +165,7 @@ export default function CalendarEmailImport({ customers, addWeeklyUpdateLog, aiS
     } finally {
       setIsFetching(false);
     }
-  }, [googleToken, gmailToken, autoMatchCustomer, dateFrom, dateTo]);
+  }, [googleToken, gmailToken, autoMatchCustomer, dateFrom, dateTo, emailSource]);
 
   /** Batch AI-summarise all items */
   const handleSummarise = useCallback(async () => {
@@ -167,10 +173,17 @@ export default function CalendarEmailImport({ customers, addWeeklyUpdateLog, aiS
     setIsSummarising(true);
     setSummaryError(null);
 
-    // Build input list for AI
+    // Build input list for AI — include email body content for richer summaries
     const inputList = items.map(item => {
-      const prefix = item.source === 'calendar' ? '[Calendar]' : '[Email]';
-      return `${prefix} ${item.title}${item.datetime ? ` (${item.datetime})` : ''}`;
+      if (item.source === 'calendar') {
+        return `[Calendar] ${item.title}${item.datetime ? ` (${item.datetime})` : ''}`;
+      }
+      // Email — include body snippet for executive-quality summaries
+      const parts = [`[Email] Subject: ${item.title}`];
+      if (item.to) parts.push(`To: ${item.to}`);
+      const bodySnippet = item.body ? item.body.slice(0, 800) : '';
+      if (bodySnippet) parts.push(`Body: ${bodySnippet}`);
+      return parts.join(' | ');
     });
 
     const userContent = `Summarise each of these ${inputList.length} work items in 1-2 sentences:\n\n${inputList.map((t, i) => `${i + 1}. ${t}`).join('\n')}`;
@@ -384,6 +397,19 @@ export default function CalendarEmailImport({ customers, addWeeklyUpdateLog, aiS
                   />
                 </label>
 
+                {/* Email source filter — only shown when Gmail is connected */}
+                {gmailToken && (
+                  <select
+                    value={emailSource}
+                    onChange={e => setEmailSource(e.target.value)}
+                    className="h-7 bg-secondary border border-border rounded-lg px-1.5 text-[11px] text-foreground focus:outline-none focus:border-ring"
+                  >
+                    <option value="both">★ Starred + Sent</option>
+                    <option value="starred">★ Starred Only</option>
+                    <option value="sent">Sent Only</option>
+                  </select>
+                )}
+
                 <button
                   onClick={handleFetch}
                   disabled={isFetching}
@@ -447,7 +473,7 @@ export default function CalendarEmailImport({ customers, addWeeklyUpdateLog, aiS
               {isFetching && (
                 <div className="flex items-center justify-center gap-2 py-6 text-muted-foreground text-xs">
                   <Loader2 size={14} className="animate-spin" />
-                  <span>Fetching calendar events and sent emails…</span>
+                  <span>Fetching calendar events and {emailSource === 'starred' ? 'starred' : emailSource === 'sent' ? 'sent' : 'starred & sent'} emails…</span>
                 </div>
               )}
 
@@ -473,16 +499,25 @@ export default function CalendarEmailImport({ customers, addWeeklyUpdateLog, aiS
                       >
                         {/* Row 1: source icon + title + datetime */}
                         <div className="flex items-start gap-2 mb-2">
-                          {/* Source icon */}
+                          {/* Source icon — star indicator for starred emails */}
                           {item.source === 'calendar' ? (
                             <Calendar size={13} className="text-blue-400 mt-0.5 flex-shrink-0" />
                           ) : (
-                            <Mail size={13} className="text-purple-400 mt-0.5 flex-shrink-0" />
+                            <div className="flex items-center gap-1 mt-0.5 flex-shrink-0">
+                              <Mail size={13} className="text-purple-400" />
+                              {item.starred && <Star size={11} className="text-amber-400 fill-amber-400" />}
+                            </div>
                           )}
                           <div className="min-w-0 flex-1">
                             <p className="text-xs font-medium text-foreground leading-snug">{item.title}</p>
                             {item.datetime && (
                               <p className="text-[10px] text-muted-foreground mt-0.5">{item.datetime}</p>
+                            )}
+                            {/* Body snippet preview for emails */}
+                            {item.body && (
+                              <p className="text-[10px] text-muted-foreground/70 mt-0.5 line-clamp-2 leading-relaxed">
+                                {item.body.slice(0, 150)}{item.body.length > 150 ? '…' : ''}
+                              </p>
                             )}
                           </div>
 

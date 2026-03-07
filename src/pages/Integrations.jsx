@@ -380,7 +380,7 @@ export default function Integrations() {
             <div>
               <p className="text-sm font-semibold text-foreground">Gmail</p>
               <p className="text-xs text-muted-foreground">
-                {gmailToken ? 'Connected — used by Weekly Report to reference sent emails' : 'Not connected'}
+                {gmailToken ? 'Connected — reads starred & sent emails for Weekly Report and AI summaries' : 'Not connected'}
               </p>
             </div>
           </div>
@@ -419,7 +419,7 @@ export default function Integrations() {
               Connect Gmail to let the Weekly Report reference your sent emails when generating the weekly status email.
             </p>
             <p className="text-xs text-muted-foreground/60 mb-4 max-w-sm mx-auto">
-              Only subject lines are read — email bodies are never accessed.
+              Email subject lines and body content are read locally for AI summarization. No data is stored beyond your session.
             </p>
             <Button onClick={() => gmailLogin()} size="sm">
               <LogIn size={14} className="mr-1.5" />
