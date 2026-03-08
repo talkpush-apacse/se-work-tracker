@@ -13,7 +13,7 @@ import {
 } from '../constants';
 import { Button } from '../components/ui/button';
 import ConfirmDialog from '../components/ConfirmDialog';
-import { fetchCalendarEvents, fetchGmailSent } from '../lib/googleApi';
+import { fetchCalendarEvents, fetchGmailSent, fetchGmailInbox } from '../lib/googleApi';
 
 // ─── Module-level helpers ─────────────────────────────────────────────────────
 
@@ -199,12 +199,23 @@ function buildWeekContext({ weekStart, weekEnd, points, tasks, customers, okrs, 
     lines.push('');
   }
 
-  // ── Emails sent ──
+  // ── Email activity (sent + received) ──
   if (gmailEmails && gmailEmails.length > 0) {
-    lines.push('### Emails Sent This Week');
-    gmailEmails.forEach(e => {
-      lines.push(`  - ${e.subject || '(no subject)'}`);
-    });
+    lines.push('### Email Activity This Week');
+    const sentEmails     = gmailEmails.filter(e => e.direction === 'sent');
+    const receivedEmails = gmailEmails.filter(e => e.direction === 'received');
+    if (sentEmails.length > 0) {
+      lines.push('**Sent:**');
+      sentEmails.forEach(e => {
+        lines.push(`  - ${e.subject || '(no subject)'}`);
+      });
+    }
+    if (receivedEmails.length > 0) {
+      lines.push('**Received:**');
+      receivedEmails.forEach(e => {
+        lines.push(`  - ${e.subject || '(no subject)'}`);
+      });
+    }
     lines.push('');
   }
 
@@ -335,8 +346,16 @@ export default function WeeklyReport({ onNavigate }) {
     }
     if (gmailToken) {
       fetches.push(
-        fetchGmailSent(gmailToken, weekStart, weekEnd)
-          .then(setGmailEmails)
+        Promise.all([
+          fetchGmailSent(gmailToken, weekStart, weekEnd),
+          fetchGmailInbox(gmailToken, weekStart, weekEnd),
+        ])
+          .then(([sent, received]) => {
+            setGmailEmails([
+              ...sent.map(e => ({ ...e, direction: 'sent' })),
+              ...received.map(e => ({ ...e, direction: 'received' })),
+            ]);
+          })
           .catch(() => setGmailEmails([]))
       );
     }

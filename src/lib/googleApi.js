@@ -65,6 +65,45 @@ export async function fetchGmailSent(token, start, end) {
   return details.filter(Boolean);
 }
 
+/**
+ * Fetch received Gmail messages for a date range (subject + sender, metadata only).
+ * Used by WeeklyReport to capture client escalations and documentation.
+ * @param {string} token - Google OAuth access token
+ * @param {Date} start - Range start
+ * @param {Date} end - Range end
+ * @returns {Promise<Array<{ id: string, subject: string, from: string, date: string }>>}
+ */
+export async function fetchGmailInbox(token, start, end) {
+  const after  = format(start, 'yyyy/MM/dd');
+  const before = format(end,   'yyyy/MM/dd');
+  const url = new URL('https://www.googleapis.com/gmail/v1/users/me/messages');
+  url.searchParams.set('q',          `in:inbox after:${after} before:${before}`);
+  url.searchParams.set('maxResults', '30');
+
+  const res = await fetch(url.toString(), {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`Gmail API ${res.status}`);
+  const data = await res.json();
+  const msgs = (data.messages || []).slice(0, 15);
+
+  const details = await Promise.all(msgs.map(async (m) => {
+    const mUrl = new URL(`https://www.googleapis.com/gmail/v1/users/me/messages/${m.id}`);
+    mUrl.searchParams.set('format',          'METADATA');
+    mUrl.searchParams.set('metadataHeaders', 'Subject,From,Date');
+    const mr = await fetch(mUrl.toString(), { headers: { Authorization: `Bearer ${token}` } });
+    if (!mr.ok) return null;
+    const md = await mr.json();
+    const headers = md.payload?.headers || [];
+    const subject = headers.find(h => h.name === 'Subject')?.value || '(no subject)';
+    const from    = headers.find(h => h.name === 'From')?.value || '';
+    const date    = headers.find(h => h.name === 'Date')?.value || '';
+    return { id: m.id, subject, from, date };
+  }));
+
+  return details.filter(Boolean);
+}
+
 // ─── Gmail Full-Body Helpers (used by CalendarEmailImport) ──────────────────
 
 /** Decode Gmail's URL-safe base64 encoding to UTF-8 text */
