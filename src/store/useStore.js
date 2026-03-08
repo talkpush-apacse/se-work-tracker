@@ -14,6 +14,7 @@ const KEYS = {
   annotations: 'gpt-annotations',
   weeklyReports: 'gpt-weekly-reports',
   weeklyUpdateLogs: 'gpt-weekly-update-logs',
+  timeBudgets: 'gpt-time-budgets',
 };
 
 const MIGRATION_FLAG = 'gpt-migrated-to-neon';
@@ -218,8 +219,40 @@ function createBatchedSaver(getMounted, onError) {
   return saver;
 }
 
+// ─── Evergreen task weekly reset ──────────────────────────────────
+// Resets 'evergreen' tasks with status 'done' back to 'open' at the
+// start of each new week (Monday). Runs once per week, gated by a
+// localStorage flag storing the Monday date of the last reset.
+function resetEvergreenTasks() {
+  const now = new Date();
+  const day = now.getDay();
+  // Calculate this Monday (weekStartsOn = 1)
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday);
+  const mondayStr = monday.toISOString().slice(0, 10);
+
+  const lastReset = localStorage.getItem('gpt-evergreen-last-reset');
+  if (lastReset === mondayStr) return; // already reset this week
+
+  const tasks = load('gpt-tasks', []);
+  let changed = false;
+  const updated = tasks.map(t => {
+    if (t.taskType === 'evergreen' && t.status === 'done') {
+      changed = true;
+      return { ...t, status: 'open', points: 0, closedAt: null };
+    }
+    return t;
+  });
+  if (changed) {
+    save('gpt-tasks', updated);
+    console.log('[evergreen] Reset done evergreen tasks for week of', mondayStr);
+  }
+  localStorage.setItem('gpt-evergreen-last-reset', mondayStr);
+}
+
 // ─── Run V2 migration before any component mounts ────────────────
 runV2Migration();
+resetEvergreenTasks();
 
 export function useStore() {
   const [okrs, setOkrs] = useState(() => migrateOkrs(load(KEYS.okrs)));
@@ -232,6 +265,7 @@ export function useStore() {
   const [annotations, setAnnotations] = useState(() => load(KEYS.annotations));
   const [weeklyReports, setWeeklyReports] = useState(() => load(KEYS.weeklyReports));
   const [weeklyUpdateLogs, setWeeklyUpdateLogs] = useState(() => load(KEYS.weeklyUpdateLogs));
+  const [timeBudgets, setTimeBudgets] = useState(() => load(KEYS.timeBudgets));
   const [aiSettings, setAiSettings] = useState(() => {
     const stored = load(KEYS.aiSettings, null);
     if (!stored) return DEFAULT_AI_SETTINGS;
@@ -263,6 +297,7 @@ export function useStore() {
   useEffect(() => { save(KEYS.annotations, annotations); }, [annotations]);
   useEffect(() => { save(KEYS.weeklyReports, weeklyReports); }, [weeklyReports]);
   useEffect(() => { save(KEYS.weeklyUpdateLogs, weeklyUpdateLogs); }, [weeklyUpdateLogs]);
+  useEffect(() => { save(KEYS.timeBudgets, timeBudgets); }, [timeBudgets]);
 
   // ─── Neon save effects (debounced, only after mount-fetch) ───
   useEffect(() => { if (mountedRef.current) debouncedSave('okrs', okrs); }, [okrs]);
@@ -276,6 +311,7 @@ export function useStore() {
   useEffect(() => { if (mountedRef.current) debouncedSave('annotations', annotations); }, [annotations]);
   useEffect(() => { if (mountedRef.current) debouncedSave('weeklyReports', weeklyReports); }, [weeklyReports]);
   useEffect(() => { if (mountedRef.current) debouncedSave('weeklyUpdateLogs', weeklyUpdateLogs); }, [weeklyUpdateLogs]);
+  useEffect(() => { if (mountedRef.current) debouncedSave('timeBudgets', timeBudgets); }, [timeBudgets]);
 
   // Flush any pending Neon writes when the user reloads or navigates away.
   // keepalive: true tells the browser to complete the fetch even after the page unloads.
@@ -286,7 +322,7 @@ export function useStore() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (mountedRef.current) setSyncStatus('saving'); }, [okrs, customers, points, meetingEntries, tasks, milestones, aiOutputs, aiSettings, annotations, weeklyReports, weeklyUpdateLogs]);
+  useEffect(() => { if (mountedRef.current) setSyncStatus('saving'); }, [okrs, customers, points, meetingEntries, tasks, milestones, aiOutputs, aiSettings, annotations, weeklyReports, weeklyUpdateLogs, timeBudgets]);
 
   useEffect(() => {
     if (syncStatus === 'saving') {
@@ -347,6 +383,7 @@ export function useStore() {
         if (remote.annotations) setAnnotations(remote.annotations);
         if (remote.weeklyReports) setWeeklyReports(remote.weeklyReports);
         if (remote.weeklyUpdateLogs) setWeeklyUpdateLogs(remote.weeklyUpdateLogs);
+        if (remote.timeBudgets) setTimeBudgets(remote.timeBudgets);
         if (remote.aiOutputs) setAiOutputs(remote.aiOutputs);
         if (remote.aiSettings && Object.keys(remote.aiSettings).length > 0) {
           setAiSettings(prev => ({
@@ -547,6 +584,21 @@ export function useStore() {
     setWeeklyUpdateLogs(prev => prev.filter(l => l.id !== id));
   }, []);
 
+  // ─── Time Budget actions ───
+  // Shape: { id, weekStart (YYYY-MM-DD), totalBudgetHours, meetings: [], tasks: [], createdAt }
+  const getTimeBudget = useCallback((weekStart) => {
+    return timeBudgets.find(b => b.weekStart === weekStart) || null;
+  }, [timeBudgets]);
+  const upsertTimeBudget = useCallback((weekStart, data) => {
+    setTimeBudgets(prev => {
+      const existing = prev.find(b => b.weekStart === weekStart);
+      if (existing) {
+        return prev.map(b => b.weekStart === weekStart ? { ...b, ...data } : b);
+      }
+      return [...prev, { id: uid(), createdAt: new Date().toISOString(), weekStart, totalBudgetHours: 40, meetings: [], tasks: [], ...data }];
+    });
+  }, []);
+
   // ─── One-time migration: Annotations → Weekly Update Logs ───
   // Maps good→highlight, bad→lowlight, learning→learning.
   // Guarded by a localStorage flag so it only runs once ever.
@@ -645,7 +697,7 @@ export function useStore() {
 
   return {
     okrs, customers, points, meetingEntries, tasks, milestones, aiOutputs,
-    annotations, weeklyReports, weeklyUpdateLogs,
+    annotations, weeklyReports, weeklyUpdateLogs, timeBudgets,
     addOkr, updateOkr, deleteOkr,
     addCustomer, updateCustomer, deleteCustomer, reorderCustomers,
     addPoint, deletePoint, updatePoint,
@@ -656,6 +708,7 @@ export function useStore() {
     addAnnotation, updateAnnotation, deleteAnnotation, getCustomerAnnotations,
     addWeeklyReport, updateWeeklyReport, deleteWeeklyReport,
     addWeeklyUpdateLog, updateWeeklyUpdateLog, deleteWeeklyUpdateLog, migrateAnnotationsToLogs,
+    getTimeBudget, upsertTimeBudget,
     addAiOutput, getTaskAiOutputs, updateAiOutput,
     aiSettings, updateAiSettings,
     exportData, importData,

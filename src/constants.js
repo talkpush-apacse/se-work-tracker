@@ -28,13 +28,14 @@ export const CUSTOMER_COLORS = [
 // Task types — only 'comms' and 'focus-time' appear in dropdowns.
 // 'mine' and 'coordinate' entries are kept in the maps below for backward compat
 // with existing localStorage tasks but are excluded from the active array.
-export const TASK_TYPES = ['comms', 'focus-time'];
+export const TASK_TYPES = ['comms', 'focus-time', 'evergreen'];
 
 export const TASK_TYPE_LABELS = {
   mine:         'Mine',
   coordinate:   'Coordinate',
   comms:        'Needs Comms',
   'focus-time': 'Focus Time',
+  evergreen:    'Evergreen',
 };
 
 export const TASK_TYPE_COLORS = {
@@ -42,6 +43,7 @@ export const TASK_TYPE_COLORS = {
   coordinate:   { bg: 'bg-amber-500/15',  text: 'text-amber-400',  border: 'border-amber-500/20' },
   comms:        { bg: 'bg-purple-500/15', text: 'text-purple-400', border: 'border-purple-500/20' },
   'focus-time': { bg: 'bg-teal-500/15',   text: 'text-teal-400',   border: 'border-teal-500/20' },
+  evergreen:    { bg: 'bg-green-500/15',  text: 'text-green-400',  border: 'border-green-500/20' },
 };
 
 // Points awarded per task type when a task is marked 'done'
@@ -51,6 +53,7 @@ export const TASK_TYPE_POINTS = {
   mine:         1,
   coordinate:   1,
   comms:        1,
+  evergreen:    1,
 };
 
 // Task statuses — 'archived' is a soft-delete; excluded from board by default

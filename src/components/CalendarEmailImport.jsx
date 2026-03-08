@@ -150,7 +150,7 @@ export default function CalendarEmailImport({ customers, addWeeklyUpdateLog, aiS
       // Initialise per-item state with auto-matched customers
       const initial = {};
       merged.forEach(item => {
-        const matchText = item.source === 'email' ? `${item.title} ${item.to}` : item.title;
+        const matchText = item.source === 'email' ? `${item.title} ${item.to} ${item.from}` : item.title;
         initial[item.id] = {
           tag:        'highlight',
           customerId: autoMatchCustomer(matchText),
@@ -399,15 +399,18 @@ export default function CalendarEmailImport({ customers, addWeeklyUpdateLog, aiS
 
                 {/* Email source filter — only shown when Gmail is connected */}
                 {gmailToken && (
-                  <select
-                    value={emailSource}
-                    onChange={e => setEmailSource(e.target.value)}
-                    className="h-7 bg-secondary border border-border rounded-lg px-1.5 text-[11px] text-foreground focus:outline-none focus:border-ring"
-                  >
-                    <option value="both">★ Starred + Sent</option>
-                    <option value="starred">★ Starred Only</option>
-                    <option value="sent">Sent Only</option>
-                  </select>
+                  <div className="flex flex-col gap-0.5">
+                    <select
+                      value={emailSource}
+                      onChange={e => setEmailSource(e.target.value)}
+                      className="h-7 bg-secondary border border-border rounded-lg px-1.5 text-[11px] text-foreground focus:outline-none focus:border-ring"
+                    >
+                      <option value="both">★ Starred + Sent</option>
+                      <option value="starred">★ Starred Only</option>
+                      <option value="sent">Sent Only</option>
+                    </select>
+                    <span className="text-[9px] text-muted-foreground/60 leading-tight">Tip: Star important received emails in Gmail to import them here</span>
+                  </div>
                 )}
 
                 <button
@@ -510,7 +513,14 @@ export default function CalendarEmailImport({ customers, addWeeklyUpdateLog, aiS
                           )}
                           <div className="min-w-0 flex-1">
                             <p className="text-xs font-medium text-foreground leading-snug">{item.title}</p>
-                            {item.datetime && (
+                            {/* Show From for received emails, To for sent emails */}
+                            {item.source === 'email' && item.from && !item.to && (
+                              <p className="text-[10px] text-muted-foreground mt-0.5">From: {item.from}</p>
+                            )}
+                            {item.source === 'email' && item.to && (
+                              <p className="text-[10px] text-muted-foreground mt-0.5">To: {item.to}</p>
+                            )}
+                            {item.datetime && item.source === 'calendar' && (
                               <p className="text-[10px] text-muted-foreground mt-0.5">{item.datetime}</p>
                             )}
                             {/* Body snippet preview for emails */}

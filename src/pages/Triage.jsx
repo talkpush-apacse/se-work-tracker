@@ -5,7 +5,7 @@ import {
   Calendar, User, Tag, AlertCircle, Archive, ArchiveX, Trash2,
   Settings, RotateCcw, Pencil, GripVertical, ExternalLink, ArrowLeft,
   Timer, Square, Pin, CheckSquare, Paperclip, Clock,
-  Bookmark, Table2, X,
+  Bookmark, Table2, X, RefreshCw,
 } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
@@ -29,7 +29,7 @@ import {
 } from '../constants';
 import Modal from '../components/Modal';
 import AIAssistModal from '../components/AIAssistModal';
-import { stripHtml } from '../lib/utils';
+import { stripHtml, htmlToPlainText } from '../lib/utils';
 import CalendarEmailImport from '../components/CalendarEmailImport';
 
 // ─── Helper: resolve recipient label from value key ───────────────────────────
@@ -515,7 +515,8 @@ const TaskCard = memo(function TaskCard({ task, customer, isSelected, onSelect, 
       </div>
 
       <div className="flex items-center gap-1.5 flex-wrap">
-        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${typeColors.bg} ${typeColors.text} ${typeColors.border}`}>
+        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border flex items-center gap-1 ${typeColors.bg} ${typeColors.text} ${typeColors.border}`}>
+          {task.taskType === 'evergreen' && <RefreshCw size={9} />}
           {TASK_TYPE_LABELS[task.taskType]}
         </span>
         {/* Aging chip — hidden for archived tasks */}
@@ -587,7 +588,7 @@ const HistoryItem = memo(function HistoryItem({ h }) {
   const [saved,  setSaved]  = useState(false);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(draft);
+    navigator.clipboard.writeText(htmlToPlainText(draft));
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -859,7 +860,7 @@ const AIWorkspace = memo(function AIWorkspace({ task, customer }) {
 
   const handleCopy = () => {
     if (!currentOutput) return;
-    navigator.clipboard.writeText(editedText);
+    navigator.clipboard.writeText(htmlToPlainText(editedText));
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -890,7 +891,8 @@ const AIWorkspace = memo(function AIWorkspace({ task, customer }) {
               {customer.name}
             </span>
           )}
-          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${typeColors.bg} ${typeColors.text} ${typeColors.border} flex-shrink-0`}>
+          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border flex items-center gap-1 ${typeColors.bg} ${typeColors.text} ${typeColors.border} flex-shrink-0`}>
+            {task.taskType === 'evergreen' && <RefreshCw size={9} />}
             {TASK_TYPE_LABELS[task.taskType]}
           </span>
           <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${statusColors.bg} ${statusColors.text} ${statusColors.border} flex-shrink-0`}>
@@ -1538,7 +1540,8 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, customer, onOpenDe
           </>
         </div>
         <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
-          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${typeColors.bg} ${typeColors.text} ${typeColors.border}`}>
+          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border flex items-center gap-1 ${typeColors.bg} ${typeColors.text} ${typeColors.border}`}>
+            {task.taskType === 'evergreen' && <RefreshCw size={9} />}
             {TASK_TYPE_LABELS[task.taskType]}
           </span>
           <span

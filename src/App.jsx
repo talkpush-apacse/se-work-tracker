@@ -15,6 +15,7 @@ const Customers    = lazy(() => import('./pages/Customers'));
 const Triage       = lazy(() => import('./pages/Triage'));
 const Integrations = lazy(() => import('./pages/Integrations'));
 const WeeklyReport = lazy(() => import('./pages/WeeklyReport'));
+const TimeBudget   = lazy(() => import('./pages/TimeBudget'));
 const Knowledge    = lazy(() => import('./pages/Knowledge'));
 
 const pageVariants = {
@@ -62,6 +63,7 @@ function AppContent() {
                 {activeTab === 'okrs'         && <OKRs />}
                 {activeTab === 'customers'    && <Customers />}
                 {activeTab === 'weekly'       && <WeeklyReport onNavigate={handleTabChange} />}
+                {activeTab === 'timebudget'   && <TimeBudget />}
                 {activeTab === 'knowledge'    && <Knowledge />}
                 {activeTab === 'integrations' && <Integrations />}
               </motion.div>
