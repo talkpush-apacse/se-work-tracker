@@ -22,7 +22,13 @@ export async function fetchCalendarEvents(token, start, end) {
   const res = await fetch(url.toString(), {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) throw new Error(`Calendar API ${res.status}`);
+  if (!res.ok) {
+    const err = new Error(res.status === 401
+      ? 'Session expired. Please reconnect Google Calendar in Integrations.'
+      : `Calendar API ${res.status}`);
+    err.status = res.status;
+    throw err;
+  }
   const data = await res.json();
   return (data.items || []).filter(e => e.status !== 'cancelled' && e.start?.dateTime);
 }

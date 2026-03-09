@@ -6,7 +6,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   Clock, ChevronLeft, ChevronRight, Plus, Trash2, Calendar, Loader2,
-  AlertCircle, Settings, Check, X, CheckSquare, Square,
+  AlertCircle, Settings, Check, X, CheckSquare, Square, Timer, User,
 } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, parseISO, differenceInMinutes } from 'date-fns';
 import { useAppStore } from '../context/StoreContext';
@@ -38,8 +38,8 @@ function eventToMeeting(event) {
 }
 
 export default function TimeBudget() {
-  const { customers, tasks: triageTasks, getTimeBudget, upsertTimeBudget } = useAppStore();
-  const { googleToken } = useGoogleAuth();
+  const { customers, tasks: triageTasks, points, getTimeBudget, upsertTimeBudget } = useAppStore();
+  const { googleToken, logout } = useGoogleAuth();
 
   // Week navigation — default to current week
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -98,6 +98,10 @@ export default function TimeBudget() {
       });
       setHasFetched(true);
     } catch (err) {
+      // Auto-clear stale token on 401 so the UI shows the "connect" prompt
+      if (err.status === 401) {
+        logout();
+      }
       setFetchError(err.message || 'Failed to fetch calendar events');
     } finally {
       setIsFetching(false);
@@ -139,6 +143,22 @@ export default function TimeBudget() {
     setBudgetTasks(prev => prev.map(t => t.id === id ? { ...t, hours } : t));
   }, []);
 
+  // Focus time logged — read from points for the current week
+  const weeklyLoggedSessions = useMemo(() => {
+    return points
+      .filter(p => p.hours > 0 && p.timestamp)
+      .filter(p => {
+        const t = new Date(p.timestamp);
+        return t >= weekStart && t <= weekEnd;
+      })
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  }, [points, weekStart, weekEnd]);
+
+  const loggedHours = useMemo(
+    () => Math.round(weeklyLoggedSessions.reduce((sum, s) => sum + (s.hours || 0), 0) * 100) / 100,
+    [weeklyLoggedSessions]
+  );
+
   // Calculations
   const meetingHours = useMemo(
     () => meetings.filter(m => m.included).reduce((sum, m) => sum + m.durationHours, 0),
@@ -148,7 +168,7 @@ export default function TimeBudget() {
     () => budgetTasks.reduce((sum, t) => sum + t.hours, 0),
     [budgetTasks]
   );
-  const budgeted = meetingHours + taskHours;
+  const budgeted = meetingHours + taskHours + loggedHours;
   const remaining = totalBudgetHours - budgeted;
   const budgetPercent = totalBudgetHours > 0 ? Math.min((budgeted / totalBudgetHours) * 100, 100) : 0;
   const isOverBudget = remaining < 0;
@@ -239,7 +259,7 @@ export default function TimeBudget() {
           />
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
           <div className="text-center">
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Meetings</p>
             <p className="text-lg font-bold text-foreground">{meetingHours}h</p>
@@ -247,6 +267,10 @@ export default function TimeBudget() {
           <div className="text-center">
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Tasks</p>
             <p className="text-lg font-bold text-foreground">{taskHours}h</p>
+          </div>
+          <div className="text-center">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Logged</p>
+            <p className="text-lg font-bold text-purple-400">{loggedHours}h</p>
           </div>
           <div className="text-center">
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Budgeted</p>
@@ -258,6 +282,56 @@ export default function TimeBudget() {
               {isOverBudget ? `${Math.abs(remaining)}h over` : `${remaining}h`}
             </p>
           </div>
+        </div>
+      </div>
+
+      {/* Focus Time Logged section */}
+      <div className="bg-card border border-border rounded-2xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-border">
+          <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <Timer size={14} className="text-purple-400" />
+            Focus Time Logged
+            <span className="text-xs font-normal text-muted-foreground">({loggedHours}h)</span>
+          </h2>
+        </div>
+
+        <div className="px-4 py-3">
+          {weeklyLoggedSessions.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-4">
+              No focus time logged this week yet. Complete timer sessions in Triage to track actual hours.
+            </p>
+          ) : (
+            <div className="space-y-1.5 max-h-[20rem] overflow-y-auto">
+              {weeklyLoggedSessions.map(s => {
+                const customer = s.customerId ? customers.find(c => c.id === s.customerId) : null;
+                // Use comment as description, fall back to activity type
+                const description = s.comment || s.activityType || 'Focus session';
+                const sessionDate = s.timestamp ? format(parseISO(s.timestamp), 'EEE MMM d · h:mm a') : '';
+                return (
+                  <div
+                    key={s.id}
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl border border-border bg-card"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium text-foreground leading-snug truncate">{description}</p>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        {customer && (
+                          <span className="inline-flex items-center gap-1 text-[10px] text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded-full">
+                            <User size={8} />
+                            {customer.name}
+                          </span>
+                        )}
+                        <span className="text-[10px] text-muted-foreground">{sessionDate}</span>
+                      </div>
+                    </div>
+                    <span className="text-xs font-semibold text-foreground flex-shrink-0">
+                      {Math.round(s.hours * 100) / 100}h
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
