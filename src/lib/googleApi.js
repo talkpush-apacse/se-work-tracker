@@ -252,3 +252,84 @@ export async function fetchGmailMessages(token, start, end, source = 'both') {
 
   return results;
 }
+
+// ─── Smart Email Filtering (for Weekly Report) ─────────────────────────────
+
+/** Sender patterns to exclude from weekly report email activity */
+const NOISE_SENDERS = [
+  /noreply@/i,
+  /no-reply@/i,
+  /donotreply@/i,
+  /do-not-reply@/i,
+  /notifications?@/i,
+  /mailer-daemon@/i,
+  /postmaster@/i,
+  /calendar-notification@google\.com/i,
+  /calendar-server@google\.com/i,
+  /drive-shares-dm-noreply@google\.com/i,
+  /drive-shares-noreply@google\.com/i,
+  /comments-noreply@docs\.google\.com/i,
+  /comments-noreply@google\.com/i,
+  /@teams\.microsoft\.com/i,
+  /@notifications\.google\.com/i,
+  /@docs\.google\.com/i,
+];
+
+/** Subject patterns to exclude from weekly report email activity */
+const NOISE_SUBJECT_PATTERNS = [
+  /^invitation:/i,
+  /^accepted:/i,
+  /^declined:/i,
+  /^tentative:/i,
+  /^updated invitation:/i,
+  /^canceled event:/i,
+  /^cancelled:/i,
+  /has shared .* with you/i,
+  /^out of office/i,
+  /^automatic reply/i,
+  /^auto:/i,
+  /^auto-reply/i,
+  /delivery status notification/i,
+  /undeliverable/i,
+  /^re:.*out of office/i,
+];
+
+/**
+ * Returns true if the email should be excluded from weekly report processing.
+ */
+export function isNoiseEmail(email) {
+  const from    = email.from || '';
+  const subject = email.subject || '';
+
+  if (NOISE_SENDERS.some(p => p.test(from))) return true;
+  if (NOISE_SUBJECT_PATTERNS.some(p => p.test(subject))) return true;
+
+  return false;
+}
+
+/**
+ * Filter a list of emails, removing automated/system/noise emails.
+ * Returns only human-to-human correspondence.
+ */
+export function filterRelevantEmails(emails) {
+  return emails.filter(e => !isNoiseEmail(e));
+}
+
+/**
+ * Fetch and filter Gmail messages for weekly report consumption.
+ * Fetches both sent and inbox, applies noise filtering, returns
+ * clean human-to-human correspondence with direction labels.
+ */
+export async function fetchFilteredWeeklyEmails(token, start, end) {
+  const [sent, received] = await Promise.all([
+    fetchGmailSent(token, start, end),
+    fetchGmailInbox(token, start, end),
+  ]);
+
+  const allEmails = [
+    ...sent.map(e => ({ ...e, direction: 'sent' })),
+    ...received.map(e => ({ ...e, direction: 'received' })),
+  ];
+
+  return filterRelevantEmails(allEmails);
+}

@@ -1,12 +1,15 @@
-import { LayoutDashboard, Target, Users, Menu, X, Download, Upload, ListTodo, Cloud, CloudOff, Loader2, Plug, Mail, Brain, Clock } from 'lucide-react';
-import { useState, useRef, useMemo } from 'react';
+import { LayoutDashboard, Target, Users, Menu, X, Download, Upload, ListTodo, Cloud, CloudOff, Loader2, Plug, Mail, Brain, Clock, GripVertical } from 'lucide-react';
+import { useState, useRef, useMemo, useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAppStore } from '../context/StoreContext';
 import { useTimerContext, useTimerDisplay } from '../context/TimerContext';
 import { format, startOfDay, endOfDay } from 'date-fns';
 import { filterPointsByRange } from '../utils/dateHelpers';
+import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
-const tabs = [
+const DEFAULT_TABS = [
   { id: 'triage',       label: 'Triage',         icon: ListTodo },
   { id: 'customers',    label: 'Customers',      icon: Users },
   { id: 'okrs',         label: 'OKRs',           icon: Target },
@@ -17,12 +20,137 @@ const tabs = [
   { id: 'integrations', label: 'Integrations',   icon: Plug },
 ];
 
+const STORAGE_KEY = 'gpt-sidebar-order';
+
+function loadTabOrder() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) return DEFAULT_TABS;
+    const order = JSON.parse(saved);
+    // Reorder DEFAULT_TABS according to saved order, appending any new tabs at the end
+    const ordered = [];
+    order.forEach(id => {
+      const tab = DEFAULT_TABS.find(t => t.id === id);
+      if (tab) ordered.push(tab);
+    });
+    // Add any tabs not in the saved order (new tabs added since last save)
+    DEFAULT_TABS.forEach(t => {
+      if (!ordered.find(o => o.id === t.id)) ordered.push(t);
+    });
+    return ordered;
+  } catch {
+    return DEFAULT_TABS;
+  }
+}
+
+function saveTabOrder(tabs) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(tabs.map(t => t.id)));
+}
+
+// ── Sortable nav item for desktop sidebar ──
+function SortableDesktopNavItem({ tab, activeTab, onTabChange }) {
+  const { id, label, icon: Icon } = tab;
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    zIndex: isDragging ? 10 : undefined,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-center group">
+      {/* Drag handle — only visible on lg (expanded sidebar) */}
+      <button
+        {...attributes}
+        {...listeners}
+        className="hidden lg:flex items-center justify-center w-5 h-5 flex-shrink-0 cursor-grab active:cursor-grabbing text-sidebar-foreground/20 hover:text-sidebar-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity"
+        tabIndex={-1}
+        aria-label={`Reorder ${label}`}
+      >
+        <GripVertical size={12} />
+      </button>
+      <button
+        onClick={() => onTabChange(id)}
+        title={label}
+        className={`flex-1 flex items-center justify-center lg:justify-start gap-3 px-2 lg:px-3 py-2.5 rounded-xl text-sm font-medium font-nav transition-all ${
+          activeTab === id
+            ? 'bg-sidebar-accent text-sidebar-foreground shadow-sm'
+            : 'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/60'
+        }`}
+      >
+        <Icon
+          size={16}
+          className={`flex-shrink-0 ${activeTab === id ? 'text-brand-lavender' : ''}`}
+        />
+        <span className="hidden lg:block">{label}</span>
+      </button>
+    </div>
+  );
+}
+
+// ── Sortable nav item for mobile drawer ──
+function SortableMobileNavItem({ tab, activeTab, onTabChange, onClose }) {
+  const { id, label, icon: Icon } = tab;
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    zIndex: isDragging ? 10 : undefined,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-center gap-1">
+      <button
+        {...attributes}
+        {...listeners}
+        className="flex items-center justify-center w-6 h-6 flex-shrink-0 cursor-grab active:cursor-grabbing text-sidebar-foreground/25 hover:text-sidebar-foreground/50"
+        tabIndex={-1}
+        aria-label={`Reorder ${label}`}
+      >
+        <GripVertical size={13} />
+      </button>
+      <button
+        onClick={() => { onTabChange(id); onClose(); }}
+        className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium font-nav transition-all ${
+          activeTab === id
+            ? 'bg-sidebar-accent text-sidebar-foreground'
+            : 'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/60'
+        }`}
+      >
+        <Icon size={16} className={activeTab === id ? 'text-brand-lavender' : ''} />
+        {label}
+      </button>
+    </div>
+  );
+}
+
 export default function Navigation({ activeTab, onTabChange }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const { exportData, importData, syncStatus, points, tasks } = useAppStore();
   const { isRunning, taskId: runningTaskId } = useTimerContext();
   const elapsedSeconds = useTimerDisplay();
   const fileRef = useRef();
+  const [orderedTabs, setOrderedTabs] = useState(loadTabOrder);
+
+  // Sensors: pointer (desktop) + touch (mobile)
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+  );
+
+  const handleDragEnd = useCallback((event) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setOrderedTabs(prev => {
+      const oldIndex = prev.findIndex(t => t.id === active.id);
+      const newIndex = prev.findIndex(t => t.id === over.id);
+      const reordered = arrayMove(prev, oldIndex, newIndex);
+      saveTabOrder(reordered);
+      return reordered;
+    });
+  }, []);
 
   // Today at a glance — memoized so it only recalculates when `points` changes,
   // not on every tab switch or timer tick that re-renders Navigation.
@@ -72,24 +200,18 @@ export default function Navigation({ activeTab, onTabChange }) {
         </button>
 
         <nav className="flex-1 p-2 lg:p-3 space-y-1">
-          {tabs.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              onClick={() => onTabChange(id)}
-              title={label}
-              className={`w-full flex items-center justify-center lg:justify-start gap-3 px-2 lg:px-3 py-2.5 rounded-xl text-sm font-medium font-nav transition-all ${
-                activeTab === id
-                  ? 'bg-sidebar-accent text-sidebar-foreground shadow-sm'
-                  : 'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/60'
-              }`}
-            >
-              <Icon
-                size={16}
-                className={`flex-shrink-0 ${activeTab === id ? 'text-brand-lavender' : ''}`}
-              />
-              <span className="hidden lg:block">{label}</span>
-            </button>
-          ))}
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={orderedTabs.map(t => t.id)} strategy={verticalListSortingStrategy}>
+              {orderedTabs.map(tab => (
+                <SortableDesktopNavItem
+                  key={tab.id}
+                  tab={tab}
+                  activeTab={activeTab}
+                  onTabChange={onTabChange}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
         </nav>
 
         {/* Today at a glance — only visible on expanded sidebar (lg) */}
@@ -194,20 +316,19 @@ export default function Navigation({ activeTab, onTabChange }) {
               transition={{ duration: 0.15, ease: 'easeOut' }}
               onClick={(e) => e.stopPropagation()}
             >
-              {tabs.map(({ id, label, icon: Icon }) => (
-                <button
-                  key={id}
-                  onClick={() => { onTabChange(id); setMenuOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium font-nav transition-all ${
-                    activeTab === id
-                      ? 'bg-sidebar-accent text-sidebar-foreground'
-                      : 'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/60'
-                  }`}
-                >
-                  <Icon size={16} className={activeTab === id ? 'text-brand-lavender' : ''} />
-                  {label}
-                </button>
-              ))}
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={orderedTabs.map(t => t.id)} strategy={verticalListSortingStrategy}>
+                  {orderedTabs.map(tab => (
+                    <SortableMobileNavItem
+                      key={tab.id}
+                      tab={tab}
+                      activeTab={activeTab}
+                      onTabChange={onTabChange}
+                      onClose={() => setMenuOpen(false)}
+                    />
+                  ))}
+                </SortableContext>
+              </DndContext>
               <div className="flex gap-2 pt-2 border-t border-sidebar-border">
                 <button
                   onClick={() => { exportData(); setMenuOpen(false); }}

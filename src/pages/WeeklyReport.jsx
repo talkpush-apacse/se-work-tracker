@@ -9,11 +9,12 @@ import { useGoogleAuth } from '../context/GoogleAuthContext';
 import { getThisWeekRange, filterPointsByRange, isInRange } from '../utils/dateHelpers';
 import {
   WEEKLY_REPORT_DEFAULT_PROMPT, WEEKLY_UPDATE_LOG_COLORS, WEEKLY_UPDATE_LOG_LABELS,
-  MILESTONE_STATUS_LABELS, MILESTONE_STATUS_COLORS,
+  MILESTONE_STATUS_LABELS, MILESTONE_STATUS_COLORS, WEEKLY_EMAIL_SUMMARY_PROMPT,
 } from '../constants';
 import { Button } from '../components/ui/button';
 import ConfirmDialog from '../components/ConfirmDialog';
-import { fetchCalendarEvents, fetchGmailSent, fetchGmailInbox } from '../lib/googleApi';
+import { fetchCalendarEvents, fetchFilteredWeeklyEmails } from '../lib/googleApi';
+import WeeklyUpdateLog from '../components/WeeklyUpdateLog';
 
 // ─── Module-level helpers ─────────────────────────────────────────────────────
 
@@ -33,7 +34,7 @@ function formatWeekLabel(weekStart, weekEnd) {
   return `${format(weekStart, 'MMM d')} – ${format(weekEnd, 'MMM d, yyyy')}`;
 }
 
-function buildWeekContext({ weekStart, weekEnd, points, tasks, customers, okrs, weeklyUpdateLogs, milestones, calendarEvents, gmailEmails }) {
+function buildWeekContext({ weekStart, weekEnd, points, tasks, customers, okrs, weeklyUpdateLogs, milestones, calendarEvents, gmailEmails, emailSummary }) {
   const weekLabel = formatWeekLabel(weekStart, weekEnd);
   const lines = [];
 
@@ -219,6 +220,13 @@ function buildWeekContext({ weekStart, weekEnd, points, tasks, customers, okrs, 
     lines.push('');
   }
 
+  // ── AI Email Summary (pre-generated) ──
+  if (emailSummary) {
+    lines.push('### Email Activity Summary (AI-Generated)');
+    lines.push(emailSummary);
+    lines.push('');
+  }
+
   return lines.join('\n');
 }
 
@@ -256,6 +264,9 @@ export default function WeeklyReport({ onNavigate }) {
   const [genSuccess,     setGenSuccess]     = useState(false);
   const [genSummary,     setGenSummary]     = useState(null);          // { tasks, emails, meetings }
   const [navError,       setNavError]       = useState(null);          // integration button error
+  const [emailSummary,       setEmailSummary]       = useState('');
+  const [isEmailSummarizing, setIsEmailSummarizing] = useState(false);
+  const [emailSummaryError,  setEmailSummaryError]  = useState(null);
 
   const emailOutputRef = useRef(null);
 
@@ -334,6 +345,8 @@ export default function WeeklyReport({ onNavigate }) {
   useEffect(() => {
     setCalendarEvents(null);
     setGmailEmails(null);
+    setEmailSummary('');
+    setEmailSummaryError(null);
 
     const fetches = [];
 
@@ -346,16 +359,8 @@ export default function WeeklyReport({ onNavigate }) {
     }
     if (gmailToken) {
       fetches.push(
-        Promise.all([
-          fetchGmailSent(gmailToken, weekStart, weekEnd),
-          fetchGmailInbox(gmailToken, weekStart, weekEnd),
-        ])
-          .then(([sent, received]) => {
-            setGmailEmails([
-              ...sent.map(e => ({ ...e, direction: 'sent' })),
-              ...received.map(e => ({ ...e, direction: 'received' })),
-            ]);
-          })
+        fetchFilteredWeeklyEmails(gmailToken, weekStart, weekEnd)
+          .then(setGmailEmails)
           .catch(() => setGmailEmails([]))
       );
     }
@@ -366,6 +371,55 @@ export default function WeeklyReport({ onNavigate }) {
     }
   }, [weekStart, weekEnd, googleToken, gmailToken]);
 
+  // ── Auto-summarize filtered emails via Claude API ──
+  useEffect(() => {
+    if (!gmailEmails || gmailEmails.length === 0) return;
+
+    const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
+    if (!apiKey) return;
+
+    let cancelled = false;
+    setIsEmailSummarizing(true);
+    setEmailSummaryError(null);
+
+    const emailData = gmailEmails.map(e => {
+      const dir = e.direction === 'sent' ? 'SENT' : 'RECEIVED';
+      const person = e.direction === 'sent' ? (e.to || '') : (e.from || '');
+      return `[${dir}] ${e.subject || '(no subject)'} — ${person}`;
+    }).join('\n');
+
+    fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type':            'application/json',
+        'x-api-key':               apiKey,
+        'anthropic-version':       '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model:      aiSettings.claudeModel || 'claude-sonnet-4-6',
+        max_tokens: 800,
+        system:     WEEKLY_EMAIL_SUMMARY_PROMPT,
+        messages:   [{ role: 'user', content: `Here are ${gmailEmails.length} emails from this week:\n\n${emailData}` }],
+      }),
+    })
+      .then(res => {
+        if (!res.ok) throw new Error(`Claude API ${res.status}`);
+        return res.json();
+      })
+      .then(data => {
+        if (!cancelled) setEmailSummary(data.content?.[0]?.text || '');
+      })
+      .catch(err => {
+        if (!cancelled) setEmailSummaryError(err.message);
+      })
+      .finally(() => {
+        if (!cancelled) setIsEmailSummarizing(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [gmailEmails, aiSettings.claudeModel]);
+
   const handleGenerate = useCallback(async () => {
     setIsGenerating(true);
     setGenError(null);
@@ -373,7 +427,7 @@ export default function WeeklyReport({ onNavigate }) {
     // calendarEvents / gmailEmails now come from prefetched state
     const context = buildWeekContext({
       weekStart, weekEnd, points, tasks, customers, okrs,
-      weeklyUpdateLogs, milestones, calendarEvents, gmailEmails,
+      weeklyUpdateLogs, milestones, calendarEvents, gmailEmails, emailSummary,
     });
 
     const systemPrompt = localPrompt.trim() || aiSettings.prompts?.weeklyEmail?.trim() || WEEKLY_REPORT_DEFAULT_PROMPT;
@@ -448,7 +502,7 @@ export default function WeeklyReport({ onNavigate }) {
     } finally {
       setIsGenerating(false);
     }
-  }, [provider, weekStart, weekEnd, points, tasks, customers, okrs, weeklyUpdateLogs, milestones, calendarEvents, gmailEmails, localPrompt, aiSettings, weekTasksList]);
+  }, [provider, weekStart, weekEnd, points, tasks, customers, okrs, weeklyUpdateLogs, milestones, calendarEvents, gmailEmails, emailSummary, localPrompt, aiSettings, weekTasksList]);
 
   const handleSave = useCallback(() => {
     const model = provider === 'claude'
@@ -767,6 +821,55 @@ export default function WeeklyReport({ onNavigate }) {
         )}
       </div>
 
+      {/* ── Email Activity Summary (AI-generated from filtered emails) ── */}
+      {gmailToken && gmailEmails !== null && gmailEmails.length > 0 && (
+        <div className="rounded-2xl border border-border bg-card px-5 py-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Mail size={15} className="text-brand-lavender" />
+            <h3 className="text-sm font-semibold text-foreground">Email Activity This Week</h3>
+            <span className="text-xs text-muted-foreground ml-auto">
+              {gmailEmails.length} email{gmailEmails.length !== 1 ? 's' : ''} (filtered)
+            </span>
+          </div>
+
+          {isEmailSummarizing ? (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 size={13} className="animate-spin" />
+              Summarizing emails with AI…
+            </div>
+          ) : emailSummaryError ? (
+            <p className="text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2">
+              Could not summarize emails: {emailSummaryError}
+            </p>
+          ) : emailSummary ? (
+            <div className="text-xs text-foreground/80 leading-relaxed whitespace-pre-line bg-secondary/30 rounded-xl px-4 py-3 max-h-64 overflow-y-auto">
+              {emailSummary}
+            </div>
+          ) : null}
+
+          {/* Collapsed list of email subjects */}
+          <details className="text-xs">
+            <summary className="text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
+              View {gmailEmails.length} filtered email{gmailEmails.length !== 1 ? 's' : ''}
+            </summary>
+            <div className="mt-2 space-y-1 max-h-48 overflow-y-auto pl-1">
+              {gmailEmails.map((e, i) => (
+                <div key={i} className="flex items-start gap-2 text-foreground/70">
+                  <span className={`flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                    e.direction === 'sent'
+                      ? 'bg-blue-500/15 text-blue-400'
+                      : 'bg-emerald-500/15 text-emerald-400'
+                  }`}>
+                    {e.direction === 'sent' ? 'Sent' : 'Recv'}
+                  </span>
+                  <span className="truncate">{e.subject || '(no subject)'}</span>
+                </div>
+              ))}
+            </div>
+          </details>
+        </div>
+      )}
+
       {/* ── B2: Highlights, Learnings & Shoutouts ── */}
       {reportLogs.length > 0 && (
         <div className="rounded-2xl border border-border bg-card px-5 py-4 space-y-4">
@@ -840,6 +943,9 @@ export default function WeeklyReport({ onNavigate }) {
           </div>
         </div>
       )}
+
+      {/* ── B4: Weekly Update Log (add entries before generating) ── */}
+      <WeeklyUpdateLog />
 
       {/* ── C: Generate ── */}
       <div className="rounded-2xl border border-border bg-card px-5 py-4 space-y-3">

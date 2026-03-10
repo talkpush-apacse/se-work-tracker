@@ -188,3 +188,18 @@ export const MILESTONE_STATUS_COLORS = {
   'completed':   '#10b981',
   'cancelled':   '#6b7280',
 };
+
+// ─── Smart Email Summary ──────────────────────────────────────────────────────
+export const WEEKLY_EMAIL_SUMMARY_PROMPT = `You are summarizing a Solutions Engineer's weekly client email activity. Group emails by customer/company name if identifiable. For each group, extract: key topics discussed, commitments or follow-ups mentioned, and any issues raised. Be concise and professional.
+
+Format your response as a structured summary:
+**Client Communications:**
+- [company/person]: [1-sentence summary of topic and outcome]
+
+**Internal Coordination:**
+- [summary]
+
+**Follow-ups Needed:**
+- [summary]
+
+If a category has no items, omit it entirely. Keep it to 8-12 bullet points maximum. Focus on actionable insights, not email metadata.`;
