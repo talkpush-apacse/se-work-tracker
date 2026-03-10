@@ -6,12 +6,13 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   Clock, ChevronLeft, ChevronRight, Plus, Trash2, Calendar, Loader2,
-  AlertCircle, Settings, Check, X, CheckSquare, Square, Timer, User,
+  AlertCircle, Settings, Check, X, CheckSquare, Square, Timer, User, Copy,
 } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, parseISO, differenceInMinutes } from 'date-fns';
 import { useAppStore } from '../context/StoreContext';
 import { useGoogleAuth } from '../context/GoogleAuthContext';
 import { fetchCalendarEvents } from '../lib/googleApi';
+import { formatRelative } from '../utils/dateHelpers';
 
 // Default budget hours
 const DEFAULT_BUDGET = 40;
@@ -34,6 +35,7 @@ function eventToMeeting(event) {
     startTime: start ? format(start, 'h:mm a') : '',
     durationHours: Math.max(0.5, durationHours), // minimum 0.5h
     included: true,
+    source: 'calendar',
   };
 }
 
@@ -58,6 +60,11 @@ export default function TimeBudget() {
   const [isFetching, setIsFetching] = useState(false);
   const [fetchError, setFetchError] = useState(null);
   const [hasFetched, setHasFetched] = useState(false);
+  const [lastFetchedAt, setLastFetchedAt] = useState(savedBudget?.lastFetchedAt ?? null);
+
+  // Manual meeting form
+  const [showManualMeeting, setShowManualMeeting] = useState(false);
+  const [newManualMeeting, setNewManualMeeting] = useState({ summary: '', durationHours: 1 });
 
   // New task form
   const [newTask, setNewTask] = useState({ description: '', hours: 1, customerId: '', taskId: '' });
@@ -69,6 +76,9 @@ export default function TimeBudget() {
     setMeetings(budget?.meetings ?? []);
     setBudgetTasks(budget?.tasks ?? []);
     setHasFetched(!!budget?.meetings?.length);
+    setLastFetchedAt(budget?.lastFetchedAt ?? null);
+    setFetchError(null);
+    setShowManualMeeting(false);
   }, [weekKey, getTimeBudget]);
 
   // Auto-save to store whenever meetings/tasks/budget change
@@ -77,10 +87,11 @@ export default function TimeBudget() {
       totalBudgetHours,
       meetings,
       tasks: budgetTasks,
+      lastFetchedAt,
     });
-  }, [weekKey, totalBudgetHours, meetings, budgetTasks, upsertTimeBudget]);
+  }, [weekKey, totalBudgetHours, meetings, budgetTasks, lastFetchedAt, upsertTimeBudget]);
 
-  // Fetch meetings from Google Calendar
+  // Fetch meetings from Google Calendar (preserves manual + copied entries)
   const handleFetchMeetings = useCallback(async () => {
     if (!googleToken) return;
     setIsFetching(true);
@@ -88,15 +99,18 @@ export default function TimeBudget() {
     try {
       const events = await fetchCalendarEvents(googleToken, weekStart, weekEnd);
       const meetingsList = events.map(eventToMeeting);
-      // Preserve include/exclude state for events already in the list
+      // Preserve include/exclude state for calendar events already in the list, keep manual + copied entries
       setMeetings(prev => {
-        const prevMap = new Map(prev.map(m => [m.calendarEventId, m]));
-        return meetingsList.map(m => ({
+        const manualAndCopied = prev.filter(m => m.source === 'manual' || m.source === 'copied');
+        const prevCalendarMap = new Map(prev.filter(m => !m.source || m.source === 'calendar').map(m => [m.calendarEventId, m]));
+        const calendarEntries = meetingsList.map(m => ({
           ...m,
-          included: prevMap.has(m.calendarEventId) ? prevMap.get(m.calendarEventId).included : true,
+          included: prevCalendarMap.has(m.calendarEventId) ? prevCalendarMap.get(m.calendarEventId).included : true,
         }));
+        return [...calendarEntries, ...manualAndCopied];
       });
       setHasFetched(true);
+      setLastFetchedAt(new Date().toISOString());
     } catch (err) {
       // Auto-clear stale token on 401 so the UI shows the "connect" prompt
       if (err.status === 401) {
@@ -121,6 +135,44 @@ export default function TimeBudget() {
       m.calendarEventId === calendarEventId ? { ...m, included: !m.included } : m
     ));
   }, []);
+
+  // Add a manual meeting entry
+  const addManualMeeting = useCallback(() => {
+    if (!newManualMeeting.summary.trim()) return;
+    setMeetings(prev => [...prev, {
+      calendarEventId: `manual-${crypto.randomUUID()}`,
+      summary: newManualMeeting.summary.trim(),
+      day: '',
+      startTime: '',
+      durationHours: newManualMeeting.durationHours,
+      included: true,
+      source: 'manual',
+    }]);
+    setNewManualMeeting({ summary: '', durationHours: 1 });
+    setShowManualMeeting(false);
+  }, [newManualMeeting]);
+
+  // Delete a manual/copied meeting
+  const deleteManualMeeting = useCallback((calendarEventId) => {
+    setMeetings(prev => prev.filter(m => m.calendarEventId !== calendarEventId));
+  }, []);
+
+  // Copy meetings from last week
+  const lastWeekKey = getMonday(subWeeks(currentDate, 1));
+  const lastWeekBudget = getTimeBudget(lastWeekKey);
+  const canCopyFromLastWeek = !googleToken && meetings.length === 0 && lastWeekBudget?.meetings?.length > 0;
+
+  const handleCopyFromLastWeek = useCallback(() => {
+    if (!lastWeekBudget?.meetings?.length) return;
+    const copiedMeetings = lastWeekBudget.meetings.map(m => ({
+      ...m,
+      calendarEventId: `copied-${crypto.randomUUID()}`,
+      source: 'copied',
+      included: true,
+    }));
+    setMeetings(copiedMeetings);
+    setHasFetched(true);
+  }, [lastWeekBudget]);
 
   // Task CRUD
   const addBudgetTask = useCallback(() => {
@@ -340,27 +392,91 @@ export default function TimeBudget() {
         {/* Meetings section */}
         <div className="bg-card border border-border rounded-2xl overflow-hidden">
           <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <Calendar size={14} className="text-blue-400" />
-              Meetings
-              <span className="text-xs font-normal text-muted-foreground">({meetingHours}h)</span>
-            </h2>
-            <button
-              onClick={handleFetchMeetings}
-              disabled={isFetching || !googleToken}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-secondary border border-border text-[11px] font-medium text-foreground hover:bg-secondary/80 disabled:opacity-40 transition-all"
-            >
-              {isFetching ? <Loader2 size={11} className="animate-spin" /> : <Calendar size={11} />}
-              {hasFetched ? 'Refresh' : 'Fetch'}
-            </button>
+            <div>
+              <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <Calendar size={14} className="text-blue-400" />
+                Meetings
+                <span className="text-xs font-normal text-muted-foreground">({meetingHours}h)</span>
+              </h2>
+              {lastFetchedAt && (
+                <p className="text-[10px] text-muted-foreground mt-0.5">Fetched {formatRelative(lastFetchedAt)}</p>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setShowManualMeeting(v => !v)}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-secondary border border-border text-[11px] font-medium text-foreground hover:bg-secondary/80 transition-all"
+              >
+                <Plus size={11} />
+                Manual
+              </button>
+              <button
+                onClick={handleFetchMeetings}
+                disabled={isFetching || !googleToken}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-secondary border border-border text-[11px] font-medium text-foreground hover:bg-secondary/80 disabled:opacity-40 transition-all"
+              >
+                {isFetching ? <Loader2 size={11} className="animate-spin" /> : <Calendar size={11} />}
+                {hasFetched ? 'Refresh' : 'Fetch'}
+              </button>
+            </div>
           </div>
 
           <div className="px-4 py-3 space-y-1.5 max-h-[24rem] overflow-y-auto">
-            {!googleToken && (
-              <div className="flex items-center gap-2 px-3 py-4 text-center">
-                <AlertCircle size={14} className="text-muted-foreground/50 flex-shrink-0" />
-                <p className="text-xs text-muted-foreground">Connect Google Calendar in Integrations to auto-fetch meetings.</p>
+            {/* Manual meeting form */}
+            {showManualMeeting && (
+              <div className="flex gap-1.5 flex-wrap p-2.5 bg-secondary/50 border border-border rounded-xl mb-1.5">
+                <input
+                  type="text"
+                  placeholder="Meeting name..."
+                  value={newManualMeeting.summary}
+                  onChange={e => setNewManualMeeting(prev => ({ ...prev, summary: e.target.value }))}
+                  onKeyDown={e => { if (e.key === 'Enter') addManualMeeting(); }}
+                  className="flex-1 min-w-[8rem] h-8 bg-card border border-border rounded-lg px-2.5 text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-ring"
+                  autoFocus
+                />
+                <select
+                  value={newManualMeeting.durationHours}
+                  onChange={e => setNewManualMeeting(prev => ({ ...prev, durationHours: Number(e.target.value) }))}
+                  className="h-8 bg-card border border-border rounded-lg px-1.5 text-xs text-foreground focus:outline-none focus:border-ring w-20"
+                >
+                  {[0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6, 8].map(h => (
+                    <option key={h} value={h}>{h}h</option>
+                  ))}
+                </select>
+                <button
+                  onClick={addManualMeeting}
+                  disabled={!newManualMeeting.summary.trim()}
+                  className="flex items-center gap-1 px-3 h-8 rounded-lg bg-blue-500/15 text-blue-400 text-xs font-semibold hover:bg-blue-500/25 disabled:opacity-40 transition-all"
+                >
+                  <Plus size={12} /> Add
+                </button>
+                <button
+                  onClick={() => { setShowManualMeeting(false); setNewManualMeeting({ summary: '', durationHours: 1 }); }}
+                  className="h-8 px-2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <X size={12} />
+                </button>
               </div>
+            )}
+
+            {!googleToken && meetings.length === 0 && (
+              <div className="flex flex-col items-center gap-2 px-3 py-4 text-center">
+                <AlertCircle size={14} className="text-muted-foreground/50 flex-shrink-0" />
+                <p className="text-xs text-muted-foreground">
+                  Re-connect Google Calendar in Integrations, or add meetings manually above.
+                </p>
+              </div>
+            )}
+
+            {/* Copy from last week button */}
+            {canCopyFromLastWeek && (
+              <button
+                onClick={handleCopyFromLastWeek}
+                className="w-full flex items-center justify-center gap-2 px-3 py-3 rounded-xl border border-dashed border-blue-500/30 bg-blue-500/5 text-blue-400 text-xs font-medium hover:bg-blue-500/10 transition-all"
+              >
+                <Copy size={12} />
+                Copy from last week ({lastWeekBudget.meetings.length} meetings)
+              </button>
             )}
 
             {fetchError && (
@@ -404,11 +520,28 @@ export default function TimeBudget() {
                   <p className={`text-xs font-medium leading-snug ${m.included ? 'text-foreground' : 'text-muted-foreground line-through'}`}>
                     {m.summary}
                   </p>
-                  <p className="text-[10px] text-muted-foreground">{m.day}{m.startTime ? ` · ${m.startTime}` : ''}</p>
+                  <div className="flex items-center gap-1.5">
+                    {m.day && <p className="text-[10px] text-muted-foreground">{m.day}{m.startTime ? ` · ${m.startTime}` : ''}</p>}
+                    {m.source === 'manual' && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 font-semibold">Manual</span>
+                    )}
+                    {m.source === 'copied' && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-400 font-semibold">Copied</span>
+                    )}
+                  </div>
                 </div>
                 <span className={`text-xs font-semibold flex-shrink-0 ${m.included ? 'text-foreground' : 'text-muted-foreground'}`}>
                   {m.durationHours}h
                 </span>
+                {(m.source === 'manual' || m.source === 'copied') && (
+                  <button
+                    onClick={() => deleteManualMeeting(m.calendarEventId)}
+                    className="p-1 text-muted-foreground hover:text-red-400 transition-colors flex-shrink-0"
+                    title="Remove"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                )}
               </div>
             ))}
           </div>

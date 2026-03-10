@@ -6,7 +6,7 @@ import {
 import { format, addWeeks, parseISO } from 'date-fns';
 import { useAppStore } from '../context/StoreContext';
 import { useGoogleAuth } from '../context/GoogleAuthContext';
-import { getThisWeekRange, filterPointsByRange, isInRange } from '../utils/dateHelpers';
+import { getThisWeekRange, filterPointsByRange, isInRange, getWeekRangeForOffset, formatWeekLabel } from '../utils/dateHelpers';
 import {
   WEEKLY_REPORT_DEFAULT_PROMPT, WEEKLY_UPDATE_LOG_COLORS, WEEKLY_UPDATE_LOG_LABELS,
   MILESTONE_STATUS_LABELS, MILESTONE_STATUS_COLORS, WEEKLY_EMAIL_SUMMARY_PROMPT,
@@ -17,22 +17,6 @@ import { fetchCalendarEvents, fetchFilteredWeeklyEmails } from '../lib/googleApi
 import WeeklyUpdateLog from '../components/WeeklyUpdateLog';
 
 // ─── Module-level helpers ─────────────────────────────────────────────────────
-
-function getWeekRangeForOffset(offset) {
-  const base = getThisWeekRange();
-  return {
-    weekStart: addWeeks(base.start, offset),
-    weekEnd:   addWeeks(base.end,   offset),
-  };
-}
-
-function formatWeekLabel(weekStart, weekEnd) {
-  const sameMonth = weekStart.getMonth() === weekEnd.getMonth();
-  if (sameMonth) {
-    return `${format(weekStart, 'MMM d')} – ${format(weekEnd, 'd, yyyy')}`;
-  }
-  return `${format(weekStart, 'MMM d')} – ${format(weekEnd, 'MMM d, yyyy')}`;
-}
 
 function buildWeekContext({ weekStart, weekEnd, points, tasks, customers, okrs, weeklyUpdateLogs, milestones, calendarEvents, gmailEmails, emailSummary }) {
   const weekLabel = formatWeekLabel(weekStart, weekEnd);
@@ -945,7 +929,7 @@ export default function WeeklyReport({ onNavigate }) {
       )}
 
       {/* ── B4: Weekly Update Log (add entries before generating) ── */}
-      <WeeklyUpdateLog />
+      <WeeklyUpdateLog weekStart={weekStart} weekEnd={weekEnd} />
 
       {/* ── C: Generate ── */}
       <div className="rounded-2xl border border-border bg-card px-5 py-4 space-y-3">

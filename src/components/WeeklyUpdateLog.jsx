@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Bookmark, Pencil, Trash2, X, Check } from 'lucide-react';
+import { format } from 'date-fns';
 import { useAppStore } from '../context/StoreContext';
 import {
   WEEKLY_UPDATE_LOG_TYPES, WEEKLY_UPDATE_LOG_LABELS, WEEKLY_UPDATE_LOG_COLORS,
@@ -7,7 +8,7 @@ import {
 import CalendarEmailImport from './CalendarEmailImport';
 import ConfirmDialog from './ConfirmDialog';
 
-export default function WeeklyUpdateLog() {
+export default function WeeklyUpdateLog({ weekStart, weekEnd } = {}) {
   const {
     customers, weeklyUpdateLogs,
     addWeeklyUpdateLog, updateWeeklyUpdateLog, deleteWeeklyUpdateLog,
@@ -41,6 +42,20 @@ export default function WeeklyUpdateLog() {
     const count = migrateAnnotationsToLogs();
     if (count > 0) setMigrationBanner(count);
   }, []);
+
+  // Sync date filters + default logDate to parent week range (when rendered inside WeeklyReport)
+  useEffect(() => {
+    if (!weekStart || !weekEnd) return;
+    const from = format(weekStart, 'yyyy-MM-dd');
+    const to   = format(weekEnd,   'yyyy-MM-dd');
+    setFilterLogDateFrom(from);
+    setFilterLogDateTo(to);
+    // Default logDate to today if within range, otherwise weekStart
+    const today = new Date().toISOString().slice(0, 10);
+    if (!logEditId) {
+      setLogDate(today >= from && today <= to ? today : from);
+    }
+  }, [weekStart, weekEnd]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Filtered + sorted logs
   const filteredLogs = useMemo(() => {

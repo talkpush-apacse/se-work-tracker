@@ -1,4 +1,4 @@
-import { startOfWeek, endOfWeek, isWithinInterval, parseISO, format, subWeeks, startOfDay, endOfDay } from 'date-fns';
+import { startOfWeek, endOfWeek, isWithinInterval, parseISO, format, subWeeks, addWeeks, startOfDay, endOfDay } from 'date-fns';
 
 export function getThisWeekRange() {
   const now = new Date();
@@ -55,4 +55,21 @@ export function getStreakDays(points) {
     else break;
   }
   return streak;
+}
+
+// Week offset helpers (shared by WeeklyReport + Triage)
+export function getWeekRangeForOffset(offset) {
+  const base = getThisWeekRange();
+  return {
+    weekStart: addWeeks(base.start, offset),
+    weekEnd:   addWeeks(base.end,   offset),
+  };
+}
+
+export function formatWeekLabel(weekStart, weekEnd) {
+  const sameMonth = weekStart.getMonth() === weekEnd.getMonth();
+  if (sameMonth) {
+    return `${format(weekStart, 'MMM d')} – ${format(weekEnd, 'd, yyyy')}`;
+  }
+  return `${format(weekStart, 'MMM d')} – ${format(weekEnd, 'MMM d, yyyy')}`;
 }

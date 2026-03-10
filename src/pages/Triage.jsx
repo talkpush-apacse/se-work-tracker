@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, memo, useRef, useEffect } from 'react';
 import {
   ChevronDown, Plus, Mic, MicOff, Copy, Save, Check, CheckCircle2,
-  Loader2, ClipboardList, Sparkles, ChevronRight,
+  Loader2, ClipboardList, Sparkles, ChevronLeft, ChevronRight,
   Calendar, User, Tag, AlertCircle, Archive, ArchiveX, Trash2,
   Settings, RotateCcw, Pencil, GripVertical, ExternalLink, ArrowLeft,
   Timer, Square, Pin, CheckSquare, Paperclip, Clock,
@@ -10,8 +10,10 @@ import {
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { parseISO } from 'date-fns';
 import { useAppStore } from '../context/StoreContext';
 import { useTimerContext, useTimerDisplay } from '../context/TimerContext';
+import { getWeekRangeForOffset, formatWeekLabel, isInRange } from '../utils/dateHelpers';
 import ConfirmDialog from '../components/ConfirmDialog';
 import FileAttachments from '../components/FileAttachments';
 import RichTextEditor from '../components/ui/RichTextEditor';
@@ -1904,6 +1906,11 @@ export default function Triage() {
   // Priority quick-filter toggle
   const [filterPriorityClients, setFilterPriorityClients] = useState(false);
 
+  // Closed tab week picker state
+  const [closedWeekOffset, setClosedWeekOffset] = useState(0);
+  const { weekStart: closedWeekStart, weekEnd: closedWeekEnd } = getWeekRangeForOffset(closedWeekOffset);
+  const closedWeekLabel = formatWeekLabel(closedWeekStart, closedWeekEnd);
+
   // Ref for scrolling to the filter bar (used by the "filtered" badge click)
   const filterRowRef = useRef(null);
 
@@ -1969,7 +1976,7 @@ export default function Triage() {
     [tasks, customerMap, filterCustomerId, filterTaskType, filterStatus, filterPriorityClients]
   );
 
-  // Closed tasks: done + archived, sorted by closedAt DESC
+  // Closed tasks: done + archived, filtered by selected week, sorted by closedAt DESC
   const closedTasks = useMemo(
     () => tasks.filter(t => {
       if (t.status !== 'done' && t.status !== 'archived') return false;
@@ -1979,9 +1986,12 @@ export default function Triage() {
         const cust = customerMap.get(t.customerId);
         if (!cust?.pinned) return false;
       }
+      // Filter by week range — use closedAt, fallback to createdAt
+      const closedDate = t.closedAt || t.createdAt;
+      if (closedDate && !isInRange(parseISO(closedDate), closedWeekStart, closedWeekEnd)) return false;
       return true;
     }).sort((a, b) => new Date(b.closedAt || b.createdAt) - new Date(a.closedAt || a.createdAt)),
-    [tasks, customerMap, filterCustomerId, filterTaskType, filterPriorityClients]
+    [tasks, customerMap, filterCustomerId, filterTaskType, filterPriorityClients, closedWeekStart, closedWeekEnd]
   );
 
   // Dedicated in-progress list — respects customer/taskType/priority filters but NOT filterStatus
@@ -1997,6 +2007,24 @@ export default function Triage() {
       return true;
     }),
     [tasks, customerMap, filterCustomerId, filterTaskType, filterPriorityClients]
+  );
+
+  // Evergreen tasks: all tasks with taskType 'evergreen', regardless of status
+  const evergreenTasks = useMemo(
+    () => tasks.filter(t => {
+      if (t.taskType !== 'evergreen') return false;
+      if (filterCustomerId && t.customerId !== filterCustomerId) return false;
+      if (filterPriorityClients) {
+        const cust = customerMap.get(t.customerId);
+        if (!cust?.pinned) return false;
+      }
+      return true;
+    }).sort((a, b) => {
+      // Open first, then done, then archived
+      const statusOrder = { 'open': 0, 'in-progress': 1, 'blocked': 2, 'done': 3, 'archived': 4 };
+      return (statusOrder[a.status] ?? 5) - (statusOrder[b.status] ?? 5);
+    }),
+    [tasks, customerMap, filterCustomerId, filterPriorityClients]
   );
 
   const filtersActive = filterCustomerId || filterTaskType || filterStatus || filterPriorityClients;
@@ -2411,6 +2439,22 @@ export default function Triage() {
               </span>
             )}
           </button>
+          <button
+            onClick={() => { setBoardTab('evergreen'); setFilterStatus(''); setFilterCustomerId(''); setFilterTaskType(''); setFilterPriorityClients(false); clearSelection(); }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              boardTab === 'evergreen' ? 'bg-green-500/15 text-green-400 shadow-sm' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <RefreshCw size={12} />
+            Evergreen
+            {evergreenTasks.length > 0 && (
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                boardTab === 'evergreen' ? 'bg-green-500/20 text-green-400' : 'bg-muted text-muted-foreground'
+              }`}>
+                {evergreenTasks.length}
+              </span>
+            )}
+          </button>
         </div>
 
         {/* Bulk action bar — shown when tasks are selected */}
@@ -2521,7 +2565,35 @@ export default function Triage() {
           )
         )}
 
-        {/* Closed tab — done + archived tasks, non-draggable */}
+        {/* Closed tab — week picker + done/archived tasks */}
+        {boardTab === 'closed' && (
+          <div className="flex items-center justify-between bg-card border border-border rounded-xl px-4 py-2.5 mb-3">
+            <button
+              onClick={() => setClosedWeekOffset(o => o - 1)}
+              className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+            >
+              <ChevronLeft size={14} />
+            </button>
+            <div className="text-center">
+              <p className="text-xs font-semibold text-foreground">{closedWeekLabel}</p>
+              {closedWeekOffset !== 0 && (
+                <button
+                  onClick={() => setClosedWeekOffset(0)}
+                  className="text-[10px] text-brand-lavender hover:underline mt-0.5"
+                >
+                  Go to this week
+                </button>
+              )}
+            </div>
+            <button
+              onClick={() => setClosedWeekOffset(o => o + 1)}
+              disabled={closedWeekOffset >= 0}
+              className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-30"
+            >
+              <ChevronRight size={14} />
+            </button>
+          </div>
+        )}
         {boardTab === 'closed' && (
           closedTasks.length === 0 ? (
             <div className="bg-card border border-border rounded-2xl px-5 py-10 text-center">
@@ -2543,6 +2615,31 @@ export default function Triage() {
                     />
                   );
                 })}
+            </div>
+          )
+        )}
+
+        {/* Evergreen tab — all evergreen tasks regardless of status */}
+        {boardTab === 'evergreen' && (
+          evergreenTasks.length === 0 ? (
+            <div className="bg-card border border-border rounded-2xl px-5 py-10 text-center">
+              <RefreshCw size={24} className="text-green-400/60 mx-auto mb-2" />
+              <p className="text-muted-foreground text-sm">No evergreen tasks.</p>
+              <p className="text-muted-foreground/70 text-xs mt-1">Evergreen tasks auto-reset to open every Monday so they can be tracked weekly.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {evergreenTasks.map(task => {
+                const customer = customerMap.get(task.customerId);
+                return (
+                  <SortableTaskRow
+                    key={task.id}
+                    task={task}
+                    customer={customer}
+                    onOpenDetail={handleOpenDetail}
+                  />
+                );
+              })}
             </div>
           )
         )}
