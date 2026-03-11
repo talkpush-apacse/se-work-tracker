@@ -1,9 +1,13 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import pkg from './package.json' with { type: 'json' }
 
 // https://vite.dev/config/
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
   // Drop console.log and console.debug calls from production bundles.
   // console.warn and console.error are preserved for runtime error visibility.
   // This uses esbuild's native pure-function elimination — no extra dependencies needed.

@@ -1,0 +1,165 @@
+{
+  "versions": [
+    {
+      "version": "1.0.0",
+      "date": "2026-03-11",
+      "summary": "Focus time budget toggle, annotation log type, closed tab fix",
+      "changes": [
+        { "type": "feat", "description": "Include/exclude toggle for focus time sessions in Time Budget" },
+        { "type": "feat", "description": "Annotation log type for tracking configuration changes" },
+        { "type": "fix", "description": "Reset closed week offset when switching to closed tab" }
+      ]
+    },
+    {
+      "version": "0.9.0",
+      "date": "2026-03-10",
+      "summary": "Drag-and-drop sidebar, manual meetings, evergreen tab, closed week picker",
+      "changes": [
+        { "type": "feat", "description": "Drag-and-drop sidebar reordering" },
+        { "type": "feat", "description": "Move Weekly Update Log to Weekly Report page" },
+        { "type": "feat", "description": "Smarter Gmail import with context-aware summaries" },
+        { "type": "feat", "description": "Deduct focus timer hours from weekly time budget" },
+        { "type": "feat", "description": "Weekly Update Log auto-syncs to Weekly Report date range" },
+        { "type": "feat", "description": "Evergreen tasks tab in Triage" },
+        { "type": "feat", "description": "Week date range picker for Closed tab" },
+        { "type": "feat", "description": "Manual meeting entry + copy from last week in Time Budget" }
+      ]
+    },
+    {
+      "version": "0.8.0",
+      "date": "2026-03-08",
+      "summary": "Knowledge Hub, Gmail integration, time budget, evergreen tasks",
+      "changes": [
+        { "type": "feat", "description": "Add webhook endpoint for creating tasks from Apple Shortcuts" },
+        { "type": "feat", "description": "Evergreen tasks, clipboard fix, email highlights" },
+        { "type": "feat", "description": "Time Budget page (YNAB-style weekly hour budgeting)" },
+        { "type": "feat", "description": "Persist OAuth tokens across sessions" },
+        { "type": "feat", "description": "Expand Weekly Report to include received emails" },
+        { "type": "feat", "description": "Enhanced Gmail import — starred emails, body-aware AI summaries" },
+        { "type": "feat", "description": "Date range pickers for Calendar & Email import" },
+        { "type": "feat", "description": "Knowledge Hub for persistent reference notes" },
+        { "type": "feat", "description": "Next-week-priority log type" },
+        { "type": "feat", "description": "Calendar & Email import panel" }
+      ]
+    },
+    {
+      "version": "0.7.0",
+      "date": "2026-03-06",
+      "summary": "Weekly Report overhaul, AI Assist, In Progress tab, email refiner",
+      "changes": [
+        { "type": "feat", "description": "In Progress tab in Triage board" },
+        { "type": "feat", "description": "AI Assist email refiner replaces generic system prompt" },
+        { "type": "feat", "description": "Create Triage task directly from Focus Timer" },
+        { "type": "feat", "description": "Consolidate Annotations into Weekly Update Log (5 types)" },
+        { "type": "feat", "description": "Auto-save toast + standalone AI Assist modal in Triage" },
+        { "type": "feat", "description": "Weekly Report UI overhaul — expandable tiles, Week in Review" },
+        { "type": "feat", "description": "Show milestones and annotations in Weekly Report view" },
+        { "type": "feat", "description": "Include archived tasks and closedAt-less done tasks in Weekly Report" },
+        { "type": "fix", "description": "Flush pending Neon saves on page unload via beforeunload + keepalive" },
+        { "type": "fix", "description": "Strip markdown syntax from AI Assist email refiner output" },
+        { "type": "fix", "description": "Bypass Neon debounce for done/archived task status changes" },
+        { "type": "fix", "description": "Fix PWA modal responsiveness on iPhone screens" },
+        { "type": "fix", "description": "Auto-reload on SW update to prevent stale chunk errors" },
+        { "type": "fix", "description": "Proxy Whisper transcription through server to fix CORS" }
+      ]
+    },
+    {
+      "version": "0.6.0",
+      "date": "2026-03-04",
+      "summary": "Weekly Update Log, focus timer distribution, customer and triage UX",
+      "changes": [
+        { "type": "feat", "description": "Weekly Update Log, Highlights panel, and Add Task from Customers" },
+        { "type": "feat", "description": "Distribute focus-timer points across multiple customers" },
+        { "type": "feat", "description": "7 Triage page UX improvements" },
+        { "type": "feat", "description": "7 UX improvements to Customers tab and Customer Detail page" },
+        { "type": "feat", "description": "Remove Meeting VOUs, rename Phase Type, add Interaction Type field" },
+        { "type": "fix", "description": "Display all point values with 1 decimal place" },
+        { "type": "fix", "description": "Add iOS safe area insets to mobile nav for PWA" },
+        { "type": "fix", "description": "Equal auto-split in DistributeTimeModal on every customer toggle" },
+        { "type": "perf", "description": "Batch 1+2 audit — memoization, data safety, cascade fix" },
+        { "type": "fix", "description": "Add missing CheckCircle2 import in Triage.jsx" }
+      ]
+    },
+    {
+      "version": "0.5.0",
+      "date": "2026-03-03",
+      "summary": "SE Tracker v2 — customer-centric restructure, Google Calendar, AI email generator",
+      "changes": [
+        { "type": "feat", "description": "SE Tracker v2 — remove Projects tab, restructure around Customers" },
+        { "type": "feat", "description": "Customer detail view — task log + milestone timeline calendar" },
+        { "type": "feat", "description": "Google Calendar integration in Integrations tab" },
+        { "type": "feat", "description": "Weekly Email Generator — Gmail + Calendar + AI" },
+        { "type": "feat", "description": "Custom percentage split in Distribute Focus Time modal" },
+        { "type": "feat", "description": "Log Hours button in CustomerDetailView" },
+        { "type": "feat", "description": "Customer search filter in Distribute Focus Time modal" },
+        { "type": "feat", "description": "Annotations and Meeting VOUs" },
+        { "type": "perf", "description": "Apply performance and code review fixes" }
+      ]
+    },
+    {
+      "version": "0.4.0",
+      "date": "2026-02-26",
+      "summary": "Design system migration, auto-timer, file attachments, performance",
+      "changes": [
+        { "type": "feat", "description": "Design system migration + rich text notes (TipTap editor)" },
+        { "type": "feat", "description": "Auto-timer on task open/close + audit fixes" },
+        { "type": "feat", "description": "File attachments on tasks via Vercel Blob Storage" },
+        { "type": "feat", "description": "Optional activity type, decimal points, auto-fill points on timer save" },
+        { "type": "fix", "description": "Auto-navigate to Closed tab when task is marked done/archived" },
+        { "type": "perf", "description": "Memoize expensive render-time computations + split TimerContext" },
+        { "type": "perf", "description": "Memo row, memoize projectLines, batch saver" }
+      ]
+    },
+    {
+      "version": "0.3.0",
+      "date": "2026-02-25",
+      "summary": "Neon Postgres migration, priority views, calendar timeline, triage redesign",
+      "changes": [
+        { "type": "feat", "description": "Migrate data persistence from localStorage to Neon Postgres" },
+        { "type": "feat", "description": "Priority views, bulk actions, priority filters + iOS PWA fix" },
+        { "type": "feat", "description": "UX improvements — inline task editing, sidebar widget, triage polish" },
+        { "type": "feat", "description": "Calendar timeline, closedAt timestamps, triage filter fix, PWA icons" },
+        { "type": "feat", "description": "Per-task timer in triage with auto point logging" },
+        { "type": "feat", "description": "Projects timeline tab + triage active/closed tabs" },
+        { "type": "feat", "description": "Triage queue redesign + task detail page" },
+        { "type": "fix", "description": "Remove API rewrite that blocked serverless function routing" },
+        { "type": "fix", "description": "Default status filter to open on Triage page load" }
+      ]
+    },
+    {
+      "version": "0.2.0",
+      "date": "2026-02-22",
+      "summary": "AI Workspace, OKRs, task management, voice input, model selectors",
+      "changes": [
+        { "type": "feat", "description": "Meeting Log and Triage AI Workspace" },
+        { "type": "feat", "description": "Tasks tab in project detail view" },
+        { "type": "feat", "description": "Recipient dropdown for task creation" },
+        { "type": "feat", "description": "Save & Add Another button in AddTaskModal" },
+        { "type": "feat", "description": "Archive tasks, client/project filters, recipient-aware AI prompts" },
+        { "type": "feat", "description": "OKR key results (Yes/No + 0-100) and quarterly grouping" },
+        { "type": "feat", "description": "Custom AI instructions + Claude provider support" },
+        { "type": "feat", "description": "Pin-to-top priority for projects and customers" },
+        { "type": "feat", "description": "Editable AI output + recipient selector in AI Workspace" },
+        { "type": "feat", "description": "Inline task name editing, nav reorder, Claude Sonnet 4.6" },
+        { "type": "feat", "description": "OpenAI model selector (GPT-4o, GPT-4.1, GPT-5 Mini)" },
+        { "type": "feat", "description": "Plain text AI output, Claude model selector" },
+        { "type": "feat", "description": "Quick-add task from Task Board with project selector" },
+        { "type": "feat", "description": "Replace Web Speech API with OpenAI Whisper for voice input" },
+        { "type": "feat", "description": "Responsive nav, customer drag-reorder, inline creation, model settings, empty states" },
+        { "type": "feat", "description": "Task points system, triage filters, aging chips, inline project create" },
+        { "type": "feat", "description": "Editable previous AI outputs in Workspace history" },
+        { "type": "feat", "description": "Trim task types, revamp AI output types, email nature, task notes" }
+      ]
+    },
+    {
+      "version": "0.1.0",
+      "date": "2026-02-20",
+      "summary": "Initial release — gamified SE work tracker",
+      "changes": [
+        { "type": "feat", "description": "Initial build: gamified SE work tracker with Dashboard, Customers, Projects, OKRs" },
+        { "type": "feat", "description": "Bulk add modals for customers, projects, OKRs, and point entries" },
+        { "type": "feat", "description": "Real-time stopwatch + entry editing" }
+      ]
+    }
+  ]
+}

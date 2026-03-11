@@ -270,6 +270,9 @@ export default function Navigation({ activeTab, onTabChange }) {
             <span className="hidden lg:block">Import Data</span>
           </button>
           <input ref={fileRef} type="file" accept=".json" onChange={handleImport} className="hidden" />
+          <p className="text-[10px] text-sidebar-foreground/25 text-center lg:text-left lg:px-3 py-1">
+            v{__APP_VERSION__}
+          </p>
         </div>
       </aside>
 
@@ -344,6 +347,9 @@ export default function Navigation({ activeTab, onTabChange }) {
                 </button>
               </div>
               <input ref={fileRef} type="file" accept=".json" onChange={handleImport} className="hidden" />
+              <p className="text-[10px] text-sidebar-foreground/25 text-center pt-1">
+                v{__APP_VERSION__}
+              </p>
             </motion.div>
           </motion.div>
         )}
