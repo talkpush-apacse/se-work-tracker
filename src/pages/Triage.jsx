@@ -2049,6 +2049,7 @@ export default function Triage() {
     clearSelection();
     if (status === 'done' || status === 'archived') {
       setBoardTab('closed');
+      setClosedWeekOffset(0);
       setFilterStatus('');
       setFilterCustomerId('');
       setFilterTaskType('');
@@ -2059,6 +2060,7 @@ export default function Triage() {
     selectedTaskIds.forEach(id => updateTask(id, { status: 'archived' }));
     clearSelection();
     setBoardTab('closed');
+    setClosedWeekOffset(0);
     setFilterStatus('');
     setFilterCustomerId('');
     setFilterTaskType('');
@@ -2099,6 +2101,7 @@ export default function Triage() {
   const handleTaskStatusChange = useCallback((newStatus) => {
     if (newStatus === 'done' || newStatus === 'archived') {
       setBoardTab('closed');
+      setClosedWeekOffset(0);
       setFilterStatus('');
       setFilterCustomerId('');
       setFilterTaskType('');
@@ -2116,6 +2119,7 @@ export default function Triage() {
     const closedTask = tasks.find(t => t.id === taskDetailId);
     if (closedTask && (closedTask.status === 'done' || closedTask.status === 'archived')) {
       setBoardTab('closed');
+      setClosedWeekOffset(0);
       setFilterStatus('');
       setFilterCustomerId('');
       setFilterTaskType('');
@@ -2425,7 +2429,7 @@ export default function Triage() {
             )}
           </button>
           <button
-            onClick={() => { setBoardTab('closed'); setFilterStatus(''); setFilterCustomerId(''); setFilterTaskType(''); setFilterPriorityClients(false); clearSelection(); }}
+            onClick={() => { setBoardTab('closed'); setClosedWeekOffset(0); setFilterStatus(''); setFilterCustomerId(''); setFilterTaskType(''); setFilterPriorityClients(false); clearSelection(); }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
               boardTab === 'closed' ? 'bg-muted text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
             }`}
