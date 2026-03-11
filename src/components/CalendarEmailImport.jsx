@@ -14,11 +14,12 @@ import { fetchCalendarEvents, fetchGmailMessages } from '../lib/googleApi';
 import { WEEKLY_UPDATE_LOG_TYPES, WEEKLY_UPDATE_LOG_LABELS, WEEKLY_UPDATE_LOG_COLORS } from '../constants';
 
 // Log types available for tagging (exclude 'neutral' — not useful for promoted items)
-const TAG_TYPES = ['highlight', 'lowlight', 'learning', 'next-week-priority', 'skip'];
+const TAG_TYPES = ['highlight', 'lowlight', 'learning', 'annotation', 'next-week-priority', 'skip'];
 const TAG_LABELS = {
   highlight:            'Highlight',
   lowlight:             'Lowlight',
   learning:             'Learning',
+  annotation:           'Annotation',
   'next-week-priority': 'Priority',
   skip:                 'Skip',
 };

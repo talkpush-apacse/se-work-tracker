@@ -125,7 +125,7 @@ function buildWeekContext({ weekStart, weekEnd, points, tasks, customers, okrs, 
     try { return isInRange(parseISO(l.date + 'T00:00:00'), weekStart, weekEnd); }
     catch { return false; }
   });
-  const reportLogs = weekLogs.filter(l => ['highlight', 'lowlight', 'learning', 'shoutout'].includes(l.type));
+  const reportLogs = weekLogs.filter(l => ['highlight', 'lowlight', 'learning', 'shoutout', 'annotation'].includes(l.type));
   if (reportLogs.length > 0) {
     const highlights = reportLogs.filter(l => l.type === 'highlight');
     const lowlights  = reportLogs.filter(l => l.type === 'lowlight');
@@ -156,6 +156,14 @@ function buildWeekContext({ weekStart, weekEnd, points, tasks, customers, okrs, 
     if (shoutouts.length > 0) {
       lines.push('**Shoutouts:**');
       shoutouts.forEach(l => {
+        const cName = l.customerId ? customerMap.get(l.customerId)?.name : null;
+        lines.push(`  - ${l.text}${cName ? ` [${cName}]` : ''}`);
+      });
+    }
+    const annotations = reportLogs.filter(l => l.type === 'annotation');
+    if (annotations.length > 0) {
+      lines.push('**Config Annotations:**');
+      annotations.forEach(l => {
         const cName = l.customerId ? customerMap.get(l.customerId)?.name : null;
         lines.push(`  - ${l.text}${cName ? ` [${cName}]` : ''}`);
       });
@@ -304,7 +312,7 @@ export default function WeeklyReport({ onNavigate }) {
   );
 
   // Report-worthy types (Neutral excluded from Weekly Report display)
-  const REPORT_TYPES = ['highlight', 'lowlight', 'learning', 'shoutout', 'next-week-priority'];
+  const REPORT_TYPES = ['highlight', 'lowlight', 'learning', 'shoutout', 'annotation', 'next-week-priority'];
   const reportLogs = useMemo(
     () => weekLogs.filter(l => REPORT_TYPES.includes(l.type)),
     [weekLogs] // eslint-disable-line react-hooks/exhaustive-deps

@@ -134,13 +134,14 @@ export const ANNOTATION_TAG_COLORS = {
 };
 
 // ─── Weekly Update Log ────────────────────────────────────────────────────────
-export const WEEKLY_UPDATE_LOG_TYPES = ['highlight', 'lowlight', 'neutral', 'learning', 'shoutout', 'next-week-priority'];
+export const WEEKLY_UPDATE_LOG_TYPES = ['highlight', 'lowlight', 'neutral', 'learning', 'shoutout', 'annotation', 'next-week-priority'];
 export const WEEKLY_UPDATE_LOG_LABELS = {
   highlight:            'Highlight',
   lowlight:             'Lowlight',
   neutral:              'Neutral',
   learning:             'Learning',
   shoutout:             'Shoutout',
+  annotation:           'Annotation',
   'next-week-priority': 'Next Week Priority',
 };
 export const WEEKLY_UPDATE_LOG_COLORS = {
@@ -149,6 +150,7 @@ export const WEEKLY_UPDATE_LOG_COLORS = {
   neutral:              '#6b7280',  // gray
   learning:             '#3b82f6',  // blue
   shoutout:             '#f59e0b',  // amber/gold
+  annotation:           '#8b5cf6',  // violet
   'next-week-priority': '#f97316',  // orange
 };
 
