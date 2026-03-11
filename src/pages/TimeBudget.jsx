@@ -16,6 +16,8 @@ import { formatRelative } from '../utils/dateHelpers';
 
 // Default budget hours
 const DEFAULT_BUDGET = 40;
+// Stable empty array to prevent infinite re-render when budget has no excludedPointIds
+const EMPTY_EXCLUDED = [];
 
 /** Compute the Monday date string (YYYY-MM-DD) for a given date */
 function getMonday(date) {
@@ -62,6 +64,9 @@ export default function TimeBudget() {
   const [hasFetched, setHasFetched] = useState(false);
   const [lastFetchedAt, setLastFetchedAt] = useState(savedBudget?.lastFetchedAt ?? null);
 
+  // Focus time exclusions — track which point IDs are excluded from budget
+  const [excludedPointIds, setExcludedPointIds] = useState(savedBudget?.excludedPointIds ?? EMPTY_EXCLUDED);
+
   // Manual meeting form
   const [showManualMeeting, setShowManualMeeting] = useState(false);
   const [newManualMeeting, setNewManualMeeting] = useState({ summary: '', durationHours: 1 });
@@ -77,6 +82,7 @@ export default function TimeBudget() {
     setBudgetTasks(budget?.tasks ?? []);
     setHasFetched(!!budget?.meetings?.length);
     setLastFetchedAt(budget?.lastFetchedAt ?? null);
+    setExcludedPointIds(budget?.excludedPointIds ?? EMPTY_EXCLUDED);
     setFetchError(null);
     setShowManualMeeting(false);
   }, [weekKey, getTimeBudget]);
@@ -88,8 +94,9 @@ export default function TimeBudget() {
       meetings,
       tasks: budgetTasks,
       lastFetchedAt,
+      excludedPointIds,
     });
-  }, [weekKey, totalBudgetHours, meetings, budgetTasks, lastFetchedAt, upsertTimeBudget]);
+  }, [weekKey, totalBudgetHours, meetings, budgetTasks, lastFetchedAt, excludedPointIds, upsertTimeBudget]);
 
   // Fetch meetings from Google Calendar (preserves manual + copied entries)
   const handleFetchMeetings = useCallback(async () => {
@@ -134,6 +141,13 @@ export default function TimeBudget() {
     setMeetings(prev => prev.map(m =>
       m.calendarEventId === calendarEventId ? { ...m, included: !m.included } : m
     ));
+  }, []);
+
+  // Toggle focus time session inclusion in budget
+  const togglePointInclusion = useCallback((pointId) => {
+    setExcludedPointIds(prev =>
+      prev.includes(pointId) ? prev.filter(id => id !== pointId) : [...prev, pointId]
+    );
   }, []);
 
   // Add a manual meeting entry
@@ -207,8 +221,12 @@ export default function TimeBudget() {
   }, [points, weekStart, weekEnd]);
 
   const loggedHours = useMemo(
-    () => Math.round(weeklyLoggedSessions.reduce((sum, s) => sum + (s.hours || 0), 0) * 100) / 100,
-    [weeklyLoggedSessions]
+    () => Math.round(
+      weeklyLoggedSessions
+        .filter(s => !excludedPointIds.includes(s.id))
+        .reduce((sum, s) => sum + (s.hours || 0), 0) * 100
+    ) / 100,
+    [weeklyLoggedSessions, excludedPointIds]
   );
 
   // Calculations
@@ -359,13 +377,31 @@ export default function TimeBudget() {
                 // Use comment as description, fall back to activity type
                 const description = s.comment || s.activityType || 'Focus session';
                 const sessionDate = s.timestamp ? format(parseISO(s.timestamp), 'EEE MMM d · h:mm a') : '';
+                const isIncluded = !excludedPointIds.includes(s.id);
                 return (
                   <div
                     key={s.id}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl border border-border bg-card"
+                    className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${
+                      isIncluded
+                        ? 'border-border bg-card'
+                        : 'border-border/50 bg-secondary/30 opacity-50'
+                    }`}
                   >
+                    {/* Toggle inclusion in budget — matches meeting checkbox pattern */}
+                    <button
+                      onClick={() => togglePointInclusion(s.id)}
+                      className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                      title={isIncluded ? 'Exclude from budget' : 'Include in budget'}
+                    >
+                      {isIncluded
+                        ? <CheckSquare size={14} className="text-purple-400" />
+                        : <Square size={14} />
+                      }
+                    </button>
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs font-medium text-foreground leading-snug truncate">{description}</p>
+                      <p className={`text-xs font-medium leading-snug truncate ${
+                        isIncluded ? 'text-foreground' : 'text-muted-foreground line-through'
+                      }`}>{description}</p>
                       <div className="flex items-center gap-1.5 mt-0.5">
                         {customer && (
                           <span className="inline-flex items-center gap-1 text-[10px] text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded-full">
@@ -376,7 +412,9 @@ export default function TimeBudget() {
                         <span className="text-[10px] text-muted-foreground">{sessionDate}</span>
                       </div>
                     </div>
-                    <span className="text-xs font-semibold text-foreground flex-shrink-0">
+                    <span className={`text-xs font-semibold flex-shrink-0 ${
+                      isIncluded ? 'text-foreground' : 'text-muted-foreground'
+                    }`}>
                       {Math.round(s.hours * 100) / 100}h
                     </span>
                   </div>
