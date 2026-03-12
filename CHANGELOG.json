@@ -1,6 +1,18 @@
 {
   "versions": [
     {
+      "version": "1.0.1",
+      "date": "2026-03-12",
+      "summary": "Versioning system, code quality refactors",
+      "changes": [
+        { "type": "feat", "description": "Add versioning system with CHANGELOG.json and version display in sidebar" },
+        { "type": "chore", "description": "Extract switchToClosedTab() shared callback in Triage (5 duplicate blocks removed)" },
+        { "type": "chore", "description": "Extract HOUR_OPTIONS constant in TimeBudget (3 duplicate arrays removed)" },
+        { "type": "chore", "description": "Deduplicate customerMap and move REPORT_TYPES to module scope in WeeklyReport" },
+        { "type": "chore", "description": "Add __APP_VERSION__ to ESLint globals" }
+      ]
+    },
+    {
       "version": "1.0.0",
       "date": "2026-03-11",
       "summary": "Focus time budget toggle, annotation log type, closed tab fix",
