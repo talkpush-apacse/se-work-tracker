@@ -16,11 +16,17 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import { fetchCalendarEvents, fetchFilteredWeeklyEmails } from '../lib/googleApi';
 import WeeklyUpdateLog from '../components/WeeklyUpdateLog';
 
+// ─── Module-level constants ──────────────────────────────────────────────────
+
+// Report-worthy types (Neutral excluded from Weekly Report display)
+const REPORT_TYPES = ['highlight', 'lowlight', 'learning', 'shoutout', 'annotation', 'next-week-priority'];
+
 // ─── Module-level helpers ─────────────────────────────────────────────────────
 
 function buildWeekContext({ weekStart, weekEnd, points, tasks, customers, okrs, weeklyUpdateLogs, milestones, calendarEvents, gmailEmails, emailSummary }) {
   const weekLabel = formatWeekLabel(weekStart, weekEnd);
   const lines = [];
+  const customerMap = new Map(customers.map(c => [c.id, c]));
 
   lines.push(`## Weekly Work Summary: ${weekLabel}`);
   lines.push('');
@@ -47,8 +53,6 @@ function buildWeekContext({ weekStart, weekEnd, points, tasks, customers, okrs, 
   // ── Customer breakdown ──
   if (activeCustomerIds.length > 0) {
     lines.push('### Customer Breakdown');
-    const customerMap = new Map(customers.map(c => [c.id, c]));
-
     activeCustomerIds.forEach(cid => {
       const customer = customerMap.get(cid);
       if (!customer) return;
@@ -64,7 +68,6 @@ function buildWeekContext({ weekStart, weekEnd, points, tasks, customers, okrs, 
   }
 
   // ── Tasks this week ──
-  const customerMap = new Map(customers.map(c => [c.id, c]));
   const inProgressTasks = tasks.filter(t => t.status === 'in-progress');
   const blockedTasks = tasks.filter(t => t.status === 'blocked');
 
@@ -311,17 +314,15 @@ export default function WeeklyReport({ onNavigate }) {
     [weeklyUpdateLogs, weekStart, weekEnd]
   );
 
-  // Report-worthy types (Neutral excluded from Weekly Report display)
-  const REPORT_TYPES = ['highlight', 'lowlight', 'learning', 'shoutout', 'annotation', 'next-week-priority'];
   const reportLogs = useMemo(
     () => weekLogs.filter(l => REPORT_TYPES.includes(l.type)),
-    [weekLogs] // eslint-disable-line react-hooks/exhaustive-deps
+    [weekLogs]
   );
   const logsByType = useMemo(() => {
     const groups = {};
     REPORT_TYPES.forEach(t => { groups[t] = weekLogs.filter(l => l.type === t); });
     return groups;
-  }, [weekLogs]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [weekLogs]);
 
   // Milestones whose targetDate falls in the selected week
   const weekMilestones = useMemo(

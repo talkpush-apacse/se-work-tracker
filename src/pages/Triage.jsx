@@ -2044,27 +2044,27 @@ export default function Triage() {
     setFilterPriorityClients(false);
     clearSelection();
   }, [clearSelection]);
-  const handleBulkStatus = (status) => {
-    selectedTaskIds.forEach(id => updateTask(id, { status }));
-    clearSelection();
-    if (status === 'done' || status === 'archived') {
-      setBoardTab('closed');
-      setClosedWeekOffset(0);
-      setFilterStatus('');
-      setFilterCustomerId('');
-      setFilterTaskType('');
-      setFilterPriorityClients(false);
-    }
-  };
-  const handleBulkArchive = () => {
-    selectedTaskIds.forEach(id => updateTask(id, { status: 'archived' }));
-    clearSelection();
+  // Shared callback: switch to Closed tab, reset week to current, clear all filters
+  const switchToClosedTab = useCallback(() => {
     setBoardTab('closed');
     setClosedWeekOffset(0);
     setFilterStatus('');
     setFilterCustomerId('');
     setFilterTaskType('');
     setFilterPriorityClients(false);
+    clearSelection();
+  }, [clearSelection]);
+  const handleBulkStatus = (status) => {
+    selectedTaskIds.forEach(id => updateTask(id, { status }));
+    if (status === 'done' || status === 'archived') {
+      switchToClosedTab();
+    } else {
+      clearSelection();
+    }
+  };
+  const handleBulkArchive = () => {
+    selectedTaskIds.forEach(id => updateTask(id, { status: 'archived' }));
+    switchToClosedTab();
   };
 
   // ── Auto-timer: start on task open, stop + auto-save points on close ───
@@ -2100,15 +2100,9 @@ export default function Triage() {
   // re-rendering just because the parent re-rendered (works in tandem with memo())
   const handleTaskStatusChange = useCallback((newStatus) => {
     if (newStatus === 'done' || newStatus === 'archived') {
-      setBoardTab('closed');
-      setClosedWeekOffset(0);
-      setFilterStatus('');
-      setFilterCustomerId('');
-      setFilterTaskType('');
-      setFilterPriorityClients(false);
-      clearSelection();
+      switchToClosedTab();
     }
-  }, [clearSelection]);
+  }, [switchToClosedTab]);
 
   const handleCloseDetail = () => {
     // Auto-stop timer if running for the current task
@@ -2118,13 +2112,7 @@ export default function Triage() {
     // If the task was marked done/archived while in the detail view, switch to Closed tab
     const closedTask = tasks.find(t => t.id === taskDetailId);
     if (closedTask && (closedTask.status === 'done' || closedTask.status === 'archived')) {
-      setBoardTab('closed');
-      setClosedWeekOffset(0);
-      setFilterStatus('');
-      setFilterCustomerId('');
-      setFilterTaskType('');
-      setFilterPriorityClients(false);
-      clearSelection();
+      switchToClosedTab();
     }
     setTaskDetailId(null);
   };
@@ -2429,7 +2417,7 @@ export default function Triage() {
             )}
           </button>
           <button
-            onClick={() => { setBoardTab('closed'); setClosedWeekOffset(0); setFilterStatus(''); setFilterCustomerId(''); setFilterTaskType(''); setFilterPriorityClients(false); clearSelection(); }}
+            onClick={switchToClosedTab}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
               boardTab === 'closed' ? 'bg-muted text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
             }`}

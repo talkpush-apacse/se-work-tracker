@@ -16,6 +16,8 @@ import { formatRelative } from '../utils/dateHelpers';
 
 // Default budget hours
 const DEFAULT_BUDGET = 40;
+// Duration options for meeting and task hour selectors
+const HOUR_OPTIONS = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6, 8];
 // Stable empty array to prevent infinite re-render when budget has no excludedPointIds
 const EMPTY_EXCLUDED = [];
 
@@ -477,7 +479,7 @@ export default function TimeBudget() {
                   onChange={e => setNewManualMeeting(prev => ({ ...prev, durationHours: Number(e.target.value) }))}
                   className="h-8 bg-card border border-border rounded-lg px-1.5 text-xs text-foreground focus:outline-none focus:border-ring w-20"
                 >
-                  {[0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6, 8].map(h => (
+                  {HOUR_OPTIONS.map(h => (
                     <option key={h} value={h}>{h}h</option>
                   ))}
                 </select>
@@ -611,7 +613,7 @@ export default function TimeBudget() {
                 onChange={e => setNewTask(prev => ({ ...prev, hours: Number(e.target.value) }))}
                 className="h-8 bg-secondary border border-border rounded-lg px-1.5 text-xs text-foreground focus:outline-none focus:border-ring w-20"
               >
-                {[0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6, 8].map(h => (
+                {HOUR_OPTIONS.map(h => (
                   <option key={h} value={h}>{h}h</option>
                 ))}
               </select>
@@ -658,7 +660,7 @@ export default function TimeBudget() {
                       onChange={e => updateBudgetTaskHours(t.id, Number(e.target.value))}
                       className="h-6 bg-secondary border border-border rounded-lg px-1 text-[11px] text-foreground focus:outline-none focus:border-ring w-16"
                     >
-                      {[0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6, 8].map(h => (
+                      {HOUR_OPTIONS.map(h => (
                         <option key={h} value={h}>{h}h</option>
                       ))}
                     </select>
