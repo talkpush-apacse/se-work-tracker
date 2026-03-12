@@ -6,7 +6,16 @@ const MAX_SECONDS = 12 * 60 * 60; // 12 hours
 function loadTimerState() {
   try {
     const raw = localStorage.getItem(TIMER_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    const state = JSON.parse(raw);
+    // V3 backward-compat: migrate old customerId-based format to workType-based
+    if (state && state.customerId !== undefined && !state.workType) {
+      state.workType = 'deep_work';
+      state.clientIds = state.customerId ? [state.customerId] : [];
+      delete state.customerId;
+      localStorage.setItem(TIMER_KEY, JSON.stringify(state));
+    }
+    return state;
   } catch {
     return null;
   }
@@ -56,9 +65,11 @@ export function useTimer() {
     if (!current) return null;
     const elapsed = Math.min(calcElapsed(current.startedAt), MAX_SECONDS);
     const session = {
-      customerId: current.customerId ?? null,
+      workType: current.workType || 'deep_work',
+      clientIds: current.clientIds || [],
       taskId: current.taskId ?? null,
       taskDescription: current.taskDescription ?? null,
+      okrId: current.okrId ?? null,
       elapsedSeconds: elapsed,
       startedAt: current.startedAt,
     };
@@ -123,15 +134,14 @@ export function useTimer() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // Empty deps is intentional: run exactly once on mount
 
-  // customerId can be null for General Focus Time (not linked to any customer)
-  // taskId and taskDescription are optional — customer-level timers pass neither
-  const startTimer = useCallback((customerId = null, taskId = null, taskDescription = null) => {
+  // workType is required, options object is optional
+  const startTimer = useCallback((workType, { clientIds = [], taskId = null, taskDescription = null, okrId = null } = {}) => {
     // Guard against double-start
     const existing = loadTimerState();
     if (existing && existing.isRunning) return;
 
     const startedAt = new Date().toISOString();
-    const state = { customerId, taskId, taskDescription, startedAt, isRunning: true };
+    const state = { workType, clientIds, taskId, taskDescription, okrId, startedAt, isRunning: true };
     saveTimerState(state);
     setTimerState(state);
     setElapsedSeconds(0);
@@ -144,7 +154,8 @@ export function useTimer() {
 
   return {
     isRunning: !!timerState,
-    customerId: timerState?.customerId ?? null,
+    workType: timerState?.workType ?? null,
+    clientIds: timerState?.clientIds ?? [],
     taskId: timerState?.taskId ?? null,
     elapsedSeconds,
     startedAt: timerState?.startedAt ?? null,

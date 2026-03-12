@@ -15,10 +15,14 @@ const KEYS = {
   weeklyReports: 'gpt-weekly-reports',
   weeklyUpdateLogs: 'gpt-weekly-update-logs',
   timeBudgets: 'gpt-time-budgets',
+  timeLogs: 'gpt-time-logs',
+  stressLogs: 'gpt-stress-logs',
+  workTypeTargets: 'gpt-work-type-targets',
 };
 
 const MIGRATION_FLAG = 'gpt-migrated-to-neon';
 const V2_MIGRATION_FLAG = 'gpt-v2-migrated';
+const V3_MIGRATION_FLAG = 'gpt-v3-migrated';
 
 // Default AI settings shape — empty string means "use built-in default prompt"
 const DEFAULT_AI_SETTINGS = {
@@ -250,8 +254,54 @@ function resetEvergreenTasks() {
   localStorage.setItem('gpt-evergreen-last-reset', mondayStr);
 }
 
-// ─── Run V2 migration before any component mounts ────────────────
+// ─── V3 Migration: Backfill timeLogs from existing points ──────────────────
+// Maps old interaction types to new work types so the bandwidth view has
+// data from day one, even for users who tracked time before this redesign.
+function runV3Migration() {
+  if (localStorage.getItem(V3_MIGRATION_FLAG)) return;
+
+  const points = load(KEYS.points, []);
+  if (!points.length) {
+    localStorage.setItem(V3_MIGRATION_FLAG, new Date().toISOString());
+    return;
+  }
+
+  const INTERACTION_TO_WORK_TYPE = {
+    'Meeting':    'meetings',
+    'Email':      'comms',
+    'Focus Time': 'deep_work',
+  };
+
+  const timeLogs = points.map(pt => {
+    const loggedAt = pt.timestamp;
+    // Derive weekStart (Monday) from the point's timestamp
+    const d = new Date(loggedAt);
+    const day = d.getDay();
+    const diffToMonday = day === 0 ? -6 : 1 - day;
+    const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate() + diffToMonday);
+    const weekStart = monday.toISOString().slice(0, 10);
+
+    return {
+      id: crypto.randomUUID(),
+      workType: INTERACTION_TO_WORK_TYPE[pt.interactionType] || 'deep_work',
+      hours: pt.hours || 0,
+      clientIds: pt.customerId ? [pt.customerId] : [],
+      okrId: pt.okrId || null,
+      taskId: null,
+      note: pt.comment || '',
+      loggedAt,
+      weekStart,
+    };
+  });
+
+  save(KEYS.timeLogs, timeLogs);
+  localStorage.setItem(V3_MIGRATION_FLAG, new Date().toISOString());
+  console.log('[v3] Backfilled', timeLogs.length, 'timeLogs from points');
+}
+
+// ─── Run migrations before any component mounts ────────────────
 runV2Migration();
+runV3Migration();
 resetEvergreenTasks();
 
 export function useStore() {
@@ -266,6 +316,9 @@ export function useStore() {
   const [weeklyReports, setWeeklyReports] = useState(() => load(KEYS.weeklyReports));
   const [weeklyUpdateLogs, setWeeklyUpdateLogs] = useState(() => load(KEYS.weeklyUpdateLogs));
   const [timeBudgets, setTimeBudgets] = useState(() => load(KEYS.timeBudgets));
+  const [timeLogs, setTimeLogs] = useState(() => load(KEYS.timeLogs));
+  const [stressLogs, setStressLogs] = useState(() => load(KEYS.stressLogs));
+  const [workTypeTargets, setWorkTypeTargets] = useState(() => load(KEYS.workTypeTargets));
   const [aiSettings, setAiSettings] = useState(() => {
     const stored = load(KEYS.aiSettings, null);
     if (!stored) return DEFAULT_AI_SETTINGS;
@@ -298,6 +351,9 @@ export function useStore() {
   useEffect(() => { save(KEYS.weeklyReports, weeklyReports); }, [weeklyReports]);
   useEffect(() => { save(KEYS.weeklyUpdateLogs, weeklyUpdateLogs); }, [weeklyUpdateLogs]);
   useEffect(() => { save(KEYS.timeBudgets, timeBudgets); }, [timeBudgets]);
+  useEffect(() => { save(KEYS.timeLogs, timeLogs); }, [timeLogs]);
+  useEffect(() => { save(KEYS.stressLogs, stressLogs); }, [stressLogs]);
+  useEffect(() => { save(KEYS.workTypeTargets, workTypeTargets); }, [workTypeTargets]);
 
   // ─── Neon save effects (debounced, only after mount-fetch) ───
   useEffect(() => { if (mountedRef.current) debouncedSave('okrs', okrs); }, [okrs]);
@@ -312,6 +368,9 @@ export function useStore() {
   useEffect(() => { if (mountedRef.current) debouncedSave('weeklyReports', weeklyReports); }, [weeklyReports]);
   useEffect(() => { if (mountedRef.current) debouncedSave('weeklyUpdateLogs', weeklyUpdateLogs); }, [weeklyUpdateLogs]);
   useEffect(() => { if (mountedRef.current) debouncedSave('timeBudgets', timeBudgets); }, [timeBudgets]);
+  useEffect(() => { if (mountedRef.current) debouncedSave('timeLogs', timeLogs); }, [timeLogs]);
+  useEffect(() => { if (mountedRef.current) debouncedSave('stressLogs', stressLogs); }, [stressLogs]);
+  useEffect(() => { if (mountedRef.current) debouncedSave('workTypeTargets', workTypeTargets); }, [workTypeTargets]);
 
   // Flush any pending Neon writes when the user reloads or navigates away.
   // keepalive: true tells the browser to complete the fetch even after the page unloads.
@@ -322,7 +381,7 @@ export function useStore() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (mountedRef.current) setSyncStatus('saving'); }, [okrs, customers, points, meetingEntries, tasks, milestones, aiOutputs, aiSettings, annotations, weeklyReports, weeklyUpdateLogs, timeBudgets]);
+  useEffect(() => { if (mountedRef.current) setSyncStatus('saving'); }, [okrs, customers, points, meetingEntries, tasks, milestones, aiOutputs, aiSettings, annotations, weeklyReports, weeklyUpdateLogs, timeBudgets, timeLogs, stressLogs, workTypeTargets]);
 
   useEffect(() => {
     if (syncStatus === 'saving') {
@@ -384,6 +443,9 @@ export function useStore() {
         if (remote.weeklyReports) setWeeklyReports(remote.weeklyReports);
         if (remote.weeklyUpdateLogs) setWeeklyUpdateLogs(remote.weeklyUpdateLogs);
         if (remote.timeBudgets) setTimeBudgets(remote.timeBudgets);
+        if (remote.timeLogs) setTimeLogs(remote.timeLogs);
+        if (remote.stressLogs) setStressLogs(remote.stressLogs);
+        if (remote.workTypeTargets) setWorkTypeTargets(remote.workTypeTargets);
         if (remote.aiOutputs) setAiOutputs(remote.aiOutputs);
         if (remote.aiSettings && Object.keys(remote.aiSettings).length > 0) {
           setAiSettings(prev => ({
@@ -599,6 +661,50 @@ export function useStore() {
     });
   }, []);
 
+  // ─── Time Log actions ───
+  // Shape: { id, workType, hours, clientIds: [], okrId, taskId, note, loggedAt, weekStart }
+  const addTimeLog = useCallback((data) => {
+    const entry = { id: uid(), loggedAt: new Date().toISOString(), ...data };
+    setTimeLogs(prev => [...prev, entry]);
+    return entry;
+  }, []);
+  const updateTimeLog = useCallback((id, data) => {
+    setTimeLogs(prev => prev.map(l => l.id === id ? { ...l, ...data } : l));
+  }, []);
+  const deleteTimeLog = useCallback((id) => {
+    setTimeLogs(prev => prev.filter(l => l.id !== id));
+  }, []);
+
+  // ─── Stress Log actions ───
+  // Shape: { id, logDate (YYYY-MM-DD, unique per day), stressLevel (1-5), stressor, note, createdAt }
+  const upsertStressLog = useCallback((logDate, data) => {
+    setStressLogs(prev => {
+      const existing = prev.find(l => l.logDate === logDate);
+      if (existing) {
+        return prev.map(l => l.logDate === logDate ? { ...l, ...data } : l);
+      }
+      return [...prev, { id: uid(), createdAt: new Date().toISOString(), logDate, ...data }];
+    });
+  }, []);
+  const deleteStressLog = useCallback((id) => {
+    setStressLogs(prev => prev.filter(l => l.id !== id));
+  }, []);
+
+  // ─── Work Type Targets actions ───
+  // Shape: { id, weekStart (YYYY-MM-DD), targets: { deep_work, meetings, comms, admin } }
+  const getWorkTypeTargets = useCallback((weekStart) => {
+    return workTypeTargets.find(t => t.weekStart === weekStart) || null;
+  }, [workTypeTargets]);
+  const upsertWorkTypeTargets = useCallback((weekStart, targets) => {
+    setWorkTypeTargets(prev => {
+      const existing = prev.find(t => t.weekStart === weekStart);
+      if (existing) {
+        return prev.map(t => t.weekStart === weekStart ? { ...t, targets } : t);
+      }
+      return [...prev, { id: uid(), createdAt: new Date().toISOString(), weekStart, targets }];
+    });
+  }, []);
+
   // ─── One-time migration: Annotations → Weekly Update Logs ───
   // Maps good→highlight, bad→lowlight, learning→learning.
   // Guarded by a localStorage flag so it only runs once ever.
@@ -665,8 +771,8 @@ export function useStore() {
   const exportData = useCallback(() => {
     const data = {
       okrs, customers, points, tasks, meetingEntries, milestones, aiOutputs, aiSettings,
-      annotations,
-      exportedAt: new Date().toISOString(), version: 2,
+      annotations, weeklyReports, weeklyUpdateLogs, timeBudgets, timeLogs, stressLogs, workTypeTargets,
+      exportedAt: new Date().toISOString(), version: 3,
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -675,7 +781,7 @@ export function useStore() {
     a.download = `work-tracker-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [okrs, customers, points, tasks, meetingEntries, milestones, aiOutputs, aiSettings, annotations]);
+  }, [okrs, customers, points, tasks, meetingEntries, milestones, aiOutputs, aiSettings, annotations, weeklyReports, weeklyUpdateLogs, timeBudgets, timeLogs, stressLogs, workTypeTargets]);
 
   const importData = useCallback((file) => {
     const reader = new FileReader();
@@ -690,6 +796,12 @@ export function useStore() {
         if (data.milestones) setMilestones(data.milestones);
         if (data.aiOutputs) setAiOutputs(data.aiOutputs);
         if (data.annotations) setAnnotations(data.annotations);
+        if (data.weeklyReports) setWeeklyReports(data.weeklyReports);
+        if (data.weeklyUpdateLogs) setWeeklyUpdateLogs(data.weeklyUpdateLogs);
+        if (data.timeBudgets) setTimeBudgets(data.timeBudgets);
+        if (data.timeLogs) setTimeLogs(data.timeLogs);
+        if (data.stressLogs) setStressLogs(data.stressLogs);
+        if (data.workTypeTargets) setWorkTypeTargets(data.workTypeTargets);
       } catch { alert('Invalid backup file'); }
     };
     reader.readAsText(file);
@@ -698,6 +810,7 @@ export function useStore() {
   return {
     okrs, customers, points, meetingEntries, tasks, milestones, aiOutputs,
     annotations, weeklyReports, weeklyUpdateLogs, timeBudgets,
+    timeLogs, stressLogs, workTypeTargets,
     addOkr, updateOkr, deleteOkr,
     addCustomer, updateCustomer, deleteCustomer, reorderCustomers,
     addPoint, deletePoint, updatePoint,
@@ -709,6 +822,9 @@ export function useStore() {
     addWeeklyReport, updateWeeklyReport, deleteWeeklyReport,
     addWeeklyUpdateLog, updateWeeklyUpdateLog, deleteWeeklyUpdateLog, migrateAnnotationsToLogs,
     getTimeBudget, upsertTimeBudget,
+    addTimeLog, updateTimeLog, deleteTimeLog,
+    upsertStressLog, deleteStressLog,
+    getWorkTypeTargets, upsertWorkTypeTargets,
     addAiOutput, getTaskAiOutputs, updateAiOutput,
     aiSettings, updateAiSettings,
     exportData, importData,

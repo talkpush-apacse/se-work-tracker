@@ -1,6 +1,25 @@
 {
   "versions": [
     {
+      "version": "2.0.0",
+      "codename": "Rising Spark",
+      "date": "2026-03-12",
+      "summary": "Bandwidth-first redesign — Work Type tracking, Pulse check-ins, timer overhaul",
+      "changes": [
+        { "type": "feat", "description": "Work Type dimension (Deep Work, Meetings, Comms, Admin) — required on every timer start" },
+        { "type": "feat", "description": "Client tagging is now optional — multi-select instead of required single-select" },
+        { "type": "feat", "description": "New time_logs entity parallel to points for bandwidth tracking" },
+        { "type": "feat", "description": "Pulse page — daily stress check-in (1-5 emoji scale), 7-day trend chart, log table" },
+        { "type": "feat", "description": "Time Budget redesign — bandwidth overview, work type breakdown bars, health indicators, editable targets" },
+        { "type": "feat", "description": "Dashboard — This Week by Work Type card grid with hours and target comparison" },
+        { "type": "feat", "description": "OKRs — show total hours invested per OKR from time_logs" },
+        { "type": "feat", "description": "Weekly Report — bandwidth breakdown and pulse/stress context for AI generation" },
+        { "type": "feat", "description": "Recurring task type (yellow badge) in Triage" },
+        { "type": "feat", "description": "V3 migration — backfills time_logs from existing points" },
+        { "type": "feat", "description": "Work type targets — editable weekly hour goals per work type" }
+      ]
+    },
+    {
       "version": "1.0.1",
       "date": "2026-03-12",
       "summary": "Versioning system, code quality refactors",

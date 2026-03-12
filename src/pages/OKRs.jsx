@@ -294,7 +294,7 @@ function PointsProgress({ totalPoints, targetPoints, onSetTarget }) {
 
 // ─── Main OKRs page ───────────────────────────────────────────────────────────
 export default function OKRs() {
-  const { okrs, points, tasks, customers, addOkr, updateOkr, deleteOkr } = useAppStore();
+  const { okrs, points, tasks, customers, timeLogs, addOkr, updateOkr, deleteOkr } = useAppStore();
   const [createModal, setCreateModal] = useState(false);
   const [bulkModal, setBulkModal] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
@@ -384,6 +384,8 @@ export default function OKRs() {
                   const okrPoints = points.filter(pt => pt.okrId === okr.id);
                   const totalPoints = okrPoints.reduce((s, e) => s + e.points, 0);
                   const totalHours = okrPoints.reduce((s, e) => s + e.hours, 0);
+                  // Hours from timeLogs (V3 bandwidth tracking)
+                  const timeLogHours = Math.round(timeLogs.filter(l => l.okrId === okr.id).reduce((s, l) => s + (l.hours || 0), 0) * 100) / 100;
                   // Task completion points
                   const taskPts = linkedTasks.reduce((s, t) => s + (t.points || 0), 0);
                   const isExpanded = expanded[okr.id];
@@ -414,6 +416,9 @@ export default function OKRs() {
                               <span className="text-xs text-muted-foreground">{linkedTasks.length} task{linkedTasks.length !== 1 ? 's' : ''}</span>
                               <span className="text-xs font-semibold text-brand-lavender">{Number(totalPoints).toFixed(1)} pts</span>
                               <span className="text-xs text-muted-foreground">{totalHours.toFixed(1)}h</span>
+                              {timeLogHours > 0 && (
+                                <span className="text-xs font-semibold text-teal-400">{timeLogHours}h invested</span>
+                              )}
                               {taskPts > 0 && (
                                 <span className="text-xs font-semibold text-teal-400">⚡{Number(taskPts).toFixed(1)} task pts</span>
                               )}

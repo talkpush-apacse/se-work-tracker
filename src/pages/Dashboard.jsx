@@ -1,10 +1,19 @@
 import { useState, useMemo, useRef } from 'react';
-import { Trophy, Zap, Clock, Flame, Activity, TrendingUp, Star, Plus, Timer, Users } from 'lucide-react';
+import { Trophy, Zap, Clock, Flame, Activity, TrendingUp, Star, Plus, Timer, Users, Brain, MessageSquare, ClipboardList } from 'lucide-react';
 import { useAppStore } from '../context/StoreContext';
 import { useTimerContext } from '../context/TimerContext';
+import { startOfWeek, format } from 'date-fns';
 import { getThisWeekRange, filterPointsByRange, formatRelative, formatDateTime, getStreakDays } from '../utils/dateHelpers';
 import AddPointsModal from '../components/AddPointsModal';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { WORK_TYPES, WORK_TYPE_LABELS, WORK_TYPE_COLORS } from '../constants';
+
+const WORK_TYPE_ICONS_MAP = {
+  deep_work: Brain,
+  meetings:  Users,
+  comms:     MessageSquare,
+  admin:     ClipboardList,
+};
 
 function CustomerBadge({ customerId, customers, size = 'sm' }) {
   const c = customers.find(x => x.id === customerId);
@@ -41,8 +50,8 @@ function StatCard({ icon: Icon, label, value, sub, color = 'indigo' }) {
 }
 
 export default function Dashboard({ onNavigate }) {
-  const { customers, okrs, points, tasks } = useAppStore();
-  const { isRunning, customerId: runningCustomerId, startTimer, stopTimer } = useTimerContext();
+  const { customers, okrs, points, tasks, timeLogs, getWorkTypeTargets } = useAppStore();
+  const { isRunning, clientIds: runningClientIds, startTimer, stopTimer } = useTimerContext();
   const [addModal, setAddModal] = useState(null); // holds customer object for AddPointsModal
   const [timerConflict, setTimerConflict] = useState(null); // holds the customer to start after conflict
   const [flashId, setFlashId] = useState(null);
@@ -104,6 +113,29 @@ export default function Dashboard({ onNavigate }) {
     [okrs, points, tasks]
   );
 
+  // This week's work type breakdown from timeLogs
+  const weekKey = useMemo(() => format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd'), []);
+  const workTypeHours = useMemo(() => {
+    const hours = { deep_work: 0, meetings: 0, comms: 0, admin: 0 };
+    timeLogs.forEach(log => {
+      if (log.weekStart === weekKey && hours[log.workType] !== undefined) {
+        hours[log.workType] += log.hours || 0;
+      }
+    });
+    Object.keys(hours).forEach(k => { hours[k] = Math.round(hours[k] * 100) / 100; });
+    return hours;
+  }, [timeLogs, weekKey]);
+
+  const totalWorkTypeHours = useMemo(
+    () => WORK_TYPES.reduce((s, wt) => s + workTypeHours[wt], 0),
+    [workTypeHours]
+  );
+
+  const currentTargets = useMemo(() => {
+    const saved = getWorkTypeTargets(weekKey);
+    return saved?.targets || { deep_work: 20, meetings: 8, comms: 8, admin: 4 };
+  }, [weekKey, getWorkTypeTargets]);
+
   // Recent activity feed — sort+slice only when points changes
   const recentActivity = useMemo(
     () => [...points]
@@ -154,6 +186,34 @@ export default function Dashboard({ onNavigate }) {
         <StatCard icon={Activity} label="Top activity" value={topActivity ? topActivity.split(' ')[0] : 'None yet'} sub="by points" color="emerald" />
         <StatCard icon={Users} label="Active customers" value={activeCustomerCount} color="rose" />
       </div>
+
+      {/* This Week by Work Type */}
+      {totalWorkTypeHours > 0 ? (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {WORK_TYPES.map(wt => {
+            const Icon = WORK_TYPE_ICONS_MAP[wt];
+            const hrs = workTypeHours[wt];
+            const target = currentTargets[wt] || 0;
+            const pct = totalWorkTypeHours > 0 ? Math.round((hrs / totalWorkTypeHours) * 100) : 0;
+            return (
+              <div key={wt} className="bg-card border border-border rounded-2xl p-4">
+                <div className={`inline-flex p-2 rounded-xl mb-2 ${WORK_TYPE_COLORS[wt].bg}`}>
+                  <Icon size={16} className={WORK_TYPE_COLORS[wt].text} />
+                </div>
+                <p className="text-lg font-bold text-foreground">{hrs}h</p>
+                <p className="text-sm text-muted-foreground">{WORK_TYPE_LABELS[wt]}</p>
+                <p className="text-xs text-muted-foreground/70 mt-0.5">
+                  {pct}% of total · {target > 0 ? `${target}h target` : 'no target'}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="bg-card border border-border rounded-2xl p-4 text-center text-sm text-muted-foreground">
+          Start tracking by work type to see your bandwidth breakdown here.
+        </div>
+      )}
 
       {/* Weekly summary banner */}
       {totalPts > 0 && (
@@ -218,19 +278,19 @@ export default function Dashboard({ onNavigate }) {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (isRunning && runningCustomerId !== customer.id) {
+                          if (isRunning && !runningClientIds.includes(customer.id)) {
                             setTimerConflict(customer);
                           } else if (!isRunning) {
-                            startTimer(customer.id);
+                            startTimer('deep_work', { clientIds: [customer.id] });
                           }
                           // If already running for THIS customer, widget is visible — no action needed
                         }}
                         className={`p-1.5 rounded-lg transition-colors flex-shrink-0 ${
-                          runningCustomerId === customer.id
+                          runningClientIds.includes(customer.id)
                             ? 'bg-brand-sage/30 text-brand-sage cursor-default'
                             : 'bg-muted/50 hover:bg-brand-sage/20 text-muted-foreground hover:text-brand-sage'
                         }`}
-                        title={runningCustomerId === customer.id ? 'Timer running' : 'Start timer'}
+                        title={runningClientIds.includes(customer.id) ? 'Timer running' : 'Start timer'}
                       >
                         <Timer size={13} />
                       </button>
@@ -332,7 +392,7 @@ export default function Dashboard({ onNavigate }) {
       {timerConflict && (
         <ConfirmDialog
           title="Timer Already Running"
-          message={`A timer is already running for another customer. Stop it first (you'll be prompted to save), then start a new timer for "${timerConflict.name}".`}
+          message={`A timer is already running. Stop it first (you'll be prompted to save), then start a new timer for "${timerConflict.name}".`}
           danger={false}
           onConfirm={() => { stopTimer(); setTimerConflict(null); }}
           onCancel={() => setTimerConflict(null)}

@@ -23,7 +23,7 @@ const REPORT_TYPES = ['highlight', 'lowlight', 'learning', 'shoutout', 'annotati
 
 // ─── Module-level helpers ─────────────────────────────────────────────────────
 
-function buildWeekContext({ weekStart, weekEnd, points, tasks, customers, okrs, weeklyUpdateLogs, milestones, calendarEvents, gmailEmails, emailSummary }) {
+function buildWeekContext({ weekStart, weekEnd, points, tasks, customers, okrs, weeklyUpdateLogs, milestones, calendarEvents, gmailEmails, emailSummary, timeLogs, stressLogs }) {
   const weekLabel = formatWeekLabel(weekStart, weekEnd);
   const lines = [];
   const customerMap = new Map(customers.map(c => [c.id, c]));
@@ -49,6 +49,76 @@ function buildWeekContext({ weekStart, weekEnd, points, tasks, customers, okrs, 
   lines.push(`- Active customers: ${activeCustomerIds.length}`);
   lines.push(`- Tasks completed: ${weekTasks.length}`);
   lines.push('');
+
+  // ── Bandwidth Breakdown (from timeLogs) ──
+  if (timeLogs && timeLogs.length > 0) {
+    const weekKey = format(weekStart, 'yyyy-MM-dd');
+    const weekTimeLogs = timeLogs.filter(l => l.weekStart === weekKey);
+    if (weekTimeLogs.length > 0) {
+      const byType = { deep_work: 0, meetings: 0, comms: 0, admin: 0 };
+      weekTimeLogs.forEach(l => {
+        if (byType[l.workType] !== undefined) byType[l.workType] += l.hours || 0;
+      });
+      const totalByType = Object.values(byType).reduce((s, v) => s + v, 0);
+      if (totalByType > 0) {
+        lines.push('### How I Spent My Time');
+        lines.push(`- Total hours logged: ${Math.round(totalByType * 10) / 10}h`);
+        Object.entries(byType).forEach(([wt, hrs]) => {
+          if (hrs > 0) {
+            const label = { deep_work: 'Deep Work', meetings: 'Meetings', comms: 'Comms', admin: 'Admin' }[wt] || wt;
+            const pct = Math.round((hrs / totalByType) * 100);
+            lines.push(`- ${label}: ${Math.round(hrs * 10) / 10}h (${pct}%)`);
+          }
+        });
+        // Flags
+        if (byType.meetings / totalByType > 0.5) {
+          lines.push('- FLAG: Meeting load was unusually high (>50% of time)');
+        }
+        lines.push('');
+
+        // Hours by OKR
+        const okrHours = {};
+        weekTimeLogs.filter(l => l.okrId).forEach(l => {
+          okrHours[l.okrId] = (okrHours[l.okrId] || 0) + (l.hours || 0);
+        });
+        const okrEntries = Object.entries(okrHours).filter(([, h]) => h > 0);
+        if (okrEntries.length > 0) {
+          lines.push('### Time Invested by OKR');
+          okrEntries.forEach(([okrId, hrs]) => {
+            const okr = okrs.find(o => o.id === okrId);
+            if (okr) lines.push(`- ${okr.title}: ${Math.round(hrs * 10) / 10}h this week`);
+          });
+          lines.push('');
+        }
+      }
+    }
+  }
+
+  // ── Weekly Pulse (stress) ──
+  if (stressLogs && stressLogs.length > 0) {
+    const weekStressLogs = stressLogs.filter(l => {
+      try { return isInRange(parseISO(l.logDate + 'T12:00:00'), weekStart, weekEnd); }
+      catch { return false; }
+    });
+    if (weekStressLogs.length > 0) {
+      const avgStress = Math.round(weekStressLogs.reduce((s, l) => s + l.stressLevel, 0) / weekStressLogs.length * 10) / 10;
+      const stressorCounts = {};
+      weekStressLogs.forEach(l => {
+        if (l.stressor) stressorCounts[l.stressor] = (stressorCounts[l.stressor] || 0) + 1;
+      });
+      const topStressor = Object.entries(stressorCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
+      lines.push('### Weekly Pulse');
+      lines.push(`- Average stress: ${avgStress} / 5`);
+      if (topStressor) {
+        const stressorLabel = { workload: 'Workload', client_issue: 'Client Issue', unclear_priorities: 'Unclear Priorities', meetings: 'Meetings', personal: 'Personal', other: 'Other' }[topStressor] || topStressor;
+        lines.push(`- Top stressor: ${stressorLabel}`);
+      }
+      weekStressLogs.forEach(l => {
+        if (l.note) lines.push(`- ${l.logDate}: ${l.note}`);
+      });
+      lines.push('');
+    }
+  }
 
   // ── Customer breakdown ──
   if (activeCustomerIds.length > 0) {
@@ -234,6 +304,7 @@ export default function WeeklyReport({ onNavigate }) {
     points, tasks, customers, okrs, weeklyUpdateLogs, milestones,
     weeklyReports, addWeeklyReport, deleteWeeklyReport,
     aiSettings, updateAiSettings,
+    timeLogs, stressLogs,
   } = useAppStore();
   const { googleToken, gmailToken } = useGoogleAuth();
 
@@ -421,6 +492,7 @@ export default function WeeklyReport({ onNavigate }) {
     const context = buildWeekContext({
       weekStart, weekEnd, points, tasks, customers, okrs,
       weeklyUpdateLogs, milestones, calendarEvents, gmailEmails, emailSummary,
+      timeLogs, stressLogs,
     });
 
     const systemPrompt = localPrompt.trim() || aiSettings.prompts?.weeklyEmail?.trim() || WEEKLY_REPORT_DEFAULT_PROMPT;

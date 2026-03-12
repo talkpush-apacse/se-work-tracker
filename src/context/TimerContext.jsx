@@ -12,26 +12,34 @@ export function TimerProvider({ children }) {
   const timer = useTimer();
   const { customers } = useAppStore();
 
-  // If the customer being timed gets deleted, auto-stop the timer
-  // (skip check when customerId is null — General Focus Time)
-  const stopTimerRef = useRef(timer.stopTimer);
-  stopTimerRef.current = timer.stopTimer;
-
+  // If ALL tagged clients are deleted while timer is running, remove them from timer state
+  // (but don't stop the timer — work type is the primary dimension now)
+  const prevClientIdsRef = useRef(timer.clientIds);
   useEffect(() => {
-    if (timer.isRunning && timer.customerId) {
-      const stillExists = customers.some(c => c.id === timer.customerId);
-      if (!stillExists) {
-        stopTimerRef.current();
+    if (timer.isRunning && timer.clientIds.length > 0) {
+      const stillExist = timer.clientIds.filter(id => customers.some(c => c.id === id));
+      if (stillExist.length < timer.clientIds.length) {
+        // Some clients were deleted — update timer state in localStorage
+        try {
+          const raw = localStorage.getItem('gpt-active-timer');
+          if (raw) {
+            const state = JSON.parse(raw);
+            state.clientIds = stillExist;
+            localStorage.setItem('gpt-active-timer', JSON.stringify(state));
+          }
+        } catch { /* ignore */ }
       }
     }
-  }, [customers, timer.isRunning, timer.customerId]);
+    prevClientIdsRef.current = timer.clientIds;
+  }, [customers, timer.isRunning, timer.clientIds]);
 
   // Memoised control value — reference stays stable between every 1-second tick,
   // so components that only need start/stop/state don't re-render every second.
   const controlValue = useMemo(
     () => ({
       isRunning: timer.isRunning,
-      customerId: timer.customerId,
+      workType: timer.workType,
+      clientIds: timer.clientIds,
       taskId: timer.taskId,
       startedAt: timer.startedAt,
       stoppedSession: timer.stoppedSession,
@@ -41,7 +49,7 @@ export function TimerProvider({ children }) {
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
-      timer.isRunning, timer.customerId, timer.taskId, timer.startedAt,
+      timer.isRunning, timer.workType, timer.clientIds, timer.taskId, timer.startedAt,
       timer.stoppedSession, timer.clearStoppedSession, timer.startTimer, timer.stopTimer,
     ]
   );
@@ -56,7 +64,7 @@ export function TimerProvider({ children }) {
 }
 
 /**
- * Returns stable control values (isRunning, customerId, taskId, startedAt,
+ * Returns stable control values (isRunning, workType, clientIds, taskId, startedAt,
  * stoppedSession, clearStoppedSession, startTimer, stopTimer).
  * Does NOT re-render on every timer tick — only on start/stop/session events.
  */

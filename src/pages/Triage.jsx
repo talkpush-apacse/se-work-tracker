@@ -27,6 +27,7 @@ import {
   AUTO_TRACK_RATE,
   AUTO_TRACK_MIN_SECONDS,
   TASK_INTERACTION_TYPES, TASK_INTERACTION_TYPE_LABELS,
+  TASK_TYPE_TO_WORK_TYPE,
 } from '../constants';
 import Modal from '../components/Modal';
 import AIAssistModal from '../components/AIAssistModal';
@@ -1593,7 +1594,7 @@ function fmtHMS(totalSeconds) {
 
 function TaskDetailView({ task, customer, onBack }) {
   const { updateTask, deleteTask, customers, addTask } = useAppStore();
-  const { isRunning, customerId: runningCustomerId, taskId: runningTaskId, startTimer, stopTimer } = useTimerContext();
+  const { isRunning, taskId: runningTaskId, startTimer, stopTimer } = useTimerContext();
   const elapsedSeconds = useTimerDisplay();
 
   // Timer computed flags
@@ -1807,7 +1808,7 @@ function TaskDetailView({ task, customer, onBack }) {
                     if (isRunningElsewhere) {
                       setTimerConflict(true);
                     } else {
-                      startTimer(task.customerId, task.id, task.description);
+                      startTimer(TASK_TYPE_TO_WORK_TYPE[task.taskType] || 'deep_work', { clientIds: task.customerId ? [task.customerId] : [], taskId: task.id, taskDescription: task.description });
                     }
                   }}
                   className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-brand-sage/20 hover:bg-brand-sage/40 text-brand-sage border border-brand-sage/50 transition-all shadow-sm shadow-emerald-500/10"
@@ -2073,15 +2074,31 @@ export default function Triage() {
     if (!session || session.elapsedSeconds < AUTO_TRACK_MIN_SECONDS) return;
     const hours = session.elapsedSeconds / 3600;
     const pts = Math.round(hours * AUTO_TRACK_RATE * 100) / 100;
-    addPoint({
-      customerId: session.customerId,
-      points: pts,
-      hours: Math.round(hours * 100) / 100,
-      activityType: 'General Admin',
-      comment: `Auto-tracked: ${session.taskDescription || 'Task review'}`,
-    });
+    const clientIds = session.clientIds || [];
+    // Create a point for each tagged client (or one with null if no clients)
+    if (clientIds.length > 0) {
+      clientIds.forEach(cid => {
+        addPoint({
+          customerId: cid,
+          points: Math.round((pts / clientIds.length) * 100) / 100,
+          hours: Math.round((hours / clientIds.length) * 100) / 100,
+          activityType: 'General Admin',
+          comment: `Auto-tracked: ${session.taskDescription || 'Task review'}`,
+        });
+      });
+    } else {
+      addPoint({
+        customerId: null,
+        points: pts,
+        hours: Math.round(hours * 100) / 100,
+        activityType: 'General Admin',
+        comment: `Auto-tracked: ${session.taskDescription || 'Task review'}`,
+      });
+    }
     // Toast feedback so user knows points were captured
-    const cName = customers.find(c => c.id === session.customerId)?.name || 'task';
+    const cName = clientIds.length === 1
+      ? customers.find(c => c.id === clientIds[0])?.name || 'task'
+      : clientIds.length > 1 ? `${clientIds.length} clients` : 'task';
     setAutoSaveToast({ pts, customerName: cName });
     setTimeout(() => setAutoSaveToast(null), 3000);
   }, [addPoint, customers]);
@@ -2092,7 +2109,7 @@ export default function Triage() {
       autoSaveSession(stopTimer({ silent: true }));
     }
     // Always attempt start — startTimer's internal localStorage guard prevents double-start
-    startTimer(task.customerId, task.id, task.description);
+    startTimer(TASK_TYPE_TO_WORK_TYPE[task.taskType] || 'deep_work', { clientIds: task.customerId ? [task.customerId] : [], taskId: task.id, taskDescription: task.description });
     setTaskDetailId(task.id);
   }, [isRunning, runningTaskId, autoSaveSession, stopTimer, startTimer]);
 
@@ -2289,11 +2306,11 @@ export default function Triage() {
                 assigneeOrTeam: null,
                 status: 'open',
               });
-              startTimer(customerId || null, newTask.id, newTask.description);
+              startTimer('deep_work', { clientIds: customerId ? [customerId] : [], taskId: newTask.id, taskDescription: newTask.description });
               setShowTimerTaskForm(false);
             }}
             onStartWithoutTask={() => {
-              startTimer(null, null, null);
+              startTimer('deep_work');
               setShowTimerTaskForm(false);
             }}
             onCancel={() => setShowTimerTaskForm(false)}

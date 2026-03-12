@@ -28,7 +28,7 @@ export const CUSTOMER_COLORS = [
 // Task types — only 'comms' and 'focus-time' appear in dropdowns.
 // 'mine' and 'coordinate' entries are kept in the maps below for backward compat
 // with existing localStorage tasks but are excluded from the active array.
-export const TASK_TYPES = ['comms', 'focus-time', 'evergreen'];
+export const TASK_TYPES = ['comms', 'focus-time', 'evergreen', 'recurring'];
 
 export const TASK_TYPE_LABELS = {
   mine:         'Mine',
@@ -36,6 +36,7 @@ export const TASK_TYPE_LABELS = {
   comms:        'Needs Comms',
   'focus-time': 'Focus Time',
   evergreen:    'Evergreen',
+  recurring:    'Recurring',
 };
 
 export const TASK_TYPE_COLORS = {
@@ -44,6 +45,7 @@ export const TASK_TYPE_COLORS = {
   comms:        { bg: 'bg-purple-500/15', text: 'text-purple-400', border: 'border-purple-500/20' },
   'focus-time': { bg: 'bg-teal-500/15',   text: 'text-teal-400',   border: 'border-teal-500/20' },
   evergreen:    { bg: 'bg-green-500/15',  text: 'text-green-400',  border: 'border-green-500/20' },
+  recurring:    { bg: 'bg-yellow-500/15', text: 'text-yellow-400', border: 'border-yellow-500/20' },
 };
 
 // Points awarded per task type when a task is marked 'done'
@@ -54,6 +56,7 @@ export const TASK_TYPE_POINTS = {
   coordinate:   1,
   comms:        1,
   evergreen:    1,
+  recurring:    1,
 };
 
 // Task statuses — 'archived' is a soft-delete; excluded from board by default
@@ -119,6 +122,59 @@ export const TASK_INTERACTION_TYPE_COLORS = {
   'Email':      '#6366f1',
   'Focus Time': '#10b981',
 };
+
+// ─── Work Types (bandwidth-first tracking) ──────────────────────────────────
+export const WORK_TYPES = ['deep_work', 'meetings', 'comms', 'admin'];
+
+export const WORK_TYPE_LABELS = {
+  deep_work: 'Deep Work',
+  meetings:  'Meetings',
+  comms:     'Comms',
+  admin:     'Admin',
+};
+
+export const WORK_TYPE_COLORS = {
+  deep_work: { bg: 'bg-teal-500/15',   text: 'text-teal-400',   border: 'border-teal-500/20', hex: '#14b8a6' },
+  meetings:  { bg: 'bg-blue-500/15',   text: 'text-blue-400',   border: 'border-blue-500/20', hex: '#3b82f6' },
+  comms:     { bg: 'bg-purple-500/15', text: 'text-purple-400', border: 'border-purple-500/20', hex: '#8b5cf6' },
+  admin:     { bg: 'bg-amber-500/15',  text: 'text-amber-400',  border: 'border-amber-500/20', hex: '#f59e0b' },
+};
+
+// Default weekly hour targets per work type (must sum to ≤ 40)
+export const DEFAULT_WORK_TYPE_TARGETS = {
+  deep_work: 20,
+  meetings:  8,
+  comms:     8,
+  admin:     4,
+};
+
+// Map task types → work types for timer auto-fill
+export const TASK_TYPE_TO_WORK_TYPE = {
+  'focus-time': 'deep_work',
+  comms:        'comms',
+  evergreen:    'deep_work',
+  recurring:    'deep_work',
+};
+
+// ─── Pulse: Stress Logging ──────────────────────────────────────────────────
+export const STRESSOR_TYPES = ['workload', 'client_issue', 'unclear_priorities', 'meetings', 'personal', 'other'];
+
+export const STRESSOR_LABELS = {
+  workload:            'Workload',
+  client_issue:        'Client Issue',
+  unclear_priorities:  'Unclear Priorities',
+  meetings:            'Meetings',
+  personal:            'Personal',
+  other:               'Other',
+};
+
+export const STRESS_LEVELS = [
+  { level: 1, emoji: '😌', label: 'Calm',         desc: 'No notable stress. Work felt manageable, no fires, good pace.' },
+  { level: 2, emoji: '😐', label: 'Mild',         desc: 'Minor friction or interruptions, nothing that derailed the day.' },
+  { level: 3, emoji: '😤', label: 'Moderate',     desc: 'Noticeable pressure. One or more stressors required real mental energy.' },
+  { level: 4, emoji: '😰', label: 'High',         desc: 'Difficult day. Multiple stressors, felt stretched thin.' },
+  { level: 5, emoji: '🤯', label: 'Overwhelming', desc: 'Survival mode. Reactive all day, significant anxiety.' },
+];
 
 // Points-per-hour rate for auto-tracked task sessions (2150 / 160 hours)
 export const AUTO_TRACK_RATE = 2150 / 160; // 13.4375

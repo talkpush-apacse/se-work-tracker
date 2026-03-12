@@ -17,6 +17,7 @@ const Integrations = lazy(() => import('./pages/Integrations'));
 const WeeklyReport = lazy(() => import('./pages/WeeklyReport'));
 const TimeBudget   = lazy(() => import('./pages/TimeBudget'));
 const Knowledge    = lazy(() => import('./pages/Knowledge'));
+const Pulse        = lazy(() => import('./pages/Pulse'));
 
 const pageVariants = {
   hidden: { opacity: 0, y: 16 },
@@ -64,6 +65,7 @@ function AppContent() {
                 {activeTab === 'customers'    && <Customers />}
                 {activeTab === 'weekly'       && <WeeklyReport onNavigate={handleTabChange} />}
                 {activeTab === 'timebudget'   && <TimeBudget />}
+                {activeTab === 'pulse'        && <Pulse />}
                 {activeTab === 'knowledge'    && <Knowledge />}
                 {activeTab === 'integrations' && <Integrations />}
               </motion.div>

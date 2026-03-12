@@ -9,9 +9,13 @@ const ALLOWED_ENTITIES = new Set([
   'okrs', 'customers', 'projects', 'points',
   'meetingEntries', 'tasks', 'milestones',
   'aiOutputs', 'aiSettings',
-  'annotations',                  // were missing — bug fix
-  'weeklyReports',                // new
-  'weeklyUpdateLogs',             // new
+  'annotations',
+  'weeklyReports',
+  'weeklyUpdateLogs',
+  'timeBudgets',
+  'timeLogs',
+  'stressLogs',
+  'workTypeTargets',
 ]);
 
 export default async function handler(req, res) {

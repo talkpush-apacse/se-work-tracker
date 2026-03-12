@@ -1,4 +1,4 @@
-import { LayoutDashboard, Target, Users, Menu, X, Download, Upload, ListTodo, Cloud, CloudOff, Loader2, Plug, Mail, Brain, Clock, GripVertical } from 'lucide-react';
+import { LayoutDashboard, Target, Users, Menu, X, Download, Upload, ListTodo, Cloud, CloudOff, Loader2, Plug, Mail, Brain, Clock, GripVertical, Heart } from 'lucide-react';
 import { useState, useRef, useMemo, useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAppStore } from '../context/StoreContext';
@@ -16,6 +16,7 @@ const DEFAULT_TABS = [
   { id: 'dashboard',    label: 'Dashboard',      icon: LayoutDashboard },
   { id: 'weekly',       label: 'Weekly Report',  icon: Mail },
   { id: 'timebudget',   label: 'Time Budget',   icon: Clock },
+  { id: 'pulse',        label: 'Pulse',          icon: Heart },
   { id: 'knowledge',    label: 'Knowledge',      icon: Brain },
   { id: 'integrations', label: 'Integrations',   icon: Plug },
 ];

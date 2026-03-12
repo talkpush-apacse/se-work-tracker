@@ -7,12 +7,23 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   Clock, ChevronLeft, ChevronRight, Plus, Trash2, Calendar, Loader2,
   AlertCircle, Settings, Check, X, CheckSquare, Square, Timer, User, Copy,
+  Brain, Users, MessageSquare, ClipboardList, RotateCcw, ChevronDown, ChevronUp,
 } from 'lucide-react';
-import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, parseISO, differenceInMinutes } from 'date-fns';
+import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, parseISO, differenceInMinutes, isThursday, isFriday, isSaturday, isSunday } from 'date-fns';
 import { useAppStore } from '../context/StoreContext';
 import { useGoogleAuth } from '../context/GoogleAuthContext';
 import { fetchCalendarEvents } from '../lib/googleApi';
 import { formatRelative } from '../utils/dateHelpers';
+import {
+  WORK_TYPES, WORK_TYPE_LABELS, WORK_TYPE_COLORS, DEFAULT_WORK_TYPE_TARGETS,
+} from '../constants';
+
+const WORK_TYPE_ICONS = {
+  deep_work: Brain,
+  meetings:  Users,
+  comms:     MessageSquare,
+  admin:     ClipboardList,
+};
 
 // Default budget hours
 const DEFAULT_BUDGET = 40;
@@ -44,7 +55,7 @@ function eventToMeeting(event) {
 }
 
 export default function TimeBudget() {
-  const { customers, tasks: triageTasks, points, getTimeBudget, upsertTimeBudget } = useAppStore();
+  const { customers, tasks: triageTasks, points, timeLogs, getTimeBudget, upsertTimeBudget, getWorkTypeTargets, upsertWorkTypeTargets } = useAppStore();
   const { googleToken, logout } = useGoogleAuth();
 
   // Week navigation — default to current week
@@ -261,6 +272,74 @@ export default function TimeBudget() {
     [triageTasks]
   );
 
+  // ── Bandwidth: Work Type breakdown from timeLogs ──────────────────────────
+  const [showTargetsEditor, setShowTargetsEditor] = useState(false);
+  const [showDetailSections, setShowDetailSections] = useState(false);
+
+  // Get targets for this week (or defaults)
+  const currentTargets = useMemo(() => {
+    const saved = getWorkTypeTargets(weekKey);
+    return saved?.targets || { ...DEFAULT_WORK_TYPE_TARGETS };
+  }, [weekKey, getWorkTypeTargets]);
+
+  const [editTargets, setEditTargets] = useState(currentTargets);
+  useEffect(() => { setEditTargets(currentTargets); }, [currentTargets]);
+
+  // Time logs for current week, grouped by work type
+  const workTypeHours = useMemo(() => {
+    const hours = { deep_work: 0, meetings: 0, comms: 0, admin: 0 };
+    timeLogs.forEach(log => {
+      if (!log.weekStart || log.weekStart !== weekKey) return;
+      if (hours[log.workType] !== undefined) {
+        hours[log.workType] += log.hours || 0;
+      }
+    });
+    // Round
+    Object.keys(hours).forEach(k => { hours[k] = Math.round(hours[k] * 100) / 100; });
+    return hours;
+  }, [timeLogs, weekKey]);
+
+  const totalLoggedByType = useMemo(
+    () => WORK_TYPES.reduce((s, wt) => s + workTypeHours[wt], 0),
+    [workTypeHours]
+  );
+
+  const totalTargetHours = useMemo(
+    () => Object.values(currentTargets).reduce((s, v) => s + v, 0),
+    [currentTargets]
+  );
+
+  // Health indicators
+  const healthAlerts = useMemo(() => {
+    const alerts = [];
+    const totalLogged = totalLoggedByType;
+    if (totalLogged > 0) {
+      const meetingPct = workTypeHours.meetings / totalLogged;
+      if (meetingPct > 0.5) {
+        alerts.push({ type: 'warning', text: 'Meeting-heavy week — meetings are over 50% of your logged time.' });
+      }
+      if (workTypeHours.deep_work < currentTargets.deep_work * 0.5 && totalLogged > 10) {
+        alerts.push({ type: 'warning', text: 'Below deep work target — consider protecting focus blocks.' });
+      }
+    }
+    const now = new Date();
+    const isLateWeek = isThursday(now) || isFriday(now) || isSaturday(now) || isSunday(now);
+    const isCurrentWeek = weekKey === getMonday(new Date());
+    if (isLateWeek && isCurrentWeek && totalLogged < 30 && totalLogged > 0) {
+      alerts.push({ type: 'info', text: 'Underlogged — are sessions being tracked? You have less than 30h logged late in the week.' });
+    }
+    return alerts;
+  }, [totalLoggedByType, workTypeHours, currentTargets, weekKey]);
+
+  const handleSaveTargets = () => {
+    upsertWorkTypeTargets(weekKey, editTargets);
+    setShowTargetsEditor(false);
+  };
+
+  const handleResetTargets = () => {
+    setEditTargets({ ...DEFAULT_WORK_TYPE_TARGETS });
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -321,6 +400,162 @@ export default function TimeBudget() {
         </button>
       </div>
 
+      {/* ── Weekly Bandwidth Overview ──────────────────────────────────────── */}
+      <div className="bg-card border border-border rounded-2xl px-5 py-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-foreground">Weekly Bandwidth</h2>
+          <p className="text-sm text-muted-foreground">
+            <span className="font-bold text-foreground">{totalLoggedByType.toFixed(1)}h</span>
+            <span className="mx-1">/</span>
+            <span>{totalTargetHours}h target</span>
+            <span className="ml-1.5 text-xs">({totalTargetHours > 0 ? Math.round((totalLoggedByType / totalTargetHours) * 100) : 0}%)</span>
+          </p>
+        </div>
+
+        {/* Stacked progress bar */}
+        <div className="w-full h-4 rounded-full bg-secondary overflow-hidden flex">
+          {WORK_TYPES.map(wt => {
+            const pct = totalTargetHours > 0 ? (workTypeHours[wt] / totalTargetHours) * 100 : 0;
+            if (pct <= 0) return null;
+            return (
+              <div
+                key={wt}
+                className="h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
+                style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: WORK_TYPE_COLORS[wt].hex }}
+                title={`${WORK_TYPE_LABELS[wt]}: ${workTypeHours[wt]}h`}
+              />
+            );
+          })}
+        </div>
+
+        {/* Legend */}
+        <div className="flex flex-wrap gap-3">
+          {WORK_TYPES.map(wt => (
+            <div key={wt} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: WORK_TYPE_COLORS[wt].hex }} />
+              {WORK_TYPE_LABELS[wt]}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Work Type Breakdown ──────────────────────────────────────────────── */}
+      <div className="bg-card border border-border rounded-2xl px-5 py-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-foreground">By Work Type</h2>
+          <button
+            onClick={() => setShowTargetsEditor(v => !v)}
+            className="text-xs text-brand-lavender hover:text-brand-lavender/80 font-medium transition-colors"
+          >
+            {showTargetsEditor ? 'Close' : 'Edit targets'}
+          </button>
+        </div>
+
+        {/* 4 horizontal bars */}
+        <div className="space-y-3">
+          {WORK_TYPES.map(wt => {
+            const Icon = WORK_TYPE_ICONS[wt];
+            const target = currentTargets[wt] || 0;
+            const logged = workTypeHours[wt];
+            const pct = target > 0 ? Math.min((logged / target) * 100, 100) : 0;
+            const over = logged > target;
+            return (
+              <div key={wt}>
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    <Icon size={13} className={WORK_TYPE_COLORS[wt].text} />
+                    <span className="text-xs font-medium text-foreground">{WORK_TYPE_LABELS[wt]}</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    <span className={`font-semibold ${over ? 'text-amber-400' : 'text-foreground'}`}>{logged}h</span>
+                    {' / '}{target}h
+                  </span>
+                </div>
+                <div className="w-full h-2 rounded-full bg-secondary overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{ width: `${pct}%`, backgroundColor: WORK_TYPE_COLORS[wt].hex }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Targets editor */}
+        {showTargetsEditor && (
+          <div className="border-t border-border pt-3 mt-3 space-y-2">
+            <p className="text-xs text-muted-foreground font-medium">Weekly hour targets</p>
+            <div className="grid grid-cols-2 gap-2">
+              {WORK_TYPES.map(wt => (
+                <label key={wt} className="flex items-center gap-2 text-xs">
+                  <span className="text-muted-foreground w-20">{WORK_TYPE_LABELS[wt]}</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={60}
+                    step={1}
+                    value={editTargets[wt]}
+                    onChange={e => setEditTargets(prev => ({ ...prev, [wt]: Math.max(0, Number(e.target.value)) }))}
+                    className="w-16 h-7 bg-secondary border border-border rounded-lg px-2 text-xs text-foreground text-center focus:outline-none focus:border-ring"
+                  />
+                  <span className="text-muted-foreground">hrs</span>
+                </label>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <p className="text-[10px] text-muted-foreground flex-1">
+                Total: {Object.values(editTargets).reduce((s, v) => s + v, 0)}h
+              </p>
+              <button
+                onClick={handleResetTargets}
+                className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+              >
+                <RotateCcw size={10} /> Reset
+              </button>
+              <button
+                onClick={handleSaveTargets}
+                className="px-3 py-1 rounded-lg bg-brand-lavender text-foreground text-xs font-semibold hover:bg-brand-lavender/80 transition-colors"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Health Indicators ─────────────────────────────────────────────────── */}
+      {healthAlerts.length > 0 && (
+        <div className="space-y-2">
+          {healthAlerts.map((alert, i) => (
+            <div
+              key={i}
+              className={`flex items-start gap-2.5 px-4 py-2.5 rounded-xl border text-xs ${
+                alert.type === 'warning'
+                  ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+                  : 'bg-blue-500/10 border-blue-500/20 text-blue-400'
+              }`}
+            >
+              <AlertCircle size={13} className="mt-0.5 flex-shrink-0" />
+              <span>{alert.text}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Original Budget Summary (collapsible) ─────────────────────────── */}
+      <div>
+        <button
+          onClick={() => setShowDetailSections(v => !v)}
+          className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors mb-3"
+        >
+          {showDetailSections ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          Budget Planning Details
+          <span className="text-[10px] font-normal">(meetings, tasks, focus time)</span>
+        </button>
+      </div>
+
+      {showDetailSections && (<>
       {/* Summary card */}
       <div className="bg-card border border-border rounded-2xl px-5 py-4 space-y-3">
         {/* Budget bar */}
@@ -678,6 +913,7 @@ export default function TimeBudget() {
           </div>
         </div>
       </div>
+      </>)}
     </div>
   );
 }
