@@ -89,8 +89,7 @@ export default function Pulse() {
     const logDate = editingId
       ? stressLogs.find(l => l.id === editingId)?.logDate || TODAY
       : TODAY;
-    upsertStressLog({
-      logDate,
+    upsertStressLog(logDate, {
       stressLevel: level,
       stressor,
       note: note.trim(),
@@ -142,9 +141,11 @@ export default function Pulse() {
     return (logged.reduce((s, d) => s + d.level, 0) / logged.length).toFixed(1);
   }, [trendData]);
 
-  // All logs sorted newest first
+  // All logs sorted newest first (filter out any corrupted entries missing a valid logDate string)
   const sortedLogs = useMemo(
-    () => [...stressLogs].sort((a, b) => b.logDate.localeCompare(a.logDate)),
+    () => [...stressLogs]
+      .filter(l => typeof l.logDate === 'string')
+      .sort((a, b) => b.logDate.localeCompare(a.logDate)),
     [stressLogs]
   );
 

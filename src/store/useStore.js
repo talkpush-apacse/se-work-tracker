@@ -317,7 +317,9 @@ export function useStore() {
   const [weeklyUpdateLogs, setWeeklyUpdateLogs] = useState(() => load(KEYS.weeklyUpdateLogs));
   const [timeBudgets, setTimeBudgets] = useState(() => load(KEYS.timeBudgets));
   const [timeLogs, setTimeLogs] = useState(() => load(KEYS.timeLogs));
-  const [stressLogs, setStressLogs] = useState(() => load(KEYS.stressLogs));
+  const [stressLogs, setStressLogs] = useState(() =>
+    load(KEYS.stressLogs).filter(l => typeof l.logDate === 'string')
+  );
   const [workTypeTargets, setWorkTypeTargets] = useState(() => load(KEYS.workTypeTargets));
   const [aiSettings, setAiSettings] = useState(() => {
     const stored = load(KEYS.aiSettings, null);
