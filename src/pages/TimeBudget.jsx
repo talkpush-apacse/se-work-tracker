@@ -16,6 +16,7 @@ import { fetchCalendarEvents } from '../lib/googleApi';
 import { formatRelative } from '../utils/dateHelpers';
 import {
   WORK_TYPES, WORK_TYPE_LABELS, WORK_TYPE_COLORS, DEFAULT_WORK_TYPE_TARGETS,
+  TASK_TYPES, TASK_TYPE_LABELS, TASK_TYPE_COLORS, TASK_INTERACTION_TYPES, TASK_RECIPIENTS,
 } from '../constants';
 
 const WORK_TYPE_ICONS = {
@@ -55,7 +56,7 @@ function eventToMeeting(event) {
 }
 
 export default function TimeBudget() {
-  const { customers, tasks: triageTasks, points, timeLogs, getTimeBudget, upsertTimeBudget, getWorkTypeTargets, upsertWorkTypeTargets } = useAppStore();
+  const { customers, addTask, okrs, points, timeLogs, getTimeBudget, upsertTimeBudget, getWorkTypeTargets, upsertWorkTypeTargets } = useAppStore();
   const { googleToken, logout } = useGoogleAuth();
 
   // Week navigation — default to current week
@@ -84,8 +85,11 @@ export default function TimeBudget() {
   const [showManualMeeting, setShowManualMeeting] = useState(false);
   const [newManualMeeting, setNewManualMeeting] = useState({ summary: '', durationHours: 1 });
 
-  // New task form
-  const [newTask, setNewTask] = useState({ description: '', hours: 1, customerId: '', taskId: '' });
+  // New task form — aligned with Triage QuickAddTaskForm fields
+  const [newTask, setNewTask] = useState({
+    description: '', hours: 1, customerId: '',
+    taskType: 'comms', interactionType: '', assigneeOrTeam: '', okrId: '',
+  });
 
   // Re-load from store when week changes
   useEffect(() => {
@@ -201,18 +205,39 @@ export default function TimeBudget() {
     setHasFetched(true);
   }, [lastWeekBudget]);
 
-  // Task CRUD
+  // Task CRUD — auto-creates a linked Triage task on add
   const addBudgetTask = useCallback(() => {
     if (!newTask.description.trim()) return;
+
+    // Auto-create linked Triage task
+    const triageTask = addTask({
+      description: newTask.description.trim(),
+      customerId: newTask.customerId || undefined,
+      taskType: newTask.taskType,
+      interactionType: newTask.interactionType || undefined,
+      assigneeOrTeam: newTask.assigneeOrTeam || undefined,
+      okrId: newTask.okrId || undefined,
+      status: 'open',
+    });
+
+    // Add budget task linked to the Triage task
     setBudgetTasks(prev => [...prev, {
       id: crypto.randomUUID(),
       description: newTask.description.trim(),
       hours: newTask.hours,
       customerId: newTask.customerId || undefined,
-      taskId: newTask.taskId || undefined,
+      taskType: newTask.taskType,
+      interactionType: newTask.interactionType || undefined,
+      assigneeOrTeam: newTask.assigneeOrTeam || undefined,
+      okrId: newTask.okrId || undefined,
+      taskId: triageTask.id,
     }]);
-    setNewTask({ description: '', hours: 1, customerId: '', taskId: '' });
-  }, [newTask]);
+
+    setNewTask({
+      description: '', hours: 1, customerId: '',
+      taskType: 'comms', interactionType: '', assigneeOrTeam: '', okrId: '',
+    });
+  }, [newTask, addTask]);
 
   const removeBudgetTask = useCallback((id) => {
     setBudgetTasks(prev => prev.filter(t => t.id !== id));
@@ -265,12 +290,6 @@ export default function TimeBudget() {
   const goToPrevWeek = () => setCurrentDate(d => subWeeks(d, 1));
   const goToNextWeek = () => setCurrentDate(d => addWeeks(d, 1));
   const goToThisWeek = () => setCurrentDate(new Date());
-
-  // Active triage tasks for linking
-  const activeTasks = useMemo(
-    () => triageTasks.filter(t => t.status !== 'archived' && t.status !== 'done'),
-    [triageTasks]
-  );
 
   // ── Bandwidth: Work Type breakdown from timeLogs ──────────────────────────
   const [showTargetsEditor, setShowTargetsEditor] = useState(false);
@@ -833,8 +852,8 @@ export default function TimeBudget() {
           </div>
 
           <div className="px-4 py-3 space-y-2">
-            {/* Add task form */}
-            <div className="flex gap-1.5 flex-wrap">
+            {/* Add task form — Row 1: Description */}
+            <div className="flex gap-1.5">
               <input
                 type="text"
                 placeholder="Task description..."
@@ -843,6 +862,32 @@ export default function TimeBudget() {
                 onKeyDown={e => { if (e.key === 'Enter') addBudgetTask(); }}
                 className="flex-1 min-w-[10rem] h-8 bg-secondary border border-border rounded-lg px-2.5 text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-ring"
               />
+            </div>
+
+            {/* Row 2: Task Type · Customer · Hours · Interaction · Recipient · OKR · Add */}
+            <div className="flex gap-1.5 flex-wrap">
+              {/* Task Type */}
+              <select
+                value={newTask.taskType}
+                onChange={e => setNewTask(prev => ({ ...prev, taskType: e.target.value }))}
+                className="h-8 bg-secondary border border-border rounded-lg px-1.5 text-xs text-foreground focus:outline-none focus:border-ring w-28"
+              >
+                {TASK_TYPES.map(tt => (
+                  <option key={tt} value={tt}>{TASK_TYPE_LABELS[tt]}</option>
+                ))}
+              </select>
+
+              {/* Customer */}
+              <select
+                value={newTask.customerId}
+                onChange={e => setNewTask(prev => ({ ...prev, customerId: e.target.value }))}
+                className="h-8 bg-secondary border border-border rounded-lg px-1.5 text-xs text-foreground focus:outline-none focus:border-ring max-w-[8rem]"
+              >
+                <option value="">No client</option>
+                {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+
+              {/* Hours */}
               <select
                 value={newTask.hours}
                 onChange={e => setNewTask(prev => ({ ...prev, hours: Number(e.target.value) }))}
@@ -852,14 +897,46 @@ export default function TimeBudget() {
                   <option key={h} value={h}>{h}h</option>
                 ))}
               </select>
+
+              {/* Interaction Type */}
               <select
-                value={newTask.customerId}
-                onChange={e => setNewTask(prev => ({ ...prev, customerId: e.target.value }))}
-                className="h-8 bg-secondary border border-border rounded-lg px-1.5 text-xs text-foreground focus:outline-none focus:border-ring max-w-[8rem]"
+                value={newTask.interactionType}
+                onChange={e => setNewTask(prev => ({ ...prev, interactionType: e.target.value }))}
+                className="h-8 bg-secondary border border-border rounded-lg px-1.5 text-xs text-foreground focus:outline-none focus:border-ring w-28"
               >
-                <option value="">No client</option>
-                {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                <option value="">Interaction...</option>
+                {TASK_INTERACTION_TYPES.map(it => (
+                  <option key={it} value={it}>{it}</option>
+                ))}
               </select>
+
+              {/* Recipient */}
+              <select
+                value={newTask.assigneeOrTeam}
+                onChange={e => setNewTask(prev => ({ ...prev, assigneeOrTeam: e.target.value }))}
+                className="h-8 bg-secondary border border-border rounded-lg px-1.5 text-xs text-foreground focus:outline-none focus:border-ring max-w-[9rem]"
+              >
+                <option value="">Recipient...</option>
+                {TASK_RECIPIENTS.map(r => (
+                  <option key={r.value} value={r.value}>{r.label}</option>
+                ))}
+              </select>
+
+              {/* OKR (only if OKRs exist) */}
+              {okrs.length > 0 && (
+                <select
+                  value={newTask.okrId}
+                  onChange={e => setNewTask(prev => ({ ...prev, okrId: e.target.value }))}
+                  className="h-8 bg-secondary border border-border rounded-lg px-1.5 text-xs text-foreground focus:outline-none focus:border-ring max-w-[8rem]"
+                >
+                  <option value="">OKR...</option>
+                  {okrs.map(o => (
+                    <option key={o.id} value={o.id}>{o.title}</option>
+                  ))}
+                </select>
+              )}
+
+              {/* Add button */}
               <button
                 onClick={addBudgetTask}
                 disabled={!newTask.description.trim()}
@@ -879,15 +956,31 @@ export default function TimeBudget() {
 
               {budgetTasks.map(t => {
                 const customer = t.customerId ? customers.find(c => c.id === t.customerId) : null;
+                const typeColor = t.taskType ? TASK_TYPE_COLORS[t.taskType] : null;
                 return (
                   <div
                     key={t.id}
                     className="flex items-center gap-2 px-3 py-2 rounded-xl border border-border bg-card"
                   >
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs font-medium text-foreground leading-snug">{t.description}</p>
-                      {customer && (
-                        <p className="text-[10px] text-muted-foreground">{customer.name}</p>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {/* Task type badge */}
+                        {t.taskType && typeColor && (
+                          <span className={`inline-flex items-center rounded-full text-[9px] font-semibold px-1.5 py-0.5 border ${typeColor.bg} ${typeColor.text} ${typeColor.border}`}>
+                            {TASK_TYPE_LABELS[t.taskType] || t.taskType}
+                          </span>
+                        )}
+                        <p className="text-xs font-medium text-foreground leading-snug">{t.description}</p>
+                      </div>
+                      {/* Sub-line: customer + interaction type + recipient */}
+                      {(customer || t.interactionType || t.assigneeOrTeam) && (
+                        <div className="flex items-center gap-1 mt-0.5 text-[10px] text-muted-foreground">
+                          {customer && <span>{customer.name}</span>}
+                          {t.interactionType && <span>{customer ? '·' : ''} {t.interactionType}</span>}
+                          {t.assigneeOrTeam && (
+                            <span>· {TASK_RECIPIENTS.find(r => r.value === t.assigneeOrTeam)?.label || t.assigneeOrTeam}</span>
+                          )}
+                        </div>
                       )}
                     </div>
                     <select
