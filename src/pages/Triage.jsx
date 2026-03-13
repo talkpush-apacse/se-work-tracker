@@ -18,16 +18,13 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import FileAttachments from '../components/FileAttachments';
 import RichTextEditor from '../components/ui/RichTextEditor';
 import {
-  TASK_TYPES, TASK_TYPE_LABELS, TASK_TYPE_COLORS,
   TASK_STATUSES, TASK_STATUS_LABELS, TASK_STATUS_COLORS,
   AI_OUTPUT_TYPES, AI_OUTPUT_TYPE_LABELS,
   TASK_RECIPIENTS,
   CUSTOMER_COLORS,
-  TASK_TYPE_POINTS,
   AUTO_TRACK_RATE,
   AUTO_TRACK_MIN_SECONDS,
-  TASK_INTERACTION_TYPES, TASK_INTERACTION_TYPE_LABELS,
-  TASK_TYPE_TO_WORK_TYPE,
+  WORK_TYPES, WORK_TYPE_LABELS, WORK_TYPE_COLORS,
 } from '../constants';
 import Modal from '../components/Modal';
 import AIAssistModal from '../components/AIAssistModal';
@@ -139,11 +136,10 @@ function TriageForm({ entry, customer, customers, onSubmit, onCancel }) {
   const [form, setForm] = useState({
     customerId:      customer?.id || '',
     description:     entry.rawNotes.split('\n')[0].slice(0, 120), // pre-fill from first line
-    taskType:        'comms',
-    interactionType: '',
-    assigneeOrTeam:  '',
+    workType:        'comms',
     status:          'open',
     okrId:           '',
+    isEvergreen:     false,
   });
 
   // Local list that grows if user creates new entries inline
@@ -211,14 +207,14 @@ function TriageForm({ entry, customer, customers, onSubmit, onCancel }) {
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs text-muted-foreground mb-1">Task Type</label>
+          <label className="block text-xs text-muted-foreground mb-1">Work Type</label>
           <select
-            value={form.taskType}
-            onChange={e => setForm(p => ({ ...p, taskType: e.target.value }))}
+            value={form.workType}
+            onChange={e => setForm(p => ({ ...p, workType: e.target.value }))}
             className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
           >
-            {TASK_TYPES.map(t => (
-              <option key={t} value={t}>{TASK_TYPE_LABELS[t]}</option>
+            {WORK_TYPES.map(wt => (
+              <option key={wt} value={wt}>{WORK_TYPE_LABELS[wt]}</option>
             ))}
           </select>
         </div>
@@ -236,33 +232,18 @@ function TriageForm({ entry, customer, customers, onSubmit, onCancel }) {
         </div>
       </div>
 
-      <div>
-        <label className="block text-xs text-muted-foreground mb-1">Interaction Type <span className="text-muted-foreground/70">(optional)</span></label>
-        <select
-          value={form.interactionType}
-          onChange={e => setForm(p => ({ ...p, interactionType: e.target.value }))}
-          className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
-        >
-          <option value="">— Select type —</option>
-          {TASK_INTERACTION_TYPES.map(t => (
-            <option key={t} value={t}>{TASK_INTERACTION_TYPE_LABELS[t]}</option>
-          ))}
-        </select>
-      </div>
-
-      <div>
-        <label className="block text-xs text-muted-foreground mb-1">Recipient <span className="text-muted-foreground/70">(optional)</span></label>
-        <select
-          value={form.assigneeOrTeam}
-          onChange={e => setForm(p => ({ ...p, assigneeOrTeam: e.target.value }))}
-          className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
-        >
-          <option value="">— Select recipient —</option>
-          {TASK_RECIPIENTS.map(r => (
-            <option key={r.value} value={r.value}>{r.label}</option>
-          ))}
-        </select>
-      </div>
+      {/* Evergreen toggle */}
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={form.isEvergreen}
+          onChange={e => setForm(p => ({ ...p, isEvergreen: e.target.checked }))}
+          className="w-3.5 h-3.5 rounded border-border bg-secondary text-green-500 focus:ring-ring/40 focus:ring-1 accent-green-500"
+        />
+        <span className="text-xs text-muted-foreground flex items-center gap-1">
+          <RefreshCw size={10} className="text-green-400" /> Evergreen (resets weekly)
+        </span>
+      </label>
 
       {/* Optional OKR selector */}
       {okrs.length > 0 && (
@@ -314,8 +295,8 @@ const TriageEntryCard = memo(function TriageEntryCard({ entry, customer, onTriag
       okrId: formData.okrId || null,
       meetingEntryId: entry.id,
       description: formData.description,
-      taskType: formData.taskType,
-      assigneeOrTeam: formData.assigneeOrTeam || null,
+      workType: formData.workType,
+      isEvergreen: formData.isEvergreen || undefined,
       status: formData.status,
     });
     markMeetingEntryTriaged(entry.id);
@@ -402,7 +383,7 @@ function extractJiraLinks(text = '') {
 // ─── Task card (in the board) ─────────────────────────────────────────────────
 const TaskCard = memo(function TaskCard({ task, customer, isSelected, onSelect, onStatusChange, onArchive }) {
   const { updateTask } = useAppStore();
-  const typeColors = TASK_TYPE_COLORS[task.taskType] || TASK_TYPE_COLORS.mine;
+  const typeColors = WORK_TYPE_COLORS[task.workType] || WORK_TYPE_COLORS.comms;
   const statusColors = TASK_STATUS_COLORS[task.status] || TASK_STATUS_COLORS.open;
   const isArchived = task.status === 'archived';
 
@@ -517,8 +498,8 @@ const TaskCard = memo(function TaskCard({ task, customer, isSelected, onSelect, 
 
       <div className="flex items-center gap-1.5 flex-wrap">
         <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border flex items-center gap-1 ${typeColors.bg} ${typeColors.text} ${typeColors.border}`}>
-          {task.taskType === 'evergreen' && <RefreshCw size={9} />}
-          {TASK_TYPE_LABELS[task.taskType]}
+          {task.isEvergreen && <RefreshCw size={9} />}
+          {WORK_TYPE_LABELS[task.workType] || 'Comms'}
         </span>
         {/* Aging chip — hidden for archived tasks */}
         {!isArchived && (
@@ -526,11 +507,6 @@ const TaskCard = memo(function TaskCard({ task, customer, isSelected, onSelect, 
             title={`Created ${ageDays} day${ageDays === 1 ? '' : 's'} ago`}
           >
             {ageDays}d
-          </span>
-        )}
-        {task.assigneeOrTeam && (
-          <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
-            <User size={9} /> {recipientLabel(task.assigneeOrTeam)}
           </span>
         )}
         {/* Task points badge — shown when task is done */}
@@ -874,7 +850,7 @@ const AIWorkspace = memo(function AIWorkspace({ task, customer }) {
     setTimeout(() => setSavedMsg(false), 2000);
   };
 
-  const typeColors = TASK_TYPE_COLORS[task.taskType] || TASK_TYPE_COLORS.mine;
+  const typeColors = WORK_TYPE_COLORS[task.workType] || WORK_TYPE_COLORS.comms;
   const statusColors = TASK_STATUS_COLORS[task.status] || TASK_STATUS_COLORS.open;
   // Use local override for the resolved label (used both in hint text and passed to AI prompts)
   const recipientText = recipientOverride ? recipientLabel(recipientOverride) : null;
@@ -893,8 +869,8 @@ const AIWorkspace = memo(function AIWorkspace({ task, customer }) {
             </span>
           )}
           <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border flex items-center gap-1 ${typeColors.bg} ${typeColors.text} ${typeColors.border} flex-shrink-0`}>
-            {task.taskType === 'evergreen' && <RefreshCw size={9} />}
-            {TASK_TYPE_LABELS[task.taskType]}
+            {task.isEvergreen && <RefreshCw size={9} />}
+            {WORK_TYPE_LABELS[task.workType] || 'Comms'}
           </span>
           <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${statusColors.bg} ${statusColors.text} ${statusColors.border} flex-shrink-0`}>
             {TASK_STATUS_LABELS[task.status]}
@@ -1292,11 +1268,10 @@ function QuickAddTaskForm({ customers, onSubmit, onCancel }) {
   const [form, setForm] = useState({
     customerId:      '',
     description:     '',
-    taskType:        'comms',
-    interactionType: '',
-    assigneeOrTeam:  '',
+    workType:        'comms',
     status:          'open',
     okrId:           '',
+    isEvergreen:     false,
   });
 
   // Live list grows when user creates new entries via InlineCustomerCreate
@@ -1356,14 +1331,14 @@ function QuickAddTaskForm({ customers, onSubmit, onCancel }) {
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs text-muted-foreground mb-1">Task Type</label>
+          <label className="block text-xs text-muted-foreground mb-1">Work Type</label>
           <select
-            value={form.taskType}
-            onChange={e => setForm(p => ({ ...p, taskType: e.target.value }))}
+            value={form.workType}
+            onChange={e => setForm(p => ({ ...p, workType: e.target.value }))}
             className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
           >
-            {TASK_TYPES.map(t => (
-              <option key={t} value={t}>{TASK_TYPE_LABELS[t]}</option>
+            {WORK_TYPES.map(wt => (
+              <option key={wt} value={wt}>{WORK_TYPE_LABELS[wt]}</option>
             ))}
           </select>
         </div>
@@ -1381,33 +1356,18 @@ function QuickAddTaskForm({ customers, onSubmit, onCancel }) {
         </div>
       </div>
 
-      <div>
-        <label className="block text-xs text-muted-foreground mb-1">Interaction Type <span className="text-muted-foreground/70">(optional)</span></label>
-        <select
-          value={form.interactionType}
-          onChange={e => setForm(p => ({ ...p, interactionType: e.target.value }))}
-          className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
-        >
-          <option value="">— Select type —</option>
-          {TASK_INTERACTION_TYPES.map(t => (
-            <option key={t} value={t}>{TASK_INTERACTION_TYPE_LABELS[t]}</option>
-          ))}
-        </select>
-      </div>
-
-      <div>
-        <label className="block text-xs text-muted-foreground mb-1">Recipient <span className="text-muted-foreground/70">(optional)</span></label>
-        <select
-          value={form.assigneeOrTeam}
-          onChange={e => setForm(p => ({ ...p, assigneeOrTeam: e.target.value }))}
-          className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
-        >
-          <option value="">— Select recipient —</option>
-          {TASK_RECIPIENTS.map(r => (
-            <option key={r.value} value={r.value}>{r.label}</option>
-          ))}
-        </select>
-      </div>
+      {/* Evergreen toggle */}
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={form.isEvergreen}
+          onChange={e => setForm(p => ({ ...p, isEvergreen: e.target.checked }))}
+          className="w-3.5 h-3.5 rounded border-border bg-secondary text-green-500 focus:ring-ring/40 focus:ring-1 accent-green-500"
+        />
+        <span className="text-xs text-muted-foreground flex items-center gap-1">
+          <RefreshCw size={10} className="text-green-400" /> Evergreen (resets weekly)
+        </span>
+      </label>
 
       {/* Optional OKR selector */}
       {okrs.length > 0 && (
@@ -1455,7 +1415,7 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, customer, onOpenDe
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
 
-  const typeColors   = TASK_TYPE_COLORS[task.taskType]   || TASK_TYPE_COLORS.comms;
+  const typeColors   = WORK_TYPE_COLORS[task.workType]   || WORK_TYPE_COLORS.comms;
   const statusColors = TASK_STATUS_COLORS[task.status]   || TASK_STATUS_COLORS.open;
   // Only recompute age when the task's creation timestamp changes (not on every parent render)
   const ageDays = useMemo(
@@ -1542,8 +1502,8 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, customer, onOpenDe
         </div>
         <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
           <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border flex items-center gap-1 ${typeColors.bg} ${typeColors.text} ${typeColors.border}`}>
-            {task.taskType === 'evergreen' && <RefreshCw size={9} />}
-            {TASK_TYPE_LABELS[task.taskType]}
+            {task.isEvergreen && <RefreshCw size={9} />}
+            {WORK_TYPE_LABELS[task.workType] || 'Comms'}
           </span>
           <span
             className={`text-[10px] font-semibold ${ageStyle}`}
@@ -1689,48 +1649,31 @@ function TaskDetailView({ task, customer, onBack }) {
               </select>
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Type</label>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Work Type</label>
               <select
-                value={task.taskType}
-                onChange={e => updateTask(task.id, { taskType: e.target.value })}
+                value={task.workType || 'comms'}
+                onChange={e => updateTask(task.id, { workType: e.target.value })}
                 className={selectClass}
               >
-                {TASK_TYPES.map(t => (
-                  <option key={t} value={t} className="bg-secondary">{TASK_TYPE_LABELS[t]}</option>
+                {WORK_TYPES.map(wt => (
+                  <option key={wt} value={wt} className="bg-secondary">{WORK_TYPE_LABELS[wt]}</option>
                 ))}
               </select>
             </div>
           </div>
 
-          {/* Interaction Type */}
-          <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1 block">Interaction Type</label>
-            <select
-              value={task.interactionType || ''}
-              onChange={e => updateTask(task.id, { interactionType: e.target.value })}
-              className={selectClass}
-            >
-              <option value="" className="bg-secondary">— None —</option>
-              {TASK_INTERACTION_TYPES.map(t => (
-                <option key={t} value={t} className="bg-secondary">{TASK_INTERACTION_TYPE_LABELS[t]}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Assignee / Recipient */}
-          <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1 block">Recipient / Assignee</label>
-            <select
-              value={task.assigneeOrTeam || ''}
-              onChange={e => updateTask(task.id, { assigneeOrTeam: e.target.value })}
-              className={selectClass}
-            >
-              <option value="" className="bg-secondary">— None —</option>
-              {TASK_RECIPIENTS.map(r => (
-                <option key={r.value} value={r.value} className="bg-secondary">{r.label}</option>
-              ))}
-            </select>
-          </div>
+          {/* Evergreen toggle */}
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={!!task.isEvergreen}
+              onChange={e => updateTask(task.id, { isEvergreen: e.target.checked || undefined })}
+              className="w-3.5 h-3.5 rounded border-border bg-secondary text-green-500 focus:ring-ring/40 focus:ring-1 accent-green-500"
+            />
+            <span className="text-xs text-muted-foreground flex items-center gap-1">
+              <RefreshCw size={10} className="text-green-400" /> Evergreen (resets weekly)
+            </span>
+          </label>
 
           {/* Ticket URL */}
           <div>
@@ -1808,7 +1751,7 @@ function TaskDetailView({ task, customer, onBack }) {
                     if (isRunningElsewhere) {
                       setTimerConflict(true);
                     } else {
-                      startTimer(TASK_TYPE_TO_WORK_TYPE[task.taskType] || 'deep_work', { clientIds: task.customerId ? [task.customerId] : [], taskId: task.id, taskDescription: task.description });
+                      startTimer(task.workType || 'deep_work', { clientIds: task.customerId ? [task.customerId] : [], taskId: task.id, taskDescription: task.description });
                     }
                   }}
                   className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-brand-sage/20 hover:bg-brand-sage/40 text-brand-sage border border-brand-sage/50 transition-all shadow-sm shadow-emerald-500/10"
@@ -1899,7 +1842,7 @@ export default function Triage() {
 
   // Filter state
   const [filterCustomerId, setFilterCustomerId] = useState('');
-  const [filterTaskType,   setFilterTaskType]   = useState('');
+  const [filterWorkType,   setFilterWorkType]   = useState('');
   const [filterStatus,     setFilterStatus]     = useState('open'); // default to Open on page load
   // 'active' tab: open/in-progress/blocked; 'closed' tab: done + archived
   const [boardTab, setBoardTab] = useState('active');
@@ -1966,7 +1909,7 @@ export default function Triage() {
     () => tasks.filter(t => {
       if (t.status === 'done' || t.status === 'archived') return false;
       if (filterCustomerId && t.customerId !== filterCustomerId) return false;
-      if (filterTaskType && t.taskType !== filterTaskType) return false;
+      if (filterWorkType && t.workType !== filterWorkType) return false;
       if (filterStatus   && t.status   !== filterStatus)   return false;
       if (filterPriorityClients) {
         const cust = customerMap.get(t.customerId);
@@ -1974,7 +1917,7 @@ export default function Triage() {
       }
       return true;
     }),
-    [tasks, customerMap, filterCustomerId, filterTaskType, filterStatus, filterPriorityClients]
+    [tasks, customerMap, filterCustomerId, filterWorkType, filterStatus, filterPriorityClients]
   );
 
   // Closed tasks: done + archived, filtered by selected week, sorted by closedAt DESC
@@ -1982,7 +1925,7 @@ export default function Triage() {
     () => tasks.filter(t => {
       if (t.status !== 'done' && t.status !== 'archived') return false;
       if (filterCustomerId && t.customerId !== filterCustomerId) return false;
-      if (filterTaskType && t.taskType !== filterTaskType) return false;
+      if (filterWorkType && t.workType !== filterWorkType) return false;
       if (filterPriorityClients) {
         const cust = customerMap.get(t.customerId);
         if (!cust?.pinned) return false;
@@ -1992,28 +1935,28 @@ export default function Triage() {
       if (closedDate && !isInRange(parseISO(closedDate), closedWeekStart, closedWeekEnd)) return false;
       return true;
     }).sort((a, b) => new Date(b.closedAt || b.createdAt) - new Date(a.closedAt || a.createdAt)),
-    [tasks, customerMap, filterCustomerId, filterTaskType, filterPriorityClients, closedWeekStart, closedWeekEnd]
+    [tasks, customerMap, filterCustomerId, filterWorkType, filterPriorityClients, closedWeekStart, closedWeekEnd]
   );
 
-  // Dedicated in-progress list — respects customer/taskType/priority filters but NOT filterStatus
+  // Dedicated in-progress list — respects customer/workType/priority filters but NOT filterStatus
   const inProgressTasks = useMemo(
     () => tasks.filter(t => {
       if (t.status !== 'in-progress') return false;
       if (filterCustomerId && t.customerId !== filterCustomerId) return false;
-      if (filterTaskType && t.taskType !== filterTaskType) return false;
+      if (filterWorkType && t.workType !== filterWorkType) return false;
       if (filterPriorityClients) {
         const cust = customerMap.get(t.customerId);
         if (!cust?.pinned) return false;
       }
       return true;
     }),
-    [tasks, customerMap, filterCustomerId, filterTaskType, filterPriorityClients]
+    [tasks, customerMap, filterCustomerId, filterWorkType, filterPriorityClients]
   );
 
-  // Evergreen tasks: all tasks with taskType 'evergreen', regardless of status
+  // Evergreen tasks: all tasks with isEvergreen flag, regardless of status
   const evergreenTasks = useMemo(
     () => tasks.filter(t => {
-      if (t.taskType !== 'evergreen') return false;
+      if (!t.isEvergreen) return false;
       if (filterCustomerId && t.customerId !== filterCustomerId) return false;
       if (filterPriorityClients) {
         const cust = customerMap.get(t.customerId);
@@ -2028,7 +1971,7 @@ export default function Triage() {
     [tasks, customerMap, filterCustomerId, filterPriorityClients]
   );
 
-  const filtersActive = filterCustomerId || filterTaskType || filterStatus || filterPriorityClients;
+  const filtersActive = filterCustomerId || filterWorkType || filterStatus || filterPriorityClients;
 
   // Bulk action helpers
   const toggleSelect = useCallback((id) => setSelectedTaskIds(prev => {
@@ -2040,7 +1983,7 @@ export default function Triage() {
   const clearSelection = useCallback(() => setSelectedTaskIds(new Set()), []);
   const clearAllFilters = useCallback(() => {
     setFilterCustomerId('');
-    setFilterTaskType('');
+    setFilterWorkType('');
     setFilterStatus('');
     setFilterPriorityClients(false);
     clearSelection();
@@ -2051,7 +1994,7 @@ export default function Triage() {
     setClosedWeekOffset(0);
     setFilterStatus('');
     setFilterCustomerId('');
-    setFilterTaskType('');
+    setFilterWorkType('');
     setFilterPriorityClients(false);
     clearSelection();
   }, [clearSelection]);
@@ -2109,7 +2052,7 @@ export default function Triage() {
       autoSaveSession(stopTimer({ silent: true }));
     }
     // Always attempt start — startTimer's internal localStorage guard prevents double-start
-    startTimer(TASK_TYPE_TO_WORK_TYPE[task.taskType] || 'deep_work', { clientIds: task.customerId ? [task.customerId] : [], taskId: task.id, taskDescription: task.description });
+    startTimer(task.workType || 'deep_work', { clientIds: task.customerId ? [task.customerId] : [], taskId: task.id, taskDescription: task.description });
     setTaskDetailId(task.id);
   }, [isRunning, runningTaskId, autoSaveSession, stopTimer, startTimer]);
 
@@ -2302,8 +2245,7 @@ export default function Triage() {
               const newTask = addTask({
                 customerId: customerId || null,
                 description,
-                taskType: 'focus-time',
-                assigneeOrTeam: null,
+                workType: 'deep_work',
                 status: 'open',
               });
               startTimer('deep_work', { clientIds: customerId ? [customerId] : [], taskId: newTask.id, taskDescription: newTask.description });
@@ -2327,8 +2269,8 @@ export default function Triage() {
                   customerId: formData.customerId,
                   okrId: formData.okrId || null,
                   description: formData.description,
-                  taskType: formData.taskType,
-                  assigneeOrTeam: formData.assigneeOrTeam || null,
+                  workType: formData.workType,
+                  isEvergreen: formData.isEvergreen || undefined,
                   status: formData.status,
                 });
                 setShowQuickAdd(false);
@@ -2368,16 +2310,16 @@ export default function Triage() {
             </button>
           </div>
 
-          {/* Row 3: Task type + status (no ✕ button — see "Clear all" link below) */}
+          {/* Row 3: Work type + status (no ✕ button — see "Clear all" link below) */}
           <div className="flex gap-2">
             <select
-              value={filterTaskType}
-              onChange={e => { setFilterTaskType(e.target.value); clearSelection(); }}
+              value={filterWorkType}
+              onChange={e => { setFilterWorkType(e.target.value); clearSelection(); }}
               className="flex-1 bg-secondary border border-border rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
             >
               <option value="">All types</option>
-              {TASK_TYPES.map(t => (
-                <option key={t} value={t}>{TASK_TYPE_LABELS[t]}</option>
+              {WORK_TYPES.map(wt => (
+                <option key={wt} value={wt}>{WORK_TYPE_LABELS[wt]}</option>
               ))}
             </select>
             {/* Status filter only shown on Active tab; Closed tab always shows done+archived */}
@@ -2411,7 +2353,7 @@ export default function Triage() {
         {/* Active / Closed tab switcher */}
         <div className="flex gap-1 bg-secondary/50 rounded-xl p-1 mb-3 w-fit">
           <button
-            onClick={() => { setBoardTab('active'); setFilterStatus('open'); setFilterCustomerId(''); setFilterTaskType(''); setFilterPriorityClients(false); clearSelection(); }}
+            onClick={() => { setBoardTab('active'); setFilterStatus('open'); setFilterCustomerId(''); setFilterWorkType(''); setFilterPriorityClients(false); clearSelection(); }}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
               boardTab === 'active' ? 'bg-muted text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
             }`}
@@ -2419,7 +2361,7 @@ export default function Triage() {
             Active ({activeTasks.length})
           </button>
           <button
-            onClick={() => { setBoardTab('in-progress'); setFilterStatus(''); setFilterCustomerId(''); setFilterTaskType(''); setFilterPriorityClients(false); clearSelection(); }}
+            onClick={() => { setBoardTab('in-progress'); setFilterStatus(''); setFilterCustomerId(''); setFilterWorkType(''); setFilterPriorityClients(false); clearSelection(); }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
               boardTab === 'in-progress' ? 'bg-muted text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
             }`}
@@ -2449,7 +2391,7 @@ export default function Triage() {
             )}
           </button>
           <button
-            onClick={() => { setBoardTab('evergreen'); setFilterStatus(''); setFilterCustomerId(''); setFilterTaskType(''); setFilterPriorityClients(false); clearSelection(); }}
+            onClick={() => { setBoardTab('evergreen'); setFilterStatus(''); setFilterCustomerId(''); setFilterWorkType(''); setFilterPriorityClients(false); clearSelection(); }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
               boardTab === 'evergreen' ? 'bg-green-500/15 text-green-400 shadow-sm' : 'text-muted-foreground hover:text-foreground'
             }`}

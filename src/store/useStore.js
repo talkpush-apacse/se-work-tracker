@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { TASK_TYPE_POINTS } from '../constants';
+import { WORK_TYPE_POINTS, TASK_TYPE_TO_WORK_TYPE } from '../constants';
 import { fetchAllData, saveEntity, seedAllData } from '../lib/api';
 
 const KEYS = {
@@ -241,7 +241,8 @@ function resetEvergreenTasks() {
   const tasks = load('gpt-tasks', []);
   let changed = false;
   const updated = tasks.map(t => {
-    if (t.taskType === 'evergreen' && t.status === 'done') {
+    // Support both legacy taskType==='evergreen' and new isEvergreen flag
+    if ((t.isEvergreen === true || t.taskType === 'evergreen') && t.status === 'done') {
       changed = true;
       return { ...t, status: 'open', points: 0, closedAt: null };
     }
@@ -309,7 +310,15 @@ export function useStore() {
   const [customers, setCustomers] = useState(() => load(KEYS.customers));
   const [points, setPoints] = useState(() => load(KEYS.points));
   const [meetingEntries, setMeetingEntries] = useState(() => load(KEYS.meetingEntries));
-  const [tasks, setTasks] = useState(() => load(KEYS.tasks));
+  const [tasks, setTasks] = useState(() => {
+    const loaded = load(KEYS.tasks);
+    // Migrate taskType → workType + isEvergreen for existing tasks
+    return loaded.map(t => {
+      if (t.workType) return t;
+      const workType = TASK_TYPE_TO_WORK_TYPE[t.taskType] || 'comms';
+      return { ...t, workType, ...(t.taskType === 'evergreen' ? { isEvergreen: true } : {}) };
+    });
+  });
   const [milestones, setMilestones] = useState(() => load(KEYS.milestones));
   const [aiOutputs, setAiOutputs] = useState(() => load(KEYS.aiOutputs));
   const [annotations, setAnnotations] = useState(() => load(KEYS.annotations));
@@ -439,7 +448,12 @@ export function useStore() {
         if (remote.customers) setCustomers(remote.customers);
         setPoints(rPoints);
         setMeetingEntries(rMeetingEntries);
-        setTasks(rTasks);
+        // Migrate taskType → workType + isEvergreen for remote tasks
+        setTasks(rTasks.map(t => {
+          if (t.workType) return t;
+          const workType = TASK_TYPE_TO_WORK_TYPE[t.taskType] || 'comms';
+          return { ...t, workType, ...(t.taskType === 'evergreen' ? { isEvergreen: true } : {}) };
+        }));
         setMilestones(rMilestones);
         if (remote.annotations) setAnnotations(remote.annotations);
         if (remote.weeklyReports) setWeeklyReports(remote.weeklyReports);
@@ -543,9 +557,9 @@ export function useStore() {
 
   // ─── Task actions ───
   const addTask = useCallback((data) => {
-    // data: { customerId, okrId (optional), meetingEntryId (optional), description, taskType, assigneeOrTeam, status }
+    // data: { customerId, okrId (optional), meetingEntryId (optional), description, workType, status, isEvergreen? }
     const task = { id: uid(), createdAt: new Date().toISOString(), status: 'open', points: 0, closedAt: null, ...data };
-    if (task.status === 'done') task.points = TASK_TYPE_POINTS[task.taskType] || 0;
+    if (task.status === 'done') task.points = WORK_TYPE_POINTS[task.workType] || 0;
     if (task.status === 'done' || task.status === 'archived') task.closedAt = new Date().toISOString();
     setTasks(prev => [...prev, task]);
     return task;
@@ -561,7 +575,7 @@ export function useStore() {
           const nowClosed = ['done', 'archived'].includes(data.status);
           if (nowClosed && wasOpen) updated.closedAt = new Date().toISOString();
           else if (!nowClosed) updated.closedAt = null;
-          if (data.status === 'done') updated.points = TASK_TYPE_POINTS[updated.taskType] || 0;
+          if (data.status === 'done') updated.points = WORK_TYPE_POINTS[updated.workType] || 0;
           else if (t.status === 'done') updated.points = 0;
         }
         return updated;

@@ -148,13 +148,18 @@ export const DEFAULT_WORK_TYPE_TARGETS = {
   admin:     4,
 };
 
-// Map task types → work types for timer auto-fill
+// Map task types → work types for timer auto-fill & migration
 export const TASK_TYPE_TO_WORK_TYPE = {
   'focus-time': 'deep_work',
   comms:        'comms',
   evergreen:    'deep_work',
   recurring:    'deep_work',
+  mine:         'comms',
+  coordinate:   'comms',
 };
+
+// Points awarded per work type when a task is marked 'done'
+export const WORK_TYPE_POINTS = { deep_work: 2, meetings: 1, comms: 1, admin: 1 };
 
 // ─── Pulse: Stress Logging ──────────────────────────────────────────────────
 export const STRESSOR_TYPES = ['workload', 'client_issue', 'unclear_priorities', 'meetings', 'personal', 'other'];

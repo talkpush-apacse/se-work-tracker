@@ -6,14 +6,12 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '../context/StoreContext';
 import {
-  TASK_TYPE_LABELS, TASK_TYPE_COLORS,
-  TASK_TYPE_ENTRIES,
+  WORK_TYPES, WORK_TYPE_LABELS, WORK_TYPE_COLORS,
   TASK_STATUS_LABELS, TASK_STATUS_COLORS,
   TASK_STATUS_ENTRIES,
   MILESTONE_STATUSES, MILESTONE_STATUS_LABELS, MILESTONE_STATUS_COLORS,
   ANNOTATION_TAGS, ANNOTATION_TAG_LABELS, ANNOTATION_TAG_COLORS,
   ACTIVITY_TYPES, AUTO_TRACK_RATE,
-  TASK_INTERACTION_TYPES, TASK_INTERACTION_TYPE_LABELS,
 } from '../constants';
 import { formatDate } from '../utils/dateHelpers';
 import Modal from './Modal';
@@ -119,7 +117,7 @@ function TasksTab({ tasks, addTask, customerId, okrs }) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [expandedTaskId, setExpandedTaskId] = useState(null);
   const [taskForm, setTaskForm] = useState({
-    description: '', taskType: 'comms', status: 'open', assigneeOrTeam: '', okrId: '',
+    description: '', workType: 'comms', status: 'open', okrId: '',
   });
 
   const activeTasks = useMemo(
@@ -144,12 +142,11 @@ function TasksTab({ tasks, addTask, customerId, okrs }) {
     addTask({
       customerId,
       description:    taskForm.description.trim(),
-      taskType:       taskForm.taskType,
+      workType:       taskForm.workType,
       status:         taskForm.status,
-      assigneeOrTeam: taskForm.assigneeOrTeam.trim() || undefined,
       okrId:          taskForm.okrId || undefined,
     });
-    setTaskForm({ description: '', taskType: 'comms', status: 'open', assigneeOrTeam: '', okrId: '' });
+    setTaskForm({ description: '', workType: 'comms', status: 'open', okrId: '' });
     setShowAddForm(false);
   };
 
@@ -174,12 +171,12 @@ function TasksTab({ tasks, addTask, customerId, okrs }) {
             />
             <div className="grid grid-cols-2 gap-2">
               <select
-                value={taskForm.taskType}
-                onChange={e => setTaskForm(p => ({ ...p, taskType: e.target.value }))}
+                value={taskForm.workType}
+                onChange={e => setTaskForm(p => ({ ...p, workType: e.target.value }))}
                 className="rounded-lg border border-border bg-input px-2 py-1.5 text-xs text-foreground focus:outline-none focus:border-ring"
               >
-                {TASK_TYPE_ENTRIES.map(([v, l]) => (
-                  <option key={v} value={v}>{l}</option>
+                {WORK_TYPES.map(wt => (
+                  <option key={wt} value={wt}>{WORK_TYPE_LABELS[wt]}</option>
                 ))}
               </select>
               <select
@@ -192,13 +189,6 @@ function TasksTab({ tasks, addTask, customerId, okrs }) {
                 ))}
               </select>
             </div>
-            <input
-              type="text"
-              value={taskForm.assigneeOrTeam}
-              onChange={e => setTaskForm(p => ({ ...p, assigneeOrTeam: e.target.value }))}
-              placeholder="Assignee / Team (optional)"
-              className="w-full rounded-lg border border-border bg-input px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-ring"
-            />
             <select
               value={taskForm.okrId}
               onChange={e => setTaskForm(p => ({ ...p, okrId: e.target.value }))}
@@ -217,7 +207,7 @@ function TasksTab({ tasks, addTask, customerId, okrs }) {
                 variant="outline"
                 onClick={() => {
                   setShowAddForm(false);
-                  setTaskForm({ description: '', taskType: 'comms', status: 'open', assigneeOrTeam: '', okrId: '' });
+                  setTaskForm({ description: '', workType: 'comms', status: 'open', okrId: '' });
                 }}
               >
                 Cancel
@@ -261,7 +251,7 @@ function TasksTab({ tasks, addTask, customerId, okrs }) {
       ) : (
         <div className="space-y-2">
           {display.map(task => {
-            const typeColor   = TASK_TYPE_COLORS[task.taskType]  || {};
+            const typeColor   = WORK_TYPE_COLORS[task.workType]  || {};
             const statusColor = TASK_STATUS_COLORS[task.status]  || {};
             const isExpanded  = expandedTaskId === task.id;
             const linkedOkr   = task.okrId ? (okrs || []).find(o => o.id === task.okrId) : null;
@@ -272,9 +262,9 @@ function TasksTab({ tasks, addTask, customerId, okrs }) {
               >
                 {/* Main row */}
                 <div className="px-4 py-3 flex items-start gap-3">
-                  {/* Task type badge */}
+                  {/* Work type badge */}
                   <span className={`flex-shrink-0 mt-0.5 border rounded-full px-2 py-0.5 text-[10px] font-bold leading-tight ${typeColor.bg || 'bg-gray-500/15'} ${typeColor.text || 'text-gray-400'} ${typeColor.border || 'border-gray-500/20'}`}>
-                    {TASK_TYPE_LABELS[task.taskType] || task.taskType}
+                    {WORK_TYPE_LABELS[task.workType] || task.workType || 'Comms'}
                   </span>
 
                   {/* Description + date */}
@@ -313,12 +303,6 @@ function TasksTab({ tasks, addTask, customerId, okrs }) {
                 {/* Expandable detail panel */}
                 {isExpanded && (
                   <div className="border-t border-border/50 bg-secondary/20 px-4 py-3 space-y-1.5 text-xs text-muted-foreground">
-                    {task.assigneeOrTeam && (
-                      <p><span className="font-medium text-foreground/70">Assignee:</span> {task.assigneeOrTeam}</p>
-                    )}
-                    {task.interactionType && (
-                      <p><span className="font-medium text-foreground/70">Interaction:</span> {TASK_INTERACTION_TYPE_LABELS[task.interactionType] || task.interactionType}</p>
-                    )}
                     {linkedOkr && (
                       <p><span className="font-medium text-foreground/70">OKR:</span> {linkedOkr.quarter} — {linkedOkr.title}</p>
                     )}
@@ -543,7 +527,7 @@ function TimelineTab({ tasks, milestones, annotations, customer, onAdd, onEdit, 
                       );
                     } else {
                       const t       = ev.data;
-                      const colors  = TASK_TYPE_COLORS[t.taskType] || {};
+                      const colors  = WORK_TYPE_COLORS[t.workType] || {};
                       return (
                         <span
                           key={`t-${t.id}-${idx}`}
@@ -794,7 +778,6 @@ function TimelineTab({ tasks, milestones, annotations, customer, onAdd, onEdit, 
 function LogHoursModal({ okrs, onSubmit, onCancel }) {
   const [hours,           setHours]           = useState('');
   const [activityType,    setActivityType]    = useState('');
-  const [interactionType, setInteractionType] = useState('');
   const [okrId,           setOkrId]           = useState('');
   const [comment, setComment]           = useState('');
   const [error, setError]               = useState('');
@@ -813,7 +796,6 @@ function LogHoursModal({ okrs, onSubmit, onCancel }) {
       points:          previewPoints,
       hours:           Math.round(Number(hours) * 100) / 100,
       activityType:    activityType || '',
-      interactionType: interactionType || '',
       okrId:           okrId || null,
       comment:         comment.trim(),
     });
@@ -862,21 +844,6 @@ function LogHoursModal({ okrs, onSubmit, onCancel }) {
           >
             <option value="">Select phase…</option>
             {ACTIVITY_TYPES.map(a => <option key={a} value={a}>{a}</option>)}
-          </select>
-        </div>
-
-        {/* Interaction Type */}
-        <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-            Interaction Type <span className="text-muted-foreground/50">(optional)</span>
-          </label>
-          <select
-            value={interactionType}
-            onChange={e => setInteractionType(e.target.value)}
-            className="w-full h-10 bg-card border border-border rounded-md px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
-          >
-            <option value="">Select type…</option>
-            {TASK_INTERACTION_TYPES.map(t => <option key={t} value={t}>{TASK_INTERACTION_TYPE_LABELS[t]}</option>)}
           </select>
         </div>
 

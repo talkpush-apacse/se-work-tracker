@@ -248,7 +248,7 @@ export default function AIAssistModal({ onClose }) {
     addTask({
       customerId: selectedCustomerId,
       description: desc,
-      taskType: 'focus-time',
+      workType: 'deep_work',
       status: 'open',
     });
 

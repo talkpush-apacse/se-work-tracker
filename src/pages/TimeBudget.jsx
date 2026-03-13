@@ -16,7 +16,6 @@ import { fetchCalendarEvents } from '../lib/googleApi';
 import { formatRelative } from '../utils/dateHelpers';
 import {
   WORK_TYPES, WORK_TYPE_LABELS, WORK_TYPE_COLORS, DEFAULT_WORK_TYPE_TARGETS,
-  TASK_TYPES, TASK_TYPE_LABELS, TASK_TYPE_COLORS, TASK_INTERACTION_TYPES, TASK_RECIPIENTS,
 } from '../constants';
 
 const WORK_TYPE_ICONS = {
@@ -88,7 +87,7 @@ export default function TimeBudget() {
   // New task form — aligned with Triage QuickAddTaskForm fields
   const [newTask, setNewTask] = useState({
     description: '', hours: 1, customerId: '',
-    taskType: 'comms', interactionType: '', assigneeOrTeam: '', okrId: '',
+    workType: 'comms', okrId: '', isEvergreen: false,
   });
 
   // Re-load from store when week changes
@@ -213,9 +212,8 @@ export default function TimeBudget() {
     const triageTask = addTask({
       description: newTask.description.trim(),
       customerId: newTask.customerId || undefined,
-      taskType: newTask.taskType,
-      interactionType: newTask.interactionType || undefined,
-      assigneeOrTeam: newTask.assigneeOrTeam || undefined,
+      workType: newTask.workType,
+      isEvergreen: newTask.isEvergreen || undefined,
       okrId: newTask.okrId || undefined,
       status: 'open',
     });
@@ -226,16 +224,14 @@ export default function TimeBudget() {
       description: newTask.description.trim(),
       hours: newTask.hours,
       customerId: newTask.customerId || undefined,
-      taskType: newTask.taskType,
-      interactionType: newTask.interactionType || undefined,
-      assigneeOrTeam: newTask.assigneeOrTeam || undefined,
+      workType: newTask.workType,
       okrId: newTask.okrId || undefined,
       taskId: triageTask.id,
     }]);
 
     setNewTask({
       description: '', hours: 1, customerId: '',
-      taskType: 'comms', interactionType: '', assigneeOrTeam: '', okrId: '',
+      workType: 'comms', okrId: '', isEvergreen: false,
     });
   }, [newTask, addTask]);
 
@@ -864,16 +860,16 @@ export default function TimeBudget() {
               />
             </div>
 
-            {/* Row 2: Task Type · Customer · Hours · Interaction · Recipient · OKR · Add */}
+            {/* Row 2: Work Type · Customer · Hours · OKR · Add */}
             <div className="flex gap-1.5 flex-wrap">
-              {/* Task Type */}
+              {/* Work Type */}
               <select
-                value={newTask.taskType}
-                onChange={e => setNewTask(prev => ({ ...prev, taskType: e.target.value }))}
+                value={newTask.workType}
+                onChange={e => setNewTask(prev => ({ ...prev, workType: e.target.value }))}
                 className="h-8 bg-secondary border border-border rounded-lg px-1.5 text-xs text-foreground focus:outline-none focus:border-ring w-28"
               >
-                {TASK_TYPES.map(tt => (
-                  <option key={tt} value={tt}>{TASK_TYPE_LABELS[tt]}</option>
+                {WORK_TYPES.map(wt => (
+                  <option key={wt} value={wt}>{WORK_TYPE_LABELS[wt]}</option>
                 ))}
               </select>
 
@@ -895,30 +891,6 @@ export default function TimeBudget() {
               >
                 {HOUR_OPTIONS.map(h => (
                   <option key={h} value={h}>{h}h</option>
-                ))}
-              </select>
-
-              {/* Interaction Type */}
-              <select
-                value={newTask.interactionType}
-                onChange={e => setNewTask(prev => ({ ...prev, interactionType: e.target.value }))}
-                className="h-8 bg-secondary border border-border rounded-lg px-1.5 text-xs text-foreground focus:outline-none focus:border-ring w-28"
-              >
-                <option value="">Interaction...</option>
-                {TASK_INTERACTION_TYPES.map(it => (
-                  <option key={it} value={it}>{it}</option>
-                ))}
-              </select>
-
-              {/* Recipient */}
-              <select
-                value={newTask.assigneeOrTeam}
-                onChange={e => setNewTask(prev => ({ ...prev, assigneeOrTeam: e.target.value }))}
-                className="h-8 bg-secondary border border-border rounded-lg px-1.5 text-xs text-foreground focus:outline-none focus:border-ring max-w-[9rem]"
-              >
-                <option value="">Recipient...</option>
-                {TASK_RECIPIENTS.map(r => (
-                  <option key={r.value} value={r.value}>{r.label}</option>
                 ))}
               </select>
 
@@ -956,7 +928,7 @@ export default function TimeBudget() {
 
               {budgetTasks.map(t => {
                 const customer = t.customerId ? customers.find(c => c.id === t.customerId) : null;
-                const typeColor = t.taskType ? TASK_TYPE_COLORS[t.taskType] : null;
+                const typeColor = t.workType ? WORK_TYPE_COLORS[t.workType] : null;
                 return (
                   <div
                     key={t.id}
@@ -964,22 +936,18 @@ export default function TimeBudget() {
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        {/* Task type badge */}
-                        {t.taskType && typeColor && (
+                        {/* Work type badge */}
+                        {t.workType && typeColor && (
                           <span className={`inline-flex items-center rounded-full text-[9px] font-semibold px-1.5 py-0.5 border ${typeColor.bg} ${typeColor.text} ${typeColor.border}`}>
-                            {TASK_TYPE_LABELS[t.taskType] || t.taskType}
+                            {WORK_TYPE_LABELS[t.workType] || t.workType}
                           </span>
                         )}
                         <p className="text-xs font-medium text-foreground leading-snug">{t.description}</p>
                       </div>
-                      {/* Sub-line: customer + interaction type + recipient */}
-                      {(customer || t.interactionType || t.assigneeOrTeam) && (
+                      {/* Sub-line: customer */}
+                      {customer && (
                         <div className="flex items-center gap-1 mt-0.5 text-[10px] text-muted-foreground">
-                          {customer && <span>{customer.name}</span>}
-                          {t.interactionType && <span>{customer ? '·' : ''} {t.interactionType}</span>}
-                          {t.assigneeOrTeam && (
-                            <span>· {TASK_RECIPIENTS.find(r => r.value === t.assigneeOrTeam)?.label || t.assigneeOrTeam}</span>
-                          )}
+                          <span>{customer.name}</span>
                         </div>
                       )}
                     </div>

@@ -3,16 +3,14 @@ import { Check } from 'lucide-react';
 import Modal from './Modal';
 import { useAppStore } from '../context/StoreContext';
 import {
-  TASK_TYPES, TASK_TYPE_LABELS,
+  WORK_TYPES, WORK_TYPE_LABELS,
   TASK_STATUSES, TASK_STATUS_LABELS,
-  TASK_RECIPIENTS,
 } from '../constants';
 import { Button } from './ui/button';
 
 const BLANK_FORM = {
   description: '',
-  taskType: 'mine',
-  assigneeOrTeam: '',
+  workType: 'comms',
   status: 'open',
   okrId: '',
 };
@@ -47,8 +45,7 @@ export default function AddTaskModal({ customer, onClose }) {
       okrId: form.okrId || null,
       meetingEntryId: null,
       description: form.description.trim(),
-      taskType: form.taskType,
-      assigneeOrTeam: form.assigneeOrTeam || null,
+      workType: form.workType,
       status: form.status,
     });
     return true;
@@ -104,14 +101,14 @@ export default function AddTaskModal({ customer, onClose }) {
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1.5">Task Type</label>
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5">Work Type</label>
             <select
-              value={form.taskType}
-              onChange={e => setForm(p => ({ ...p, taskType: e.target.value }))}
+              value={form.workType}
+              onChange={e => setForm(p => ({ ...p, workType: e.target.value }))}
               className="w-full h-10 bg-card border border-border rounded-md px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
             >
-              {TASK_TYPES.map(t => (
-                <option key={t} value={t}>{TASK_TYPE_LABELS[t]}</option>
+              {WORK_TYPES.map(wt => (
+                <option key={wt} value={wt}>{WORK_TYPE_LABELS[wt]}</option>
               ))}
             </select>
           </div>
@@ -127,22 +124,6 @@ export default function AddTaskModal({ customer, onClose }) {
               ))}
             </select>
           </div>
-        </div>
-
-        <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-            Recipient <span className="text-muted-foreground/50">(optional)</span>
-          </label>
-          <select
-            value={form.assigneeOrTeam}
-            onChange={e => setForm(p => ({ ...p, assigneeOrTeam: e.target.value }))}
-            className="w-full h-10 bg-card border border-border rounded-md px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
-          >
-            <option value="">— Select recipient —</option>
-            {TASK_RECIPIENTS.map(r => (
-              <option key={r.value} value={r.value}>{r.label}</option>
-            ))}
-          </select>
         </div>
 
         {/* Optional OKR selector */}

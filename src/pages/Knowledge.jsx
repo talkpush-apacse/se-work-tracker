@@ -71,7 +71,7 @@ function buildSearchIndex(tasks, weeklyUpdateLogs, meetingEntries, aiOutputs, mi
       customerId: t.customerId || null,
       customerName: customer?.name || null,
       customerColor: customer?.color || null,
-      meta: { status: t.status, taskType: t.taskType },
+      meta: { status: t.status, workType: t.workType },
     });
   });
 

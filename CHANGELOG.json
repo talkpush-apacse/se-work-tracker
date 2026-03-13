@@ -1,6 +1,19 @@
 {
   "versions": [
     {
+      "version": "2.1.0",
+      "codename": "Stone Path",
+      "date": "2026-03-13",
+      "summary": "Unify task categorization — replace taskType with workType across all forms",
+      "changes": [
+        { "type": "feat", "description": "Replace Task Type with Work Type dropdown in all task forms (Triage, TimeBudget, CustomerDetail, AddTask)" },
+        { "type": "feat", "description": "Evergreen is now a separate isEvergreen boolean flag — evergreen tasks can be any work type" },
+        { "type": "feat", "description": "Auto-migrate existing tasks from taskType to workType on store init (localStorage + Neon)" },
+        { "type": "chore", "description": "Remove interactionType and assigneeOrTeam fields from all task forms" },
+        { "type": "chore", "description": "Simplify TimeBudget task form — 3 fewer dropdowns" }
+      ]
+    },
+    {
       "version": "2.0.0",
       "codename": "Rising Spark",
       "date": "2026-03-12",
