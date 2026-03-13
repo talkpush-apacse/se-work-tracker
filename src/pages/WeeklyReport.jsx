@@ -13,7 +13,7 @@ import {
 } from '../constants';
 import { Button } from '../components/ui/button';
 import ConfirmDialog from '../components/ConfirmDialog';
-import { fetchCalendarEvents, fetchFilteredWeeklyEmails } from '../lib/googleApi';
+import { fetchCalendarEvents, fetchWeeklyEmailsWithBodies } from '../lib/googleApi';
 import WeeklyUpdateLog from '../components/WeeklyUpdateLog';
 
 // ─── Module-level constants ──────────────────────────────────────────────────
@@ -265,21 +265,22 @@ function buildWeekContext({ weekStart, weekEnd, points, tasks, customers, okrs, 
     lines.push('');
   }
 
-  // ── Email activity (sent + received) ──
-  if (gmailEmails && gmailEmails.length > 0) {
+  // ── Email activity (only included emails) ──
+  const includedEmails = (gmailEmails || []).filter(e => !e._excluded);
+  if (includedEmails.length > 0) {
     lines.push('### Email Activity This Week');
-    const sentEmails     = gmailEmails.filter(e => e.direction === 'sent');
-    const receivedEmails = gmailEmails.filter(e => e.direction === 'received');
+    const sentEmails     = includedEmails.filter(e => e.direction === 'sent');
+    const receivedEmails = includedEmails.filter(e => e.direction === 'received');
     if (sentEmails.length > 0) {
       lines.push('**Sent:**');
       sentEmails.forEach(e => {
-        lines.push(`  - ${e.subject || '(no subject)'}`);
+        lines.push(`  - ${e.subject || '(no subject)'}${e.body ? ` — ${e.body.slice(0, 120)}` : ''}`);
       });
     }
     if (receivedEmails.length > 0) {
       lines.push('**Received:**');
       receivedEmails.forEach(e => {
-        lines.push(`  - ${e.subject || '(no subject)'}`);
+        lines.push(`  - ${e.subject || '(no subject)'}${e.body ? ` — ${e.body.slice(0, 120)}` : ''}`);
       });
     }
     lines.push('');
@@ -333,6 +334,8 @@ export default function WeeklyReport({ onNavigate }) {
   const [emailSummary,       setEmailSummary]       = useState('');
   const [isEmailSummarizing, setIsEmailSummarizing] = useState(false);
   const [emailSummaryError,  setEmailSummaryError]  = useState(null);
+  const [emailSelections,    setEmailSelections]    = useState({});  // { emailId: boolean } — true = included
+  const [expandedEmailId,    setExpandedEmailId]    = useState(null);
 
   const emailOutputRef = useRef(null);
 
@@ -411,6 +414,7 @@ export default function WeeklyReport({ onNavigate }) {
     setGmailEmails(null);
     setEmailSummary('');
     setEmailSummaryError(null);
+    setExpandedEmailId(null);
 
     const fetches = [];
 
@@ -423,8 +427,25 @@ export default function WeeklyReport({ onNavigate }) {
     }
     if (gmailToken) {
       fetches.push(
-        fetchFilteredWeeklyEmails(gmailToken, weekStart, weekEnd)
-          .then(setGmailEmails)
+        fetchWeeklyEmailsWithBodies(gmailToken, weekStart, weekEnd)
+          .then(emails => {
+            setGmailEmails(emails);
+            // Apply saved selections from localStorage, or default: noise = excluded
+            const weekKey = format(weekStart, 'yyyy-MM-dd');
+            const saved = (() => {
+              try { return JSON.parse(localStorage.getItem(`gpt-email-selections-${weekKey}`) || '{}'); }
+              catch { return {}; }
+            })();
+            const selections = {};
+            emails.forEach(e => {
+              if (saved[e.id] !== undefined) {
+                selections[e.id] = saved[e.id];
+              } else {
+                selections[e.id] = !e.isNoise; // noise emails excluded by default
+              }
+            });
+            setEmailSelections(selections);
+          })
           .catch(() => setGmailEmails([]))
       );
     }
@@ -435,63 +456,77 @@ export default function WeeklyReport({ onNavigate }) {
     }
   }, [weekStart, weekEnd, googleToken, gmailToken]);
 
-  // ── Auto-summarize filtered emails via Claude API ──
+  // Persist email selections to localStorage when they change
   useEffect(() => {
     if (!gmailEmails || gmailEmails.length === 0) return;
+    const weekKey = format(weekStart, 'yyyy-MM-dd');
+    localStorage.setItem(`gpt-email-selections-${weekKey}`, JSON.stringify(emailSelections));
+  }, [emailSelections, weekStart, gmailEmails]);
 
+  // Compute included email count
+  const includedEmailCount = useMemo(
+    () => gmailEmails ? gmailEmails.filter(e => emailSelections[e.id]).length : 0,
+    [gmailEmails, emailSelections]
+  );
+
+  // Annotate emails with _excluded for buildWeekContext
+  const annotatedEmails = useMemo(
+    () => gmailEmails ? gmailEmails.map(e => ({ ...e, _excluded: !emailSelections[e.id] })) : null,
+    [gmailEmails, emailSelections]
+  );
+
+  // "Summarize Selected" handler — manual trigger, not auto
+  const handleSummarizeEmails = useCallback(async () => {
     const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
-    if (!apiKey) return;
+    if (!apiKey || !gmailEmails) return;
 
-    let cancelled = false;
+    const included = gmailEmails.filter(e => emailSelections[e.id]);
+    if (included.length === 0) return;
+
     setIsEmailSummarizing(true);
     setEmailSummaryError(null);
 
-    const emailData = gmailEmails.map(e => {
+    const emailData = included.map(e => {
       const dir = e.direction === 'sent' ? 'SENT' : 'RECEIVED';
       const person = e.direction === 'sent' ? (e.to || '') : (e.from || '');
-      return `[${dir}] ${e.subject || '(no subject)'} — ${person}`;
-    }).join('\n');
+      const bodySnippet = e.body ? `\n  Body: ${e.body.slice(0, 300)}` : '';
+      return `[${dir}] ${e.subject || '(no subject)'} — ${person}${bodySnippet}`;
+    }).join('\n\n');
 
-    fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type':            'application/json',
-        'x-api-key':               apiKey,
-        'anthropic-version':       '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({
-        model:      aiSettings.claudeModel || 'claude-sonnet-4-6',
-        max_tokens: 800,
-        system:     WEEKLY_EMAIL_SUMMARY_PROMPT,
-        messages:   [{ role: 'user', content: `Here are ${gmailEmails.length} emails from this week:\n\n${emailData}` }],
-      }),
-    })
-      .then(res => {
-        if (!res.ok) throw new Error(`Claude API ${res.status}`);
-        return res.json();
-      })
-      .then(data => {
-        if (!cancelled) setEmailSummary(data.content?.[0]?.text || '');
-      })
-      .catch(err => {
-        if (!cancelled) setEmailSummaryError(err.message);
-      })
-      .finally(() => {
-        if (!cancelled) setIsEmailSummarizing(false);
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type':            'application/json',
+          'x-api-key':               apiKey,
+          'anthropic-version':       '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model:      aiSettings.claudeModel || 'claude-sonnet-4-6',
+          max_tokens: 800,
+          system:     WEEKLY_EMAIL_SUMMARY_PROMPT,
+          messages:   [{ role: 'user', content: `Here are ${included.length} emails from this week:\n\n${emailData}` }],
+        }),
       });
-
-    return () => { cancelled = true; };
-  }, [gmailEmails, aiSettings.claudeModel]);
+      if (!res.ok) throw new Error(`Claude API ${res.status}`);
+      const data = await res.json();
+      setEmailSummary(data.content?.[0]?.text || '');
+    } catch (err) {
+      setEmailSummaryError(err.message);
+    } finally {
+      setIsEmailSummarizing(false);
+    }
+  }, [gmailEmails, emailSelections, aiSettings.claudeModel]);
 
   const handleGenerate = useCallback(async () => {
     setIsGenerating(true);
     setGenError(null);
 
-    // calendarEvents / gmailEmails now come from prefetched state
+    // calendarEvents / annotatedEmails now come from prefetched state
     const context = buildWeekContext({
       weekStart, weekEnd, points, tasks, customers, okrs,
-      weeklyUpdateLogs, milestones, calendarEvents, gmailEmails, emailSummary,
+      weeklyUpdateLogs, milestones, calendarEvents, gmailEmails: annotatedEmails, emailSummary,
       timeLogs, stressLogs,
     });
 
@@ -886,52 +921,151 @@ export default function WeeklyReport({ onNavigate }) {
         )}
       </div>
 
-      {/* ── Email Activity Summary (AI-generated from filtered emails) ── */}
+      {/* ── Email Activity — Interactive Viewer with Include/Exclude ── */}
       {gmailToken && gmailEmails !== null && gmailEmails.length > 0 && (
         <div className="rounded-2xl border border-border bg-card px-5 py-4 space-y-3">
           <div className="flex items-center gap-2">
             <Mail size={15} className="text-brand-lavender" />
             <h3 className="text-sm font-semibold text-foreground">Email Activity This Week</h3>
             <span className="text-xs text-muted-foreground ml-auto">
-              {gmailEmails.length} email{gmailEmails.length !== 1 ? 's' : ''} (filtered)
+              {includedEmailCount}/{gmailEmails.length} included
             </span>
           </div>
 
-          {isEmailSummarizing ? (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Loader2 size={13} className="animate-spin" />
-              Summarizing emails with AI…
-            </div>
-          ) : emailSummaryError ? (
-            <p className="text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2">
-              Could not summarize emails: {emailSummaryError}
-            </p>
-          ) : emailSummary ? (
+          {/* AI summary result (shown when available) */}
+          {emailSummary && (
             <div className="text-xs text-foreground/80 leading-relaxed whitespace-pre-line bg-secondary/30 rounded-xl px-4 py-3 max-h-64 overflow-y-auto">
               {emailSummary}
             </div>
-          ) : null}
+          )}
+          {emailSummaryError && (
+            <p className="text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2">
+              Could not summarize: {emailSummaryError}
+            </p>
+          )}
 
-          {/* Collapsed list of email subjects */}
-          <details className="text-xs">
-            <summary className="text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
-              View {gmailEmails.length} filtered email{gmailEmails.length !== 1 ? 's' : ''}
-            </summary>
-            <div className="mt-2 space-y-1 max-h-48 overflow-y-auto pl-1">
-              {gmailEmails.map((e, i) => (
-                <div key={i} className="flex items-start gap-2 text-foreground/70">
-                  <span className={`flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-                    e.direction === 'sent'
-                      ? 'bg-blue-500/15 text-blue-400'
-                      : 'bg-emerald-500/15 text-emerald-400'
-                  }`}>
-                    {e.direction === 'sent' ? 'Sent' : 'Recv'}
-                  </span>
-                  <span className="truncate">{e.subject || '(no subject)'}</span>
+          {/* Select All / Deselect All + Summarize button */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => {
+                const next = {};
+                gmailEmails.forEach(e => { next[e.id] = true; });
+                setEmailSelections(next);
+              }}
+              className="text-[10px] font-semibold text-brand-lavender hover:text-brand-lavender/80 transition-colors"
+            >
+              Select All
+            </button>
+            <span className="text-muted-foreground/30">|</span>
+            <button
+              type="button"
+              onClick={() => {
+                const next = {};
+                gmailEmails.forEach(e => { next[e.id] = false; });
+                setEmailSelections(next);
+              }}
+              className="text-[10px] font-semibold text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Deselect All
+            </button>
+            <button
+              type="button"
+              onClick={handleSummarizeEmails}
+              disabled={isEmailSummarizing || includedEmailCount === 0}
+              className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-lavender/20 text-brand-lavender border border-indigo-500/20 hover:bg-brand-lavender/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+            >
+              {isEmailSummarizing ? (
+                <><Loader2 size={11} className="animate-spin" /> Summarizing…</>
+              ) : (
+                <>Summarize Selected ({includedEmailCount})</>
+              )}
+            </button>
+          </div>
+
+          {/* Email list */}
+          <div className="space-y-1 max-h-[400px] overflow-y-auto">
+            {gmailEmails.map(e => {
+              const isIncluded = emailSelections[e.id] ?? !e.isNoise;
+              const isExpanded = expandedEmailId === e.id;
+              // Parse date for display
+              const dateStr = (() => {
+                try {
+                  const d = new Date(e.date);
+                  return isNaN(d.getTime()) ? '' : format(d, 'MMM d');
+                } catch { return ''; }
+              })();
+              const person = e.direction === 'sent' ? (e.to || '').split('<')[0].trim() : (e.from || '').split('<')[0].trim();
+
+              return (
+                <div key={e.id} className={`rounded-lg border transition-all ${isIncluded ? 'border-border bg-secondary/20' : 'border-border/40 bg-secondary/5 opacity-60'}`}>
+                  <div className="flex items-center gap-2 px-3 py-2">
+                    {/* Include/Exclude checkbox */}
+                    <button
+                      type="button"
+                      onClick={() => setEmailSelections(prev => ({ ...prev, [e.id]: !prev[e.id] }))}
+                      className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                        isIncluded ? 'bg-brand-lavender border-brand-lavender' : 'border-border'
+                      }`}
+                      title={isIncluded ? 'Click to exclude' : 'Click to include'}
+                    >
+                      {isIncluded && (
+                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5l2 2 4-4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      )}
+                    </button>
+
+                    {/* Direction badge */}
+                    <span className={`flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                      e.direction === 'sent'
+                        ? 'bg-blue-500/15 text-blue-400'
+                        : 'bg-emerald-500/15 text-emerald-400'
+                    }`}>
+                      {e.direction === 'sent' ? 'Sent' : 'Recv'}
+                    </span>
+
+                    {/* Noise badge */}
+                    {e.isNoise && (
+                      <span className="flex-shrink-0 text-[9px] font-semibold px-1 py-0.5 rounded bg-amber-500/15 text-amber-400">
+                        Auto
+                      </span>
+                    )}
+
+                    {/* Subject + person */}
+                    <button
+                      type="button"
+                      onClick={() => setExpandedEmailId(isExpanded ? null : e.id)}
+                      className="flex-1 min-w-0 text-left"
+                    >
+                      <p className="text-xs text-foreground truncate">{e.subject || '(no subject)'}</p>
+                      <p className="text-[10px] text-muted-foreground truncate">
+                        {person}{dateStr ? ` · ${dateStr}` : ''}
+                      </p>
+                    </button>
+
+                    {/* Expand toggle */}
+                    {e.body && (
+                      <button
+                        type="button"
+                        onClick={() => setExpandedEmailId(isExpanded ? null : e.id)}
+                        className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors p-0.5"
+                      >
+                        {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Expanded body preview */}
+                  {isExpanded && e.body && (
+                    <div className="px-3 pb-2.5 pt-0">
+                      <div className="text-[11px] text-foreground/70 leading-relaxed whitespace-pre-wrap bg-card/50 rounded-lg px-3 py-2 max-h-40 overflow-y-auto border border-border/30">
+                        {e.body}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              ))}
-            </div>
-          </details>
+              );
+            })}
+          </div>
         </div>
       )}
 

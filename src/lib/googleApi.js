@@ -333,3 +333,74 @@ export async function fetchFilteredWeeklyEmails(token, start, end) {
 
   return filterRelevantEmails(allEmails);
 }
+
+const WEEKLY_BODY_TRUNCATE = 500;
+
+/**
+ * Fetch ALL weekly emails (sent + received) with body content and noise tagging.
+ * Returns every email — noise emails are tagged with `isNoise: true` instead of
+ * being filtered out, so the UI can show toggleable include/exclude per email.
+ *
+ * @param {string} token - Gmail OAuth access token
+ * @param {Date} start - Range start
+ * @param {Date} end - Range end
+ * @returns {Promise<Array<{ id, subject, from, to, date, body, direction, isNoise }>>}
+ */
+export async function fetchWeeklyEmailsWithBodies(token, start, end) {
+  const after  = format(start, 'yyyy/MM/dd');
+  const before = format(end,   'yyyy/MM/dd');
+
+  // Fetch sent + inbox message IDs in parallel
+  const [sentRes, inboxRes] = await Promise.all([
+    fetch(`https://www.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(`in:sent after:${after} before:${before}`)}&maxResults=30`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }).then(r => r.ok ? r.json() : { messages: [] }),
+    fetch(`https://www.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(`in:inbox after:${after} before:${before}`)}&maxResults=30`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }).then(r => r.ok ? r.json() : { messages: [] }),
+  ]);
+
+  const sentIds  = (sentRes.messages || []).slice(0, 20).map(m => ({ ...m, _dir: 'sent' }));
+  const inboxIds = (inboxRes.messages || []).slice(0, 20).map(m => ({ ...m, _dir: 'received' }));
+
+  // Deduplicate by id (an email can appear in both sent and inbox)
+  const seen = new Set();
+  const allIds = [];
+  for (const item of [...sentIds, ...inboxIds]) {
+    if (!seen.has(item.id)) {
+      seen.add(item.id);
+      allIds.push(item);
+    }
+  }
+
+  // Fetch full message details in parallel
+  const results = await Promise.all(allIds.map(async ({ id, _dir }) => {
+    try {
+      const res = await fetch(
+        `https://www.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!res.ok) return null;
+      const md = await res.json();
+
+      const headers = md.payload?.headers || [];
+      const subject = headers.find(h => h.name === 'Subject')?.value || '(no subject)';
+      const to      = headers.find(h => h.name === 'To')?.value || '';
+      const from    = headers.find(h => h.name === 'From')?.value || '';
+      const date    = headers.find(h => h.name === 'Date')?.value || '';
+
+      let body = extractPlainTextBody(md.payload || {});
+      if (body.length > WEEKLY_BODY_TRUNCATE) {
+        body = body.slice(0, WEEKLY_BODY_TRUNCATE) + '…';
+      }
+
+      const email = { id, subject, from, to, date, body, direction: _dir };
+      email.isNoise = isNoiseEmail(email);
+      return email;
+    } catch {
+      return null;
+    }
+  }));
+
+  return results.filter(Boolean);
+}

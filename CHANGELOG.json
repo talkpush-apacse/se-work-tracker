@@ -1,6 +1,20 @@
 {
   "versions": [
     {
+      "version": "2.2.0",
+      "codename": "Open Gate",
+      "date": "2026-03-13",
+      "summary": "Multi-task timer logging, Gmail email viewer with include/exclude, remove Triage Queue",
+      "changes": [
+        { "type": "feat", "description": "Multi-task logging in SaveSessionModal — distribute hours across multiple tasks per timer session" },
+        { "type": "feat", "description": "Gmail Email Viewer with include/exclude toggles — select which emails feed into AI weekly summary" },
+        { "type": "feat", "description": "Fetch email bodies for richer AI context and expandable body preview in Weekly Report" },
+        { "type": "feat", "description": "Manual 'Summarize Selected' button replaces auto-summarize for email activity" },
+        { "type": "feat", "description": "Persist email include/exclude selections per week in localStorage" },
+        { "type": "chore", "description": "Remove Triage Queue section and sticky nav from Triage page" }
+      ]
+    },
+    {
       "version": "2.1.0",
       "codename": "Stone Path",
       "date": "2026-03-13",

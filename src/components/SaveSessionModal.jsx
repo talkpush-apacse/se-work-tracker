@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
-import { Check, Search, X } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import Modal from './Modal';
 import WorkTypeSelector from './WorkTypeSelector';
-import { ACTIVITY_TYPES, AUTO_TRACK_RATE, WORK_TYPE_LABELS } from '../constants';
+import { AUTO_TRACK_RATE, WORK_TYPE_LABELS } from '../constants';
 import { useAppStore } from '../context/StoreContext';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
@@ -15,6 +15,9 @@ function formatHMS(totalSeconds) {
   return [h, m, s].map(n => String(n).padStart(2, '0')).join(':');
 }
 
+let rowIdCounter = 0;
+function nextRowId() { return `row-${++rowIdCounter}`; }
+
 export default function SaveSessionModal({ session, onClose }) {
   const { addPoint, addTimeLog, customers, okrs } = useAppStore();
 
@@ -22,21 +25,21 @@ export default function SaveSessionModal({ session, onClose }) {
   const prefilledHours  = parseFloat((session.elapsedSeconds / 3600).toFixed(2));
   const prefilledPoints = Math.round(prefilledHours * AUTO_TRACK_RATE * 100) / 100;
 
-  const [form, setForm] = useState({
-    workType:     session.workType || 'deep_work',
-    points:       String(prefilledPoints),
-    hours:        String(prefilledHours),
-    activityType: '',
-    okrId:        session.okrId || '',
-    comment:      session.taskDescription || '',
-  });
+  // Shared fields
+  const [workType, setWorkType] = useState(session.workType || 'deep_work');
+  const [points, setPoints]     = useState(String(prefilledPoints));
+  const [hours, setHours]       = useState(String(prefilledHours));
 
-  // Client multi-select state
-  const [selectedClientIds, setSelectedClientIds] = useState(() => new Set(session.clientIds || []));
-  const [searchQuery, setSearchQuery] = useState('');
-  const [errors, setErrors]      = useState({});
+  // Task rows — each row has id, description, clientId, okrId
+  const [taskRows, setTaskRows] = useState(() => [{
+    id: nextRowId(),
+    description: session.taskDescription || '',
+    clientId: (session.clientIds || [])[0] || '',
+    okrId: session.okrId || '',
+  }]);
+
+  const [errors, setErrors]         = useState({});
   const [showDiscard, setShowDiscard] = useState(false);
-  const [showClients, setShowClients] = useState(() => (session.clientIds || []).length > 0);
 
   // Sort customers: pinned first, then alphabetical
   const sortedCustomers = useMemo(
@@ -48,21 +51,30 @@ export default function SaveSessionModal({ session, onClose }) {
     [customers]
   );
 
-  const visibleCustomers = useMemo(
-    () => searchQuery.trim()
-      ? sortedCustomers.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()))
-      : sortedCustomers,
-    [sortedCustomers, searchQuery]
-  );
+  const rowCount = taskRows.length;
 
-  const selectedCount = selectedClientIds.size;
+  // Per-row distribution with last-absorbs-remainder
+  const distribute = (total) => {
+    if (rowCount <= 1) return [total];
+    const base = Math.floor(total / rowCount * 100) / 100;
+    const remainder = Math.round((total - base * (rowCount - 1)) * 100) / 100;
+    return taskRows.map((_, i) => i === rowCount - 1 ? remainder : base);
+  };
+
+  const totalHours  = Number(hours) || 0;
+  const totalPoints = Number(points) || 0;
+  const hoursDist  = distribute(totalHours);
+  const pointsDist = distribute(totalPoints);
 
   const validate = () => {
     const e = {};
-    if (!form.points || isNaN(form.points) || Number(form.points) <= 0)
+    if (!points || isNaN(points) || Number(points) <= 0)
       e.points = 'Enter a valid positive number';
-    if (!form.hours || isNaN(form.hours) || Number(form.hours) < 0)
+    if (!hours || isNaN(hours) || Number(hours) < 0)
       e.hours = 'Enter a valid number';
+    // Check at least one row has a description
+    const hasDesc = taskRows.some(r => r.description.trim());
+    if (!hasDesc) e.rows = 'At least one task needs a description';
     return e;
   };
 
@@ -71,90 +83,65 @@ export default function SaveSessionModal({ session, onClose }) {
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
 
-    const hours  = Number(form.hours);
-    const points = Number(form.points);
-    const okrId  = form.okrId || null;
-    const comment = form.comment.trim();
-    const clientIds = [...selectedClientIds];
-
     // Derive weekStart from session startedAt
     const sessionDate = new Date(session.startedAt);
     const weekStart = format(startOfWeek(sessionDate, { weekStartsOn: 1 }), 'yyyy-MM-dd');
 
-    // 1. Create time_log entry (bandwidth tracking)
-    addTimeLog({
-      workType: form.workType,
-      hours,
-      clientIds,
-      okrId,
-      taskId: session.taskId || null,
-      note: comment,
-      loggedAt: session.startedAt,
-      weekStart,
-    });
+    const workTypeLabel = WORK_TYPE_LABELS[workType] || '';
 
-    // 2. Create points entries (gamification layer — backward compat)
-    if (clientIds.length === 0) {
-      // No clients tagged — single entry with null customerId
-      addPoint({
-        customerId: null,
+    // Create one time_log + one point entry per task row
+    taskRows.forEach((row, i) => {
+      const desc = row.description.trim();
+      if (!desc) return; // skip empty rows
+
+      const rowHours  = hoursDist[i];
+      const rowPoints = pointsDist[i];
+      const clientIds = row.clientId ? [row.clientId] : [];
+      const okrId     = row.okrId || null;
+
+      // Time log (bandwidth tracking)
+      addTimeLog({
+        workType,
+        hours: rowHours,
+        clientIds,
         okrId,
-        points,
-        hours,
-        activityType: form.activityType,
-        interactionType: WORK_TYPE_LABELS[form.workType] || '',
-        comment,
+        taskId: null,
+        note: desc,
+        loggedAt: session.startedAt,
+        weekStart,
       });
-    } else if (clientIds.length === 1) {
-      // Single client — full points
+
+      // Points entry (gamification layer)
       addPoint({
-        customerId: clientIds[0],
+        customerId: row.clientId || null,
         okrId,
-        points,
-        hours,
-        activityType: form.activityType,
-        interactionType: WORK_TYPE_LABELS[form.workType] || '',
-        comment,
+        points: rowPoints,
+        hours: rowHours,
+        activityType: '',
+        interactionType: workTypeLabel,
+        comment: rowCount > 1
+          ? `${desc} (${i + 1}/${rowCount} tasks)`
+          : desc,
       });
-    } else {
-      // Multiple clients — split equally
-      clientIds.forEach((customerId, i) => {
-        const isLast = i === clientIds.length - 1;
-        const sharePoints = isLast
-          ? Math.round((points - Math.floor(points / clientIds.length * 100) / 100 * (clientIds.length - 1)) * 100) / 100
-          : Math.round(points / clientIds.length * 100) / 100;
-        const shareHours = isLast
-          ? Math.round((hours - Math.floor(hours / clientIds.length * 100) / 100 * (clientIds.length - 1)) * 100) / 100
-          : Math.round(hours / clientIds.length * 100) / 100;
-        addPoint({
-          customerId,
-          okrId,
-          points: sharePoints,
-          hours: shareHours,
-          activityType: form.activityType,
-          interactionType: WORK_TYPE_LABELS[form.workType] || '',
-          comment: `${comment}${clientIds.length > 1 ? ` (split across ${clientIds.length} clients)` : ''}`.trim(),
-        });
-      });
-    }
+    });
 
     onClose();
   };
 
-  const field = (key) => ({
-    value:    form[key],
-    onChange: (e) => setForm(p => ({ ...p, [key]: e.target.value })),
-  });
-
-  const toggleClient = (id) => {
-    setSelectedClientIds(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
+  const updateRow = (id, field, value) => {
+    setTaskRows(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r));
   };
 
-  const workTypeLabel = WORK_TYPE_LABELS[form.workType] || form.workType;
+  const addRow = () => {
+    setTaskRows(prev => [...prev, { id: nextRowId(), description: '', clientId: '', okrId: '' }]);
+  };
+
+  const removeRow = (id) => {
+    if (taskRows.length <= 1) return;
+    setTaskRows(prev => prev.filter(r => r.id !== id));
+  };
+
+  const workTypeLabel = WORK_TYPE_LABELS[workType] || workType;
 
   return (
     <Modal title={`Save Session — ${workTypeLabel}`} onClose={() => setShowDiscard(true)} size="md">
@@ -175,8 +162,8 @@ export default function SaveSessionModal({ session, onClose }) {
         <div>
           <label className="block text-xs font-medium text-muted-foreground mb-1.5">Work Type *</label>
           <WorkTypeSelector
-            value={form.workType}
-            onChange={(wt) => setForm(p => ({ ...p, workType: wt }))}
+            value={workType}
+            onChange={setWorkType}
             size="sm"
           />
         </div>
@@ -191,7 +178,8 @@ export default function SaveSessionModal({ session, onClose }) {
               min="0.01"
               placeholder="e.g. 5"
               autoFocus
-              {...field('points')}
+              value={points}
+              onChange={e => setPoints(e.target.value)}
             />
             {errors.points && <p className="mt-1 text-xs text-destructive">{errors.points}</p>}
           </div>
@@ -201,120 +189,93 @@ export default function SaveSessionModal({ session, onClose }) {
               type="number"
               step="0.01"
               min="0"
-              {...field('hours')}
+              value={hours}
+              onChange={e => setHours(e.target.value)}
             />
             {errors.hours && <p className="mt-1 text-xs text-destructive">{errors.hours}</p>}
           </div>
         </div>
 
-        {/* Client tags (optional, collapsible) */}
+        {/* Task Rows */}
         <div>
-          <button
-            type="button"
-            onClick={() => setShowClients(p => !p)}
-            className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <span>{showClients ? '▾' : '▸'}</span>
-            Tag Clients {selectedCount > 0 && `(${selectedCount})`}
-            <span className="text-muted-foreground/50">(optional)</span>
-          </button>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-xs font-medium text-muted-foreground">
+              Tasks {rowCount > 1 && <span className="text-muted-foreground/50">({rowCount} — hours split equally)</span>}
+            </label>
+            <button
+              type="button"
+              onClick={addRow}
+              className="flex items-center gap-1 text-[10px] font-semibold text-brand-lavender hover:text-brand-lavender/80 transition-colors"
+            >
+              <Plus size={10} /> Add Task
+            </button>
+          </div>
 
-          {showClients && (
-            <div className="mt-2">
-              {selectedCount > 1 && (
-                <p className="text-[10px] text-muted-foreground mb-1.5">
-                  Hours will be split equally across all tagged clients in reports.
-                </p>
-              )}
-              {/* Search */}
-              {customers.length > 5 && (
-                <div className="relative mb-1.5">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
-                  <input
-                    type="text"
-                    placeholder="Search..."
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    className="w-full pl-8 pr-7 py-1.5 text-xs bg-card border border-border rounded-lg focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40 text-foreground placeholder:text-muted-foreground"
-                  />
-                  {searchQuery && (
-                    <button type="button" onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                      <X className="w-3 h-3" />
+          {errors.rows && <p className="mb-2 text-xs text-destructive">{errors.rows}</p>}
+
+          <div className="space-y-3">
+            {taskRows.map((row, i) => (
+              <div key={row.id} className="p-3 rounded-xl border border-border bg-secondary/30 space-y-2">
+                {/* Row header with index + distribution + remove */}
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                    Task {i + 1}
+                    {rowCount > 1 && (
+                      <span className="ml-1.5 text-muted-foreground/50 normal-case font-normal">
+                        ~{hoursDist[i].toFixed(2)}h · {pointsDist[i].toFixed(1)} pts
+                      </span>
+                    )}
+                  </span>
+                  {rowCount > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeRow(row.id)}
+                      className="text-muted-foreground hover:text-destructive transition-colors p-0.5"
+                      title="Remove task"
+                    >
+                      <Trash2 size={12} />
                     </button>
                   )}
                 </div>
-              )}
-              <div className="max-h-36 overflow-y-auto rounded-lg border border-border bg-secondary/30">
-                {visibleCustomers.map(customer => {
-                  const isSelected = selectedClientIds.has(customer.id);
-                  return (
-                    <button
-                      key={customer.id}
-                      type="button"
-                      onClick={() => toggleClient(customer.id)}
-                      className={`w-full flex items-center gap-2 px-2.5 py-2 text-left transition-all border-b border-border/30 last:border-b-0 ${
-                        isSelected ? 'bg-brand-lavender/10' : 'hover:bg-secondary/80'
-                      }`}
+
+                {/* Description */}
+                <textarea
+                  rows={2}
+                  value={row.description}
+                  onChange={e => updateRow(row.id, 'description', e.target.value)}
+                  placeholder="What did you work on?"
+                  className="w-full bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40 resize-none"
+                />
+
+                {/* Client + OKR row */}
+                <div className="grid grid-cols-2 gap-2">
+                  <select
+                    value={row.clientId}
+                    onChange={e => updateRow(row.id, 'clientId', e.target.value)}
+                    className="w-full h-8 bg-card border border-border rounded-md px-2 text-xs text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+                  >
+                    <option value="">No client</option>
+                    {sortedCustomers.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+
+                  {okrs.length > 0 && (
+                    <select
+                      value={row.okrId}
+                      onChange={e => updateRow(row.id, 'okrId', e.target.value)}
+                      className="w-full h-8 bg-card border border-border rounded-md px-2 text-xs text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
                     >
-                      <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                        isSelected ? 'bg-brand-lavender border-brand-lavender' : 'border-border'
-                      }`}>
-                        {isSelected && <Check size={10} className="text-white" />}
-                      </div>
-                      <div
-                        className="w-5 h-5 rounded flex-shrink-0 flex items-center justify-center text-[8px] font-bold"
-                        style={{ backgroundColor: customer.color + '22', color: customer.color }}
-                      >
-                        {customer.name.slice(0, 2).toUpperCase()}
-                      </div>
-                      <span className="text-xs text-foreground truncate">{customer.name}</span>
-                    </button>
-                  );
-                })}
+                      <option value="">No OKR</option>
+                      {okrs.map(o => (
+                        <option key={o.id} value={o.id}>{o.quarter} — {o.title}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-
-        {/* Phase Type */}
-        <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-            Phase Type <span className="text-muted-foreground/50">(optional)</span>
-          </label>
-          <select
-            {...field('activityType')}
-            className="w-full h-10 bg-card border border-border rounded-md px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
-          >
-            <option value="">Select phase...</option>
-            {ACTIVITY_TYPES.map(a => <option key={a} value={a}>{a}</option>)}
-          </select>
-        </div>
-
-        {/* OKR selector */}
-        <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-            OKR <span className="text-muted-foreground/50">(optional)</span>
-          </label>
-          <select
-            {...field('okrId')}
-            className="w-full h-10 bg-card border border-border rounded-md px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
-          >
-            <option value="">No OKR</option>
-            {okrs.map(o => <option key={o.id} value={o.id}>{o.quarter} — {o.title}</option>)}
-          </select>
-        </div>
-
-        {/* Comment */}
-        <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-            Note <span className="text-muted-foreground/50">(optional)</span>
-          </label>
-          <textarea
-            placeholder="What did you accomplish in this session?"
-            rows={2}
-            {...field('comment')}
-            className="w-full bg-card border border-border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40 resize-none"
-          />
+            ))}
+          </div>
         </div>
 
         {/* Actions */}
@@ -333,7 +294,7 @@ export default function SaveSessionModal({ session, onClose }) {
             size="sm"
             className="flex-1"
           >
-            Save Session
+            Save{rowCount > 1 ? ` (${rowCount} tasks)` : ' Session'}
           </Button>
         </div>
       </form>

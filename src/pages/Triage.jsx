@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, memo, useRef, useEffect } from 'react';
 import {
-  ChevronDown, Plus, Mic, MicOff, Copy, Save, Check, CheckCircle2,
-  Loader2, ClipboardList, Sparkles, ChevronLeft, ChevronRight,
+  ChevronDown, Plus, Mic, MicOff, Copy, Save, Check,
+  Loader2, Sparkles, ChevronLeft, ChevronRight,
   Calendar, User, Tag, AlertCircle, Archive, ArchiveX, Trash2,
   Settings, RotateCcw, Pencil, GripVertical, ExternalLink, ArrowLeft,
   Timer, Square, Pin, CheckSquare, Paperclip, Clock,
@@ -84,8 +84,8 @@ Be concise and scannable. Bullet points within sections are fine.`,
 };
 
 // ─── Inline customer creation form ──────────────────────────────────────────
-// Used by both TriageForm and QuickAddTaskForm to allow creating a new customer
-// without leaving the current form.
+// Used by QuickAddTaskForm to allow creating a new customer without leaving
+// the current form.
 const InlineCustomerCreate = memo(function InlineCustomerCreate({ onCustomerCreated }) {
   const { addCustomer } = useAppStore();
   const [newCustomer, setNewCustomer] = useState({ name: '', color: CUSTOMER_COLORS[0].value });
@@ -130,242 +130,6 @@ const InlineCustomerCreate = memo(function InlineCustomerCreate({ onCustomerCrea
   );
 });
 
-// ─── Inline triage form (shown below an untriaged entry) ──────────────────────
-function TriageForm({ entry, customer, customers, onSubmit, onCancel }) {
-  const { okrs } = useAppStore();
-  const [form, setForm] = useState({
-    customerId:      customer?.id || '',
-    description:     entry.rawNotes.split('\n')[0].slice(0, 120), // pre-fill from first line
-    workType:        'comms',
-    status:          'open',
-    okrId:           '',
-    isEvergreen:     false,
-  });
-
-  // Local list that grows if user creates new entries inline
-  const [localCustomers, setLocalCustomers] = useState(customers || []);
-  const [showInlineCreate, setShowInlineCreate] = useState(false);
-
-  const canSubmit = form.customerId && form.description.trim();
-
-  // "Logged on" date from entry.createdAt
-  const loggedOn = entry.createdAt
-    ? new Date(entry.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    : null;
-
-  return (
-    <div className="mt-3 border-t border-border/60 pt-3 space-y-3">
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Convert to Task</p>
-        {loggedOn && (
-          <p className="text-[10px] text-muted-foreground">Logged on {loggedOn}</p>
-        )}
-      </div>
-
-      {/* Customer selector with inline creation */}
-      <div>
-        <div className="flex items-center justify-between mb-1">
-          <label className="text-xs text-muted-foreground">Customer *</label>
-          <button
-            type="button"
-            onClick={() => setShowInlineCreate(v => !v)}
-            className="text-[10px] font-semibold text-brand-lavender hover:text-brand-lavender/80 transition-colors"
-          >
-            {showInlineCreate ? '✕ Cancel' : '+ New Customer'}
-          </button>
-        </div>
-        <select
-          value={form.customerId}
-          onChange={e => setForm(p => ({ ...p, customerId: e.target.value }))}
-          className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
-        >
-          <option value="">— Select customer —</option>
-          {localCustomers.map(c => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </select>
-        {showInlineCreate && (
-          <InlineCustomerCreate
-            onCustomerCreated={c => {
-              setLocalCustomers(prev => [...prev, c]);
-              setForm(f => ({ ...f, customerId: c.id }));
-              setShowInlineCreate(false);
-            }}
-          />
-        )}
-      </div>
-
-      <div>
-        <label className="block text-xs text-muted-foreground mb-1">Task Description *</label>
-        <textarea
-          rows={2}
-          value={form.description}
-          onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
-          className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40 resize-none"
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs text-muted-foreground mb-1">Work Type</label>
-          <select
-            value={form.workType}
-            onChange={e => setForm(p => ({ ...p, workType: e.target.value }))}
-            className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
-          >
-            {WORK_TYPES.map(wt => (
-              <option key={wt} value={wt}>{WORK_TYPE_LABELS[wt]}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs text-muted-foreground mb-1">Status</label>
-          <select
-            value={form.status}
-            onChange={e => setForm(p => ({ ...p, status: e.target.value }))}
-            className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
-          >
-            {TASK_STATUSES.map(s => (
-              <option key={s} value={s}>{TASK_STATUS_LABELS[s]}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Evergreen toggle */}
-      <label className="flex items-center gap-2 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={form.isEvergreen}
-          onChange={e => setForm(p => ({ ...p, isEvergreen: e.target.checked }))}
-          className="w-3.5 h-3.5 rounded border-border bg-secondary text-green-500 focus:ring-ring/40 focus:ring-1 accent-green-500"
-        />
-        <span className="text-xs text-muted-foreground flex items-center gap-1">
-          <RefreshCw size={10} className="text-green-400" /> Evergreen (resets weekly)
-        </span>
-      </label>
-
-      {/* Optional OKR selector */}
-      {okrs.length > 0 && (
-        <div>
-          <label className="block text-xs text-muted-foreground mb-1">OKR <span className="text-muted-foreground/70">(optional)</span></label>
-          <select
-            value={form.okrId}
-            onChange={e => setForm(p => ({ ...p, okrId: e.target.value }))}
-            className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
-          >
-            <option value="">— No OKR —</option>
-            {okrs.map(o => (
-              <option key={o.id} value={o.id}>{o.quarter} — {o.title}</option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      <div className="flex gap-2 pt-1">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="flex-1 py-2 rounded-xl bg-muted hover:bg-gray-600 text-xs font-medium transition-colors"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          disabled={!canSubmit}
-          onClick={() => onSubmit({ ...form, description: form.description.trim() })}
-          className="flex-1 py-2 rounded-xl bg-brand-lavender hover:bg-brand-lavender/80 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-foreground transition-colors"
-        >
-          Create Task
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Triage queue entry card ──────────────────────────────────────────────────
-const TriageEntryCard = memo(function TriageEntryCard({ entry, customer, onTriaged }) {
-  const { addTask, markMeetingEntryTriaged, customers } = useAppStore();
-  const [expanded, setExpanded] = useState(false);
-  const [showForm, setShowForm] = useState(false);
-
-  const handleSubmit = (formData) => {
-    addTask({
-      customerId: formData.customerId,
-      okrId: formData.okrId || null,
-      meetingEntryId: entry.id,
-      description: formData.description,
-      workType: formData.workType,
-      isEvergreen: formData.isEvergreen || undefined,
-      status: formData.status,
-    });
-    markMeetingEntryTriaged(entry.id);
-    onTriaged();
-  };
-
-  const previewLines = entry.rawNotes.split('\n').slice(0, 3).join('\n');
-  const hasMore = entry.rawNotes.split('\n').length > 3;
-
-  return (
-    <div className="bg-secondary/50 border border-border/60 rounded-xl p-3">
-      {/* Entry meta */}
-      <div className="flex items-start gap-2 mb-2">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 flex-wrap mb-1">
-            {customer && (
-              <span
-                className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
-                style={{ backgroundColor: (customer.color || '#6366f1') + '22', color: customer.color || '#6366f1' }}
-              >
-                {customer.name}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-            <Calendar size={10} />
-            {new Date(entry.meetingDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-          </div>
-        </div>
-        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-brand-amber border border-amber-500/20 flex-shrink-0">
-          Untriaged
-        </span>
-      </div>
-
-      {/* Notes preview */}
-      <p className="text-xs text-foreground/80 whitespace-pre-wrap leading-relaxed">
-        {expanded ? entry.rawNotes : previewLines}
-      </p>
-      {hasMore && !expanded && (
-        <button
-          onClick={() => setExpanded(true)}
-          className="text-[10px] text-brand-lavender hover:text-brand-lavender/80 mt-1"
-        >
-          Show more…
-        </button>
-      )}
-
-      {/* Action row */}
-      {!showForm && (
-        <button
-          onClick={() => setShowForm(true)}
-          className="mt-3 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-brand-lavender/20 hover:bg-brand-lavender/40 text-brand-lavender text-xs font-semibold border border-indigo-500/20 transition-all"
-        >
-          <Plus size={12} /> Convert to Task
-        </button>
-      )}
-
-      {showForm && (
-        <TriageForm
-          entry={entry}
-          customer={customer}
-          customers={customers}
-          onSubmit={handleSubmit}
-          onCancel={() => setShowForm(false)}
-        />
-      )}
-    </div>
-  );
-});
 
 // ─── Jira URL parser ──────────────────────────────────────────────────────────
 /** Strips Atlassian ticket URLs from text and returns the clean text + ticket array. */
@@ -1829,12 +1593,11 @@ function TaskDetailView({ task, customer, onBack }) {
 // ─── Main Triage page ──────────────────────────────────────────────────────────
 export default function Triage() {
   const {
-    meetingEntries, tasks, customers, updateTask, addTask, reorderTasks, addPoint, okrs,
+    tasks, customers, updateTask, addTask, reorderTasks, addPoint, okrs,
     aiSettings,
   } = useAppStore();
   const { isRunning, taskId: runningTaskId, startTimer, stopTimer } = useTimerContext();
   const [taskDetailId, setTaskDetailId] = useState(null);
-  const [triageRefresh, setTriageRefresh] = useState(0);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [showTimerTaskForm, setShowTimerTaskForm] = useState(false);
   const [autoSaveToast, setAutoSaveToast] = useState(null); // { pts, customerName } | null
@@ -1882,27 +1645,6 @@ export default function Triage() {
     setFilterCustomerId(val);
     clearSelection();
   };
-
-  // Untriaged entries, sorted newest meeting date first
-  const untriagedEntries = useMemo(
-    () => meetingEntries
-      .filter(m => !m.isTriaged)
-      .sort((a, b) => b.meetingDate.localeCompare(a.meetingDate)),
-    [meetingEntries]
-  );
-
-  // Group untriaged entries by customer
-  const untriagedByCustomer = useMemo(
-    () => untriagedEntries.reduce((acc, entry) => {
-      const customer = customerMap.get(entry.customerId);
-      const key = customer?.id || '_none';
-      if (!acc[key]) acc[key] = { customer, entries: [] };
-      acc[key].entries.push({ entry, customer });
-      return acc;
-    }, {}),
-    [untriagedEntries, customerMap]
-  );
-
 
   // Active tasks: open, in-progress, blocked (excludes done and archived)
   const activeTasks = useMemo(
@@ -2105,81 +1847,10 @@ export default function Triage() {
   // ── Queue view ─────────────────────────────────────────────────────────────
   return (
     <>
-    {/* ── Sticky section jump nav ── */}
-    <div className="sticky top-0 z-30 -mx-4 px-4 bg-background/95 backdrop-blur-sm border-b border-border/40 mb-4">
-      <div className="flex gap-0.5 py-1 overflow-x-auto scrollbar-none">
-        {[
-          { href: 'section-queue', label: 'Queue',      badge: untriagedEntries.length || null },
-          { href: 'section-board', label: 'Task Board', badge: null },
-        ].map(({ href, label, badge }) => (
-          <button
-            key={href}
-            onClick={() => document.getElementById(href)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-all whitespace-nowrap flex-shrink-0"
-          >
-            {label}
-            {badge ? (
-              <span className="bg-amber-500/20 text-brand-amber text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none">
-                {badge}
-              </span>
-            ) : null}
-          </button>
-        ))}
-      </div>
-    </div>
-
     <div className="space-y-5">
 
-      {/* Triage Queue (untriaged meeting entries) */}
-      <div id="section-queue">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <ClipboardList size={15} className="text-brand-amber" />
-            <h2 className="text-sm font-semibold text-foreground">Triage Queue</h2>
-            {untriagedEntries.length > 0 && (
-              <span className="bg-amber-500/20 text-brand-amber border border-amber-500/20 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                {untriagedEntries.length}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {untriagedEntries.length === 0 ? (
-          <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-teal-500/10 border border-teal-500/20">
-            <CheckCircle2 size={14} className="text-teal-400 flex-shrink-0" />
-            <p className="text-sm text-teal-400 font-medium">Queue is clear — all meetings triaged</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {Object.values(untriagedByCustomer).map(({ customer, entries: customerEntries }) => (
-              <div key={customer?.id || '_none'}>
-                <div className="flex items-center gap-1.5 mb-2">
-                  {customer && (
-                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: customer.color || '#6366f1' }} />
-                  )}
-                  <span className="text-xs font-semibold text-muted-foreground">
-                    {customer?.name || 'No Customer'}
-                  </span>
-                  <span className="text-xs text-muted-foreground/70">({customerEntries.length})</span>
-                </div>
-                <div className="space-y-2">
-                  {customerEntries.map(({ entry, customer: c }) => (
-                    <TriageEntryCard
-                      key={entry.id}
-                      entry={entry}
-                      customer={c}
-                      onTriaged={() => setTriageRefresh(n => n + 1)}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
       {/* Task Board */}
-      <div id="section-board">
+      <div>
         {/* Board header */}
         <div className="flex items-center gap-2 mb-3">
           <Tag size={15} className="text-brand-lavender" />
