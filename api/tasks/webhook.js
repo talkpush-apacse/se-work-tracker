@@ -12,7 +12,7 @@
 import { randomUUID } from 'crypto';
 import { sql, authorize } from '../_db.js';
 
-const VALID_TASK_TYPES = new Set(['comms', 'focus-time', 'evergreen']);
+const VALID_TASK_TYPES = new Set(['comms', 'focus-time', 'evergreen', 'recurring']);
 const VALID_STATUSES = new Set(['open', 'in-progress']);
 
 export default async function handler(req, res) {

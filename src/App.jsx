@@ -5,6 +5,7 @@ import { TimerProvider } from './context/TimerContext';
 import { GoogleAuthProvider } from './context/GoogleAuthContext';
 import Navigation from './components/Navigation';
 import TimerWidget from './components/TimerWidget';
+import QuickStartFAB from './components/QuickStartFAB';
 import ErrorBoundary from './components/ErrorBoundary';
 
 // Lazy-load each page so the initial bundle only contains Navigation + TimerWidget.
@@ -73,6 +74,8 @@ function AppContent() {
           </Suspense>
         </div>
       </main>
+
+      <QuickStartFAB />
     </div>
   );
 }
