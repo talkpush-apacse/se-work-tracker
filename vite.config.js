@@ -17,18 +17,15 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      // Automatically update the service worker when a new build is deployed
-      registerType: 'autoUpdate',
+      // Use our custom service worker (src/sw.js) instead of auto-generated one
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.js',
+      // We handle registration manually via useServiceWorker hook
+      injectRegister: false,
 
-      // Pre-cache all static assets produced by the build
-      workbox: {
+      injectManifest: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
-        // Ensure old caches are cleaned up on update (fixes stale iOS PWA)
-        cleanupOutdatedCaches: true,
-        // Never intercept API calls — let them go straight to the network
-        navigateFallbackDenylist: [/^\/api\//],
-        skipWaiting: true,
-        clientsClaim: true,
       },
 
       // Web App Manifest

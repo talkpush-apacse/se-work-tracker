@@ -1,6 +1,18 @@
 {
   "versions": [
     {
+      "version": "2.3.0",
+      "codename": "Quiet Tide",
+      "date": "2026-03-14",
+      "summary": "Task Board visual refresh — elevated cards, single-row filter bar, polished buttons and empty state",
+      "changes": [
+        { "type": "feat", "description": "Task Board action buttons restyled: ghost style for Focus Time & AI Assist, indigo CTA for + Task" },
+        { "type": "feat", "description": "Filter bar collapsed into a single horizontal scrollable row with pill dropdowns and amber active chip for Priority Clients" },
+        { "type": "feat", "description": "Task cards upgraded from flat rows to elevated dark cards with hover lift, full title word-wrap, and status dot indicator" },
+        { "type": "feat", "description": "Polished empty state with dashed-border card, indigo checkmark icon, subtitle, and View All Tasks / Add Task action buttons" }
+      ]
+    },
+    {
       "version": "2.2.0",
       "codename": "Open Gate",
       "date": "2026-03-13",

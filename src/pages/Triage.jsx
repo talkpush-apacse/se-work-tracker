@@ -1171,7 +1171,7 @@ function QuickAddTaskForm({ customers, onSubmit, onCancel }) {
   );
 }
 
-// ─── Sortable task row (compact queue card with drag handle) ──────────────────
+// ─── Sortable task row (elevated card with drag handle) ───────────────────────
 const SortableTaskRow = memo(function SortableTaskRow({ task, customer, onOpenDetail, isSelected, onToggleSelect, onStatusChange }) {
   const { updateTask } = useAppStore();
   const { isRunning, taskId: runningTaskId } = useTimerContext();
@@ -1179,19 +1179,16 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, customer, onOpenDe
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
 
-  const typeColors   = WORK_TYPE_COLORS[task.workType]   || WORK_TYPE_COLORS.comms;
-  const statusColors = TASK_STATUS_COLORS[task.status]   || TASK_STATUS_COLORS.open;
+  const typeColors = WORK_TYPE_COLORS[task.workType] || WORK_TYPE_COLORS.comms;
   // Only recompute age when the task's creation timestamp changes (not on every parent render)
   const ageDays = useMemo(
     () => Math.floor((Date.now() - new Date(task.createdAt)) / 86_400_000),
     [task.createdAt]
   );
-  // 0–7d: muted gray  |  8–13d: amber warning  |  14+d: red urgent
-  const ageStyle = ageDays < 8
-    ? 'text-muted-foreground'
-    : ageDays < 14
-      ? 'text-amber-400'
-      : 'text-red-400';
+  // Age color: ≤7d muted, >7d amber warning
+  const ageColor = ageDays > 7 ? 'text-[#f59e0b]' : 'text-[#5a5e72]';
+  // Status dot color
+  const statusDotColor = { open: 'bg-amber-400', 'in-progress': 'bg-blue-400', blocked: 'bg-red-400', done: 'bg-green-400', archived: 'bg-gray-400' }[task.status] || 'bg-amber-400';
   // Pre-parse Jira URLs once per description change — avoids regex exec on every render
   const { cleanText: descCleanText, tickets: descTickets } = useMemo(
     () => extractJiraLinks(task.description),
@@ -1202,11 +1199,14 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, customer, onOpenDe
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex items-center gap-2 rounded-xl px-3 py-2.5 transition-all ${
-        isSelected
-          ? 'bg-brand-lavender/10 border border-indigo-500/40'
-          : 'bg-secondary/50 border border-border/60 hover:border-border'
-      }`}
+      className={`group flex items-start gap-3 rounded-[10px] px-4 py-[14px] border transition-[all_0.15s_ease]
+        shadow-[0_1px_3px_rgba(0,0,0,0.4),0_0_0_1px_rgba(255,255,255,0.05)]
+        hover:shadow-[0_4px_16px_rgba(0,0,0,0.5),0_0_0_1px_rgba(99,102,241,0.2)]
+        hover:-translate-y-px
+        ${isSelected
+          ? 'bg-[#1f2235] border-indigo-500/40'
+          : 'bg-[#1a1d2e] border-[rgba(255,255,255,0.07)] hover:bg-[#1f2235] hover:border-[rgba(99,102,241,0.2)]'
+        }`}
     >
       {/* Bulk select checkbox */}
       {onToggleSelect && (
@@ -1215,7 +1215,7 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, customer, onOpenDe
           checked={!!isSelected}
           onChange={() => onToggleSelect(task.id)}
           onClick={e => e.stopPropagation()}
-          className="w-3.5 h-3.5 rounded border-border bg-secondary text-indigo-500 focus:ring-ring/40 focus:ring-1 flex-shrink-0 cursor-pointer accent-indigo-500"
+          className="w-3.5 h-3.5 mt-[3px] rounded border-border bg-secondary text-indigo-500 focus:ring-ring/40 focus:ring-1 flex-shrink-0 cursor-pointer accent-indigo-500"
         />
       )}
 
@@ -1223,7 +1223,7 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, customer, onOpenDe
       <button
         {...attributes}
         {...listeners}
-        className="cursor-grab active:cursor-grabbing text-muted-foreground/70 hover:text-muted-foreground flex-shrink-0 touch-none p-0.5"
+        className="cursor-grab active:cursor-grabbing text-[#5a5e72] hover:text-[#8b8fa8] flex-shrink-0 touch-none p-0.5 mt-[2px]"
         onClick={e => e.stopPropagation()}
         aria-label="Drag to reorder"
       >
@@ -1235,42 +1235,48 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, customer, onOpenDe
         className="flex-1 min-w-0 cursor-pointer"
         onClick={() => onOpenDetail(task)}
       >
-        <div className="flex items-baseline gap-1.5 min-w-0 flex-wrap">
-          {/* Pulsing dot when this task's timer is running */}
-          {isTimerActive && (
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0 self-center" title="Timer running" />
-          )}
-          {customer && (
-            <span
-              className="text-[10px] font-semibold flex-shrink-0 px-1.5 py-0.5 rounded-full"
-              style={{ backgroundColor: (customer.color || '#6366f1') + '22', color: customer.color || '#6366f1' }}
-            >
-              {customer.name}
-            </span>
-          )}
-          <>
-            <span className="text-sm text-foreground/90 truncate">{descCleanText}</span>
-            {descTickets.map(t => (
-              <a
-                key={t.id}
-                href={t.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={e => e.stopPropagation()}
-                className="flex-shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded border border-brand-lavender/30 bg-brand-lavender/10 text-brand-lavender hover:bg-brand-lavender/20 transition-colors"
+        {/* Client tag + timer dot row — above title */}
+        {(isTimerActive || customer) && (
+          <div className="flex items-center gap-1.5 mb-1.5">
+            {isTimerActive && (
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" title="Timer running" />
+            )}
+            {customer && (
+              <span
+                className="text-[11px] font-bold px-2 py-[2px] rounded-[4px]"
+                style={{ backgroundColor: (customer.color || '#6366f1') + '22', color: customer.color || '#6366f1' }}
               >
-                {t.id}
-              </a>
-            ))}
-          </>
-        </div>
-        <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+                {customer.name}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Task title — full word wrap, no truncation */}
+        <p className="text-[14px] font-medium text-[#e8eaf0] leading-[1.5] break-words mb-2">
+          {descCleanText}
+          {descTickets.map(t => (
+            <a
+              key={t.id}
+              href={t.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={e => e.stopPropagation()}
+              className="inline-block ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded border border-brand-lavender/30 bg-brand-lavender/10 text-brand-lavender hover:bg-brand-lavender/20 transition-colors"
+            >
+              {t.id}
+            </a>
+          ))}
+        </p>
+
+        {/* Badges row — type + age + points + ticket link */}
+        <div className="flex items-center gap-2 flex-wrap">
           <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border flex items-center gap-1 ${typeColors.bg} ${typeColors.text} ${typeColors.border}`}>
             {task.isEvergreen && <RefreshCw size={9} />}
             {WORK_TYPE_LABELS[task.workType] || 'Comms'}
           </span>
           <span
-            className={`text-[10px] font-semibold ${ageStyle}`}
+            className={`text-[10px] font-semibold ${ageColor}`}
             title={`Created ${ageDays} day${ageDays === 1 ? '' : 's'} ago`}
           >
             {ageDays}d old
@@ -1288,18 +1294,19 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, customer, onOpenDe
         </div>
       </div>
 
-      {/* Quick status select */}
-      <div onClick={e => e.stopPropagation()} className="flex-shrink-0">
+      {/* Quick status select with colored dot indicator */}
+      <div onClick={e => e.stopPropagation()} className="flex-shrink-0 flex items-center gap-1.5 mt-[2px]">
+        <span className={`w-[6px] h-[6px] rounded-full flex-shrink-0 ${statusDotColor}`} />
         <select
           value={task.status}
           onChange={e => {
             updateTask(task.id, { status: e.target.value });
             onStatusChange?.(e.target.value);
           }}
-          className={`text-[10px] font-semibold rounded-lg px-2 py-1 border cursor-pointer focus:outline-none ${statusColors.bg} ${statusColors.text} ${statusColors.border} bg-transparent`}
+          className="text-[12px] font-medium rounded-[6px] px-3 py-[5px] border border-[rgba(255,255,255,0.07)] bg-[#1e2130] text-[#8b8fa8] cursor-pointer focus:outline-none"
         >
           {TASK_STATUSES.map(s => (
-            <option key={s} value={s} className="bg-secondary text-foreground">{TASK_STATUS_LABELS[s]}</option>
+            <option key={s} value={s} className="bg-[#1e2130] text-foreground">{TASK_STATUS_LABELS[s]}</option>
           ))}
         </select>
       </div>
@@ -1878,10 +1885,10 @@ export default function Triage() {
           {!isRunning && (
             <button
               onClick={() => { setShowTimerTaskForm(v => !v); setShowQuickAdd(false); }}
-              className={`ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
+              className={`ml-auto flex items-center gap-[6px] px-3.5 py-[7px] rounded-[6px] text-[13px] font-medium border transition-[all_0.15s_ease] ${
                 showTimerTaskForm
                   ? 'bg-emerald-700/20 border-emerald-500/40 text-emerald-400'
-                  : 'bg-secondary border-border text-muted-foreground hover:text-brand-sage hover:border-emerald-500/40'
+                  : 'bg-[#1a1d2e] border-[rgba(255,255,255,0.07)] text-[#8b8fa8] hover:bg-[#1f2235] hover:text-[#e8eaf0]'
               }`}
               title="Create a focus task and start timer"
             >
@@ -1891,16 +1898,16 @@ export default function Triage() {
           )}
           <button
             onClick={() => setAiAssistOpen(true)}
-            className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border border-border bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors font-semibold"
+            className="flex items-center gap-[6px] px-3.5 py-[7px] rounded-[6px] text-[13px] font-medium border border-[rgba(255,255,255,0.07)] bg-[#1a1d2e] text-[#8b8fa8] hover:bg-[#1f2235] hover:text-[#e8eaf0] transition-[all_0.15s_ease]"
           >
             <Sparkles size={12} /> AI Assist
           </button>
           <button
             onClick={() => { setShowQuickAdd(v => !v); setShowTimerTaskForm(false); }}
-            className={`${isRunning ? 'ml-auto' : ''} flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
+            className={`${isRunning ? 'ml-auto' : ''} flex items-center gap-[6px] px-3.5 py-[7px] rounded-[6px] text-[13px] font-medium transition-[all_0.15s_ease] ${
               showQuickAdd
-                ? 'bg-brand-lavender/20 border-indigo-500/40 text-brand-lavender/80'
-                : 'bg-secondary border-border text-muted-foreground hover:text-brand-lavender/80 hover:border-indigo-500/40'
+                ? 'bg-[#818cf8] text-white shadow-[0_4px_12px_rgba(99,102,241,0.45)]'
+                : 'bg-[#6366f1] text-white shadow-[0_2px_8px_rgba(99,102,241,0.35)] hover:bg-[#818cf8] hover:shadow-[0_4px_12px_rgba(99,102,241,0.45)]'
             }`}
           >
             <Plus size={12} />
@@ -1951,73 +1958,80 @@ export default function Triage() {
           </div>
         )}
 
-        {/* Filter bar — all rows wrapped with ref for scroll-to */}
-        <div ref={filterRowRef} className="space-y-2 mb-3">
-          {/* Row 1: Customer selector */}
-          <div className="flex gap-2">
+        {/* Filter bar — single horizontal row */}
+        <div ref={filterRowRef} className="flex items-center gap-2 mb-3 overflow-x-auto py-[10px] border-b border-[rgba(255,255,255,0.07)]">
+          {/* Customer dropdown pill */}
+          <select
+            value={filterCustomerId}
+            onChange={e => handleCustomerFilter(e.target.value)}
+            className="flex-shrink-0 bg-[#1a1d2e] border border-[rgba(255,255,255,0.07)] text-[#8b8fa8] py-[6px] px-[10px] rounded-[6px] text-[12.5px] font-medium whitespace-nowrap focus:outline-none cursor-pointer"
+          >
+            <option value="">All clients</option>
+            {customersWithTasks.map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+
+          {/* Work type dropdown pill */}
+          <select
+            value={filterWorkType}
+            onChange={e => { setFilterWorkType(e.target.value); clearSelection(); }}
+            className="flex-shrink-0 bg-[#1a1d2e] border border-[rgba(255,255,255,0.07)] text-[#8b8fa8] py-[6px] px-[10px] rounded-[6px] text-[12.5px] font-medium whitespace-nowrap focus:outline-none cursor-pointer"
+          >
+            <option value="">All types</option>
+            {WORK_TYPES.map(wt => (
+              <option key={wt} value={wt}>{WORK_TYPE_LABELS[wt]}</option>
+            ))}
+          </select>
+
+          {/* Status filter — only on Active tab */}
+          {boardTab === 'active' && (
             <select
-              value={filterCustomerId}
-              onChange={e => handleCustomerFilter(e.target.value)}
-              className="flex-1 bg-secondary border border-border rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+              value={filterStatus}
+              onChange={e => { setFilterStatus(e.target.value); clearSelection(); }}
+              className="flex-shrink-0 bg-[#1a1d2e] border border-[rgba(255,255,255,0.07)] text-[#8b8fa8] py-[6px] px-[10px] rounded-[6px] text-[12.5px] font-medium whitespace-nowrap focus:outline-none cursor-pointer"
             >
-              <option value="">All clients</option>
-              {customersWithTasks.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
+              <option value="">All statuses</option>
+              {TASK_STATUSES.filter(s => !['done', 'archived'].includes(s)).map(s => (
+                <option key={s} value={s}>{TASK_STATUS_LABELS[s]}</option>
               ))}
             </select>
-          </div>
+          )}
 
-          {/* Row 2: Priority quick-filter toggle */}
-          <div className="flex gap-2">
-            <button
-              onClick={() => { setFilterPriorityClients(v => !v); clearSelection(); }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                filterPriorityClients
-                  ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
-                  : 'bg-secondary border-border text-muted-foreground hover:text-amber-300 hover:border-amber-500/40'
-              }`}
-            >
-              {filterPriorityClients ? <Check size={11} /> : <Pin size={11} />} Priority Clients
-            </button>
-          </div>
+          {/* Vertical divider — shown when Priority Clients chip is active */}
+          {filterPriorityClients && (
+            <div className="w-px h-[18px] bg-[rgba(255,255,255,0.07)] flex-shrink-0" />
+          )}
 
-          {/* Row 3: Work type + status (no ✕ button — see "Clear all" link below) */}
-          <div className="flex gap-2">
-            <select
-              value={filterWorkType}
-              onChange={e => { setFilterWorkType(e.target.value); clearSelection(); }}
-              className="flex-1 bg-secondary border border-border rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
-            >
-              <option value="">All types</option>
-              {WORK_TYPES.map(wt => (
-                <option key={wt} value={wt}>{WORK_TYPE_LABELS[wt]}</option>
-              ))}
-            </select>
-            {/* Status filter only shown on Active tab; Closed tab always shows done+archived */}
-            {boardTab === 'active' && (
-              <select
-                value={filterStatus}
-                onChange={e => { setFilterStatus(e.target.value); clearSelection(); }}
-                className="flex-1 bg-secondary border border-border rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
-              >
-                <option value="">All statuses</option>
-                {TASK_STATUSES.filter(s => !['done', 'archived'].includes(s)).map(s => (
-                  <option key={s} value={s}>{TASK_STATUS_LABELS[s]}</option>
-                ))}
-              </select>
-            )}
-          </div>
-
-          {/* Clear all filters — right-aligned text link, appears only when any filter is active */}
-          {filtersActive && (
-            <div className="flex justify-end">
+          {/* Priority Clients — amber chip when active, ghost pill when inactive */}
+          {filterPriorityClients ? (
+            <span className="flex-shrink-0 flex items-center gap-1.5 bg-[rgba(245,158,11,0.12)] text-[#f59e0b] border border-[rgba(245,158,11,0.2)] py-1 px-[10px] rounded-[20px] text-[11.5px] font-semibold whitespace-nowrap">
+              Priority Clients
               <button
-                onClick={clearAllFilters}
-                className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
+                onClick={() => { setFilterPriorityClients(false); clearSelection(); }}
+                className="text-[#f59e0b] hover:text-amber-300 ml-0.5 leading-none"
+                aria-label="Remove Priority Clients filter"
               >
-                Clear all filters
+                ✕
               </button>
-            </div>
+            </span>
+          ) : (
+            <button
+              onClick={() => { setFilterPriorityClients(true); clearSelection(); }}
+              className="flex-shrink-0 flex items-center gap-[6px] bg-[#1a1d2e] border border-[rgba(255,255,255,0.07)] text-[#8b8fa8] py-[6px] px-[10px] rounded-[6px] text-[12.5px] font-medium whitespace-nowrap hover:bg-[#1f2235] hover:text-[#e8eaf0] transition-[all_0.15s_ease]"
+            >
+              <Pin size={11} /> Priority Clients
+            </button>
+          )}
+
+          {/* Clear all filters link — pushed to the right */}
+          {filtersActive && (
+            <button
+              onClick={clearAllFilters}
+              className="ml-auto flex-shrink-0 text-[12px] text-[#5a5e72] hover:text-[#8b8fa8] transition-colors whitespace-nowrap"
+            >
+              Clear all filters
+            </button>
           )}
         </div>
 
@@ -2122,12 +2136,36 @@ export default function Triage() {
         {/* Active tab — draggable task list */}
         {boardTab === 'active' && (
           activeTasks.length === 0 ? (
-            <div className="bg-card border border-border rounded-2xl px-5 py-10 text-center">
-              <Tag size={24} className="text-muted-foreground/60 mx-auto mb-2" />
-              <p className="text-muted-foreground text-sm">{filtersActive ? 'No tasks match this filter.' : 'No active tasks.'}</p>
-              <p className="text-muted-foreground/70 text-xs mt-1">
-                {filtersActive ? 'Try a different filter.' : 'Convert a meeting entry above or add a task to get started.'}
+            <div className="bg-[#1a1d2e] border border-dashed border-[rgba(255,255,255,0.1)] rounded-[10px] px-8 py-12 flex flex-col items-center text-center gap-[14px]">
+              {/* Icon */}
+              <div className="w-14 h-14 rounded-[16px] bg-[rgba(99,102,241,0.15)] flex items-center justify-center flex-shrink-0">
+                <Check size={26} className="text-[#6366f1]" />
+              </div>
+              {/* Title */}
+              <h3 className="text-[15px] font-semibold text-[#e8eaf0]">
+                {filtersActive ? 'No tasks match this filter.' : "You're all caught up on active tasks"}
+              </h3>
+              {/* Subtitle */}
+              <p className="text-[13px] text-[#5a5e72] max-w-[340px] leading-[1.6]">
+                {filtersActive
+                  ? 'Try adjusting your filters or clear them to see all tasks.'
+                  : 'No more tasks in this view. Add a new task or switch to In Progress to keep the momentum going.'}
               </p>
+              {/* Action buttons */}
+              <div className="flex gap-2 mt-1">
+                <button
+                  onClick={() => { setBoardTab('in-progress'); setFilterStatus(''); setFilterCustomerId(''); setFilterWorkType(''); setFilterPriorityClients(false); clearSelection(); }}
+                  className="flex items-center gap-[6px] px-3.5 py-[7px] rounded-[6px] text-[13px] font-medium border border-[rgba(255,255,255,0.07)] bg-[#1a1d2e] text-[#8b8fa8] hover:bg-[#1f2235] hover:text-[#e8eaf0] transition-[all_0.15s_ease]"
+                >
+                  View All Tasks
+                </button>
+                <button
+                  onClick={() => { setShowQuickAdd(v => !v); setShowTimerTaskForm(false); }}
+                  className="flex items-center gap-[6px] px-3.5 py-[7px] rounded-[6px] text-[13px] font-medium bg-[#6366f1] text-white shadow-[0_2px_8px_rgba(99,102,241,0.35)] hover:bg-[#818cf8] hover:shadow-[0_4px_12px_rgba(99,102,241,0.45)] transition-[all_0.15s_ease]"
+                >
+                  + Add Task
+                </button>
+              </div>
             </div>
           ) : (
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>

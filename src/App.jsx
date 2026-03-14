@@ -6,6 +6,8 @@ import { GoogleAuthProvider } from './context/GoogleAuthContext';
 import Navigation from './components/Navigation';
 import TimerWidget from './components/TimerWidget';
 import QuickStartFAB from './components/QuickStartFAB';
+import { UpdateBanner, OfflineBanner } from './components/PWABanners';
+import { useServiceWorker } from './hooks/useServiceWorker';
 import ErrorBoundary from './components/ErrorBoundary';
 
 // Lazy-load each page so the initial bundle only contains Navigation + TimerWidget.
@@ -36,6 +38,7 @@ function PageFallback() {
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState('triage');
+  const { needsUpdate, isOffline, applyUpdate, dismissUpdate } = useServiceWorker();
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
@@ -43,6 +46,9 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-background">
+      {needsUpdate && <UpdateBanner onReload={applyUpdate} onDismiss={dismissUpdate} />}
+      {isOffline && !needsUpdate && <OfflineBanner />}
+
       <Navigation activeTab={activeTab} onTabChange={handleTabChange} />
 
       {/* Main content — offset matches sidebar: icon-only (md:w-16) at md, full (lg:w-56) at lg */}
