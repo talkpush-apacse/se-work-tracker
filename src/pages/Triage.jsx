@@ -1029,6 +1029,7 @@ function TimerQuickTaskForm({ customers, onSubmit, onStartWithoutTask, onCancel 
 // ─── Quick add task form (no meeting entry, just description + customer link) ───
 function QuickAddTaskForm({ customers, onSubmit, onCancel }) {
   const { okrs } = useAppStore();
+  const [mode, setMode] = useState('single'); // 'single' | 'bulk'
   const [form, setForm] = useState({
     customerId:      '',
     description:     '',
@@ -1037,21 +1038,66 @@ function QuickAddTaskForm({ customers, onSubmit, onCancel }) {
     okrId:           '',
     isEvergreen:     false,
   });
+  const [bulkText, setBulkText] = useState('');
 
   // Live list grows when user creates new entries via InlineCustomerCreate
   const [localCustomers, setLocalCustomers] = useState(customers);
   const [showInlineCreate, setShowInlineCreate] = useState(false);
 
-  const canSubmit = form.customerId && form.description.trim();
+  // Parse bulk textarea into individual task descriptions (one per non-empty line)
+  const bulkLines = useMemo(
+    () => bulkText.split('\n').map(l => l.trim()).filter(Boolean),
+    [bulkText]
+  );
+
+  const canSubmit = mode === 'single'
+    ? form.description.trim().length > 0
+    : bulkLines.length > 0;
+
+  const handleSubmit = () => {
+    if (mode === 'single') {
+      onSubmit([{ ...form, description: form.description.trim() }]);
+    } else {
+      onSubmit(bulkLines.map(desc => ({
+        customerId:  form.customerId || null,
+        description: desc,
+        workType:    form.workType,
+        status:      form.status,
+        okrId:       form.okrId,
+        isEvergreen: form.isEvergreen,
+      })));
+    }
+  };
 
   return (
     <div className="bg-secondary/60 border border-indigo-500/30 rounded-xl p-3 space-y-3">
-      <p className="text-xs font-semibold text-brand-lavender/80 uppercase tracking-wide">New Task</p>
+      {/* Header + mode toggle */}
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold text-brand-lavender/80 uppercase tracking-wide">New Task</p>
+        <div className="flex items-center gap-0.5 bg-secondary border border-border rounded-lg p-0.5">
+          {['single', 'bulk'].map(m => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setMode(m)}
+              className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all ${
+                mode === m
+                  ? 'bg-brand-lavender text-white'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {m === 'single' ? 'Single' : 'Bulk'}
+            </button>
+          ))}
+        </div>
+      </div>
 
-      {/* Customer selector */}
+      {/* Customer selector — optional for both modes */}
       <div>
         <div className="flex items-center justify-between mb-1">
-          <label className="text-xs text-muted-foreground">Customer *</label>
+          <label className="text-xs text-muted-foreground">
+            Customer <span className="text-muted-foreground/50">(optional)</span>
+          </label>
           <button
             type="button"
             onClick={() => setShowInlineCreate(v => !v)}
@@ -1065,7 +1111,7 @@ function QuickAddTaskForm({ customers, onSubmit, onCancel }) {
           onChange={e => setForm(p => ({ ...p, customerId: e.target.value }))}
           className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
         >
-          <option value="">— Select customer —</option>
+          <option value="">— No customer —</option>
           {localCustomers.map(c => (
             <option key={c.id} value={c.id}>{c.name}</option>
           ))}
@@ -1081,17 +1127,42 @@ function QuickAddTaskForm({ customers, onSubmit, onCancel }) {
         )}
       </div>
 
-      {/* Description */}
-      <div>
-        <label className="block text-xs text-muted-foreground mb-1">Task Description *</label>
-        <textarea
-          rows={2}
-          value={form.description}
-          onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
-          placeholder="What needs to be done?"
-          className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40 resize-none"
-        />
-      </div>
+      {/* Single mode: single description textarea */}
+      {mode === 'single' && (
+        <div>
+          <label className="block text-xs text-muted-foreground mb-1">Task Description *</label>
+          <textarea
+            rows={2}
+            autoFocus
+            value={form.description}
+            onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+            placeholder="What needs to be done?"
+            className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40 resize-none"
+          />
+        </div>
+      )}
+
+      {/* Bulk mode: multi-line textarea, one task per line */}
+      {mode === 'bulk' && (
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-xs text-muted-foreground">Tasks — one per line *</label>
+            {bulkLines.length > 0 && (
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-brand-lavender/15 text-brand-lavender border border-brand-lavender/20">
+                {bulkLines.length} task{bulkLines.length !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+          <textarea
+            rows={6}
+            autoFocus
+            value={bulkText}
+            onChange={e => setBulkText(e.target.value)}
+            placeholder={"Follow up on deployment timeline\nSchedule kickoff call with client\nReview UAT feedback doc"}
+            className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40 resize-none"
+          />
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         <div>
@@ -1161,10 +1232,12 @@ function QuickAddTaskForm({ customers, onSubmit, onCancel }) {
         <button
           type="button"
           disabled={!canSubmit}
-          onClick={() => onSubmit({ ...form, description: form.description.trim() })}
+          onClick={handleSubmit}
           className="flex-1 py-2 rounded-xl bg-brand-lavender hover:bg-brand-lavender/80 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-foreground transition-colors"
         >
-          Create Task
+          {mode === 'bulk' && bulkLines.length > 1
+            ? `Create ${bulkLines.length} Tasks`
+            : 'Create Task'}
         </button>
       </div>
     </div>
@@ -1942,15 +2015,15 @@ export default function Triage() {
           <div className="mb-3">
             <QuickAddTaskForm
               customers={customers}
-              onSubmit={(formData) => {
-                addTask({
-                  customerId: formData.customerId,
-                  okrId: formData.okrId || null,
-                  description: formData.description,
-                  workType: formData.workType,
-                  isEvergreen: formData.isEvergreen || undefined,
-                  status: formData.status,
-                });
+              onSubmit={(tasks) => {
+                tasks.forEach(t => addTask({
+                  customerId:  t.customerId || null,
+                  okrId:       t.okrId || null,
+                  description: t.description,
+                  workType:    t.workType,
+                  isEvergreen: t.isEvergreen || undefined,
+                  status:      t.status,
+                }));
                 setShowQuickAdd(false);
               }}
               onCancel={() => setShowQuickAdd(false)}

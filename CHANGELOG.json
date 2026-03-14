@@ -1,6 +1,18 @@
 {
   "versions": [
     {
+      "version": "2.3.1",
+      "codename": "Open Gate",
+      "date": "2026-03-15",
+      "summary": "Bulk task creation + customer made optional on tasks",
+      "changes": [
+        { "type": "feat", "description": "Bulk add mode in Quick Add form — paste one task per line to create multiple tasks at once" },
+        { "type": "feat", "description": "Task count badge updates live as you type in bulk mode" },
+        { "type": "feat", "description": "Customer is now optional on all tasks — select 'No customer' to create unattached tasks" },
+        { "type": "fix", "description": "Single/Bulk mode toggle pill in Quick Add form header" }
+      ]
+    },
+    {
       "version": "2.3.0",
       "codename": "Quiet Tide",
       "date": "2026-03-14",
