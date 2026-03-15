@@ -1,6 +1,19 @@
 {
   "versions": [
     {
+      "version": "2.8.0",
+      "codename": "Throughput Rising",
+      "date": "2026-03-15",
+      "summary": "Voice Comms full flow — multi-step modal with TipTap editor",
+      "changes": [
+        { "type": "feat", "description": "VoiceCommsModal: full record → transcript → draft → edit flow" },
+        { "type": "feat", "description": "Transcript confirmation step — edit Whisper output before drafting" },
+        { "type": "feat", "description": "TipTap rich text editor for drafts with Bold/Italic/Underline toolbar" },
+        { "type": "feat", "description": "Optional client context picker passes customer name into the Claude prompt" },
+        { "type": "feat", "description": "Re-record button resets entire flow from any step" }
+      ]
+    },
+    {
       "version": "2.7.0",
       "codename": "Sprint Fresh",
       "date": "2026-03-15",
