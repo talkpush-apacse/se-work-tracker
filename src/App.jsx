@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense } from 'react';
+import { useState, useCallback, lazy, Suspense } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { StoreProvider } from './context/StoreContext';
 import { TimerProvider } from './context/TimerContext';
@@ -40,9 +40,9 @@ function AppContent() {
   const [activeTab, setActiveTab] = useState('triage');
   const { needsUpdate, isOffline, applyUpdate, dismissUpdate } = useServiceWorker();
 
-  const handleTabChange = (tab) => {
+  const handleTabChange = useCallback((tab) => {
     setActiveTab(tab);
-  };
+  }, []);
 
   return (
     <div className="min-h-screen bg-background">

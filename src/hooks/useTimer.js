@@ -34,16 +34,18 @@ function calcElapsed(startedAt) {
 }
 
 export function useTimer() {
-  // Initialise state from localStorage so page refresh is transparent
-  const [timerState, setTimerState] = useState(() => {
+  // Read localStorage once and derive both initial values from the same read.
+  // Using useRef ensures the initializer runs exactly once (on first render)
+  // without triggering extra re-renders.
+  const initRef = useRef(undefined);
+  if (initRef.current === undefined) {
     const saved = loadTimerState();
-    return saved && saved.isRunning ? saved : null;
-  });
+    const active = saved?.isRunning ? saved : null;
+    initRef.current = { timerState: active, elapsed: active ? calcElapsed(active.startedAt) : 0 };
+  }
 
-  const [elapsedSeconds, setElapsedSeconds] = useState(() => {
-    const saved = loadTimerState();
-    return saved && saved.isRunning ? calcElapsed(saved.startedAt) : 0;
-  });
+  const [timerState, setTimerState] = useState(initRef.current.timerState);
+  const [elapsedSeconds, setElapsedSeconds] = useState(initRef.current.elapsed);
 
   // stoppedSession is set when the timer stops; TimerWidget watches it to open SaveSessionModal
   const [stoppedSession, setStoppedSession] = useState(null);

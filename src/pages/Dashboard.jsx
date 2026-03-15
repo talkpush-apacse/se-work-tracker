@@ -91,7 +91,8 @@ export default function Dashboard({ onNavigate }) {
       const entries = points.filter(pt => pt.customerId === customer.id);
       const totalPoints = entries.reduce((s, e) => s + e.points, 0);
       const totalHours = entries.reduce((s, e) => s + e.hours, 0);
-      const lastActivity = entries.length ? entries.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0].timestamp : null;
+      const lastActivity = entries.reduce((latest, e) =>
+        !latest || e.timestamp > latest ? e.timestamp : latest, null);
       const taskCount = tasks.filter(t => t.customerId === customer.id).length;
       return { ...customer, totalPoints, totalHours, lastActivity, taskCount };
     }).filter(c => c.totalPoints > 0 || c.taskCount > 0)

@@ -25,6 +25,12 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'OpenAI API key not configured' });
   }
 
+  // Reject oversized uploads before buffering — OpenAI Whisper's hard limit is 25 MB
+  const contentLength = parseInt(req.headers['content-length'], 10);
+  if (contentLength && contentLength > 25 * 1024 * 1024) {
+    return res.status(413).json({ error: 'Audio file too large (max 25 MB)' });
+  }
+
   try {
     // Buffer the raw multipart body and forward it verbatim to OpenAI.
     // Preserves the Content-Type (including multipart boundary) set by the browser.

@@ -1,6 +1,24 @@
 {
   "versions": [
     {
+      "version": "2.6.2",
+      "codename": "Runway Open",
+      "date": "2026-03-15",
+      "summary": "Code review fixes — 3 bugs, 6 optimisations",
+      "changes": [
+        { "type": "fix", "description": "SW update-check interval now correctly cleaned up on unmount (was leaking forever)" },
+        { "type": "fix", "description": "Webhook-created tasks now use current workType + isEvergreen schema (no longer writes deprecated taskType)" },
+        { "type": "fix", "description": "Knowledge: handleNavigateToTriage no longer silently discards taskId param" },
+        { "type": "fix", "description": "Knowledge: highlightText regex compiled once per query instead of once per card render" },
+        { "type": "fix", "description": "Knowledge: AnimatePresence removed from virtualizer (was exit-animating scroll-removed items)" },
+        { "type": "fix", "description": "Timer: localStorage read on init reduced from 2 calls to 1 via shared useRef initialiser" },
+        { "type": "fix", "description": "Dashboard: lastActivity lookup changed from O(n log n) sort to O(n) reduce" },
+        { "type": "fix", "description": "TimerContext: removed dead prevClientIdsRef (was set but never read)" },
+        { "type": "fix", "description": "App: handleTabChange wrapped in useCallback to prevent Navigation re-renders" },
+        { "type": "fix", "description": "transcribe API: added 25 MB Content-Length guard matching OpenAI Whisper hard limit" }
+      ]
+    },
+    {
       "version": "2.6.1",
       "codename": "Runway Open",
       "date": "2026-03-15",

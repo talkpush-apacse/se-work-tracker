@@ -3,17 +3,28 @@
  *
  * Body (JSON):
  *   description  (string, required) — task description
- *   taskType     (string, optional) — 'comms' | 'focus-time' | 'evergreen'  (default: 'comms')
- *   status       (string, optional) — 'open' | 'in-progress'                (default: 'open')
+ *   workType     (string, optional) — 'deep_work'|'meetings'|'comms'|'admin' (default: 'comms')
+ *   taskType     (string, optional) — legacy alias; mapped to workType for backward compat
+ *   status       (string, optional) — 'open' | 'in-progress'               (default: 'open')
  *   customerId   (string, optional) — UUID of customer to link             (default: null)
+ *   isEvergreen  (boolean, optional) — marks task as weekly-recurring       (default: false)
  *
  * Returns: { ok: true, task: { ... } }
  */
 import { randomUUID } from 'crypto';
 import { sql, authorize } from '../_db.js';
 
-const VALID_TASK_TYPES = new Set(['comms', 'focus-time', 'evergreen', 'recurring']);
-const VALID_STATUSES = new Set(['open', 'in-progress']);
+// Current valid work types (matches frontend WORK_TYPES constant)
+const VALID_WORK_TYPES = new Set(['deep_work', 'meetings', 'comms', 'admin']);
+const VALID_STATUSES   = new Set(['open', 'in-progress']);
+
+// Map legacy taskType values (from old Apple Shortcuts) → current workType
+const TASK_TYPE_TO_WORK_TYPE = {
+  'comms':      'comms',
+  'focus-time': 'deep_work',
+  'evergreen':  'comms',   // evergreen is a recurrence flag, not a work type
+  'recurring':  'comms',
+};
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -25,34 +36,42 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { description, taskType, status, customerId } = req.body || {};
+    const { description, workType, taskType, status, customerId, isEvergreen } = req.body || {};
 
     // Validate required field
     if (!description || typeof description !== 'string' || !description.trim()) {
       return res.status(400).json({ error: 'Missing or empty "description"' });
     }
 
-    // Validate optional fields
-    const resolvedTaskType = taskType && VALID_TASK_TYPES.has(taskType) ? taskType : 'comms';
-    const resolvedStatus = status && VALID_STATUSES.has(status) ? status : 'open';
+    // Resolve workType: prefer explicit workType, fall back to mapped taskType, then 'comms'
+    const rawType = workType || taskType;
+    const resolvedWorkType = VALID_WORK_TYPES.has(rawType)
+      ? rawType
+      : (TASK_TYPE_TO_WORK_TYPE[rawType] || 'comms');
+
+    // isEvergreen: explicit flag OR inferred from legacy taskType='evergreen'
+    const resolvedIsEvergreen = isEvergreen === true || taskType === 'evergreen';
+
+    const resolvedStatus     = VALID_STATUSES.has(status) ? status : 'open';
     const resolvedCustomerId = customerId || null;
 
-    // Build task object (matches the shape used by the frontend store)
+    // Build task object using the current schema (workType + isEvergreen, no taskType)
     const task = {
-      id: randomUUID(),
-      createdAt: new Date().toISOString(),
-      customerId: resolvedCustomerId,
-      okrId: null,
+      id:             randomUUID(),
+      createdAt:      new Date().toISOString(),
+      customerId:     resolvedCustomerId,
+      okrId:          null,
       meetingEntryId: null,
-      description: description.trim(),
-      taskType: resolvedTaskType,
-      status: resolvedStatus,
+      description:    description.trim(),
+      workType:       resolvedWorkType,
+      isEvergreen:    resolvedIsEvergreen,
+      status:         resolvedStatus,
       assigneeOrTeam: null,
-      points: 0,
-      closedAt: null,
-      ticketUrl: null,
-      notes: null,
-      attachments: [],
+      points:         0,
+      closedAt:       null,
+      ticketUrl:      null,
+      notes:          null,
+      attachments:    [],
     };
 
     // Fetch current tasks, append new one, save back

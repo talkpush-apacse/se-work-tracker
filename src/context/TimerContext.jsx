@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useRef } from 'react';
+import { createContext, useContext, useEffect, useMemo } from 'react';
 import { useTimer } from '../hooks/useTimer';
 import { useAppStore } from './StoreContext';
 
@@ -12,9 +12,8 @@ export function TimerProvider({ children }) {
   const timer = useTimer();
   const { customers } = useAppStore();
 
-  // If ALL tagged clients are deleted while timer is running, remove them from timer state
+  // If tagged clients are deleted while timer is running, remove them from timer state
   // (but don't stop the timer — work type is the primary dimension now)
-  const prevClientIdsRef = useRef(timer.clientIds);
   useEffect(() => {
     if (timer.isRunning && timer.clientIds.length > 0) {
       const stillExist = timer.clientIds.filter(id => customers.some(c => c.id === id));
@@ -30,7 +29,6 @@ export function TimerProvider({ children }) {
         } catch { /* ignore */ }
       }
     }
-    prevClientIdsRef.current = timer.clientIds;
   }, [customers, timer.isRunning, timer.clientIds]);
 
   // Memoised control value — reference stays stable between every 1-second tick,

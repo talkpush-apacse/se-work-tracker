@@ -65,12 +65,18 @@ export function useServiceWorker() {
       }
     }
 
-    register();
+    // Capture the cleanup function from the async register() — it returns
+    // () => clearInterval(interval) once registration succeeds. Without this,
+    // the update-check interval leaks and runs forever after unmount.
+    let swCleanup = null;
+    register().then(fn => { swCleanup = fn; });
 
     // When the new SW activates (after skipWaiting), reload the page
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       window.location.reload();
     });
+
+    return () => swCleanup?.();
   }, []);
 
   // ── Apply Update ──

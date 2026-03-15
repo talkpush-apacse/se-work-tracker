@@ -85,16 +85,18 @@ function matchesKeyword(entry, words) {
   return words.every(w => haystack.includes(w));
 }
 
-function highlightText(text, words) {
-  if (!text || words.length === 0) return text;
-  const escaped = words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-  const regex = new RegExp(`(${escaped.join('|')})`, 'gi');
+// Accepts a pre-compiled RegExp (memoized by the parent) instead of rebuilding
+// on every card render. Caller resets lastIndex before passing the regex in.
+function highlightText(text, regex) {
+  if (!text || !regex) return text;
+  regex.lastIndex = 0;
   const parts = text.split(regex);
-  return parts.map((part, i) =>
-    regex.test(part)
+  return parts.map((part, i) => {
+    regex.lastIndex = 0;
+    return regex.test(part)
       ? <mark key={i} className="bg-amber-400/30 text-foreground rounded px-0.5">{part}</mark>
-      : part
-  );
+      : part;
+  });
 }
 
 // ── Skeleton loader ───────────────────────────────────────────────────────────
@@ -311,7 +313,7 @@ function AddNoteModal({ customers, initialData, onSave, onClose }) {
 }
 
 // ── Memory card ───────────────────────────────────────────────────────────────
-function MemoryCard({ entry, queryWords, aiActive, aiReason, onClick }) {
+function MemoryCard({ entry, highlightRegex, aiActive, aiReason, onClick }) {
   const colors = getEntryColors(entry);
   const dateStr = formatEntryDate(entry.date);
 
@@ -361,7 +363,7 @@ function MemoryCard({ entry, queryWords, aiActive, aiReason, onClick }) {
 
           {/* Text — 2-line clamp */}
           <p className="text-xs text-foreground/90 leading-relaxed line-clamp-2">
-            {queryWords.length > 0 ? highlightText(entry.text, queryWords) : entry.text}
+            {highlightRegex ? highlightText(entry.text, highlightRegex) : entry.text}
           </p>
 
           {/* AI reason */}
@@ -490,7 +492,19 @@ export default function Knowledge({ onNavigate }) {
     ? aiRankedEntries.filter(e => filteredEntries.some(f => f.id === e.id))
     : filteredEntries;
 
-  const queryWords = debouncedQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  // Memoize to a stable array reference — prevents every MemoryCard from getting
+  // a new prop reference on unrelated re-renders (e.g. selectedEntry changes)
+  const queryWords = useMemo(
+    () => debouncedQuery.trim().toLowerCase().split(/\s+/).filter(Boolean),
+    [debouncedQuery]
+  );
+
+  // Compile the highlight regex once per query instead of once per card render
+  const highlightRegex = useMemo(() => {
+    if (!queryWords.length) return null;
+    const escaped = queryWords.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    return new RegExp(`(${escaped.join('|')})`, 'gi');
+  }, [queryWords]);
 
   // ── Virtualization ──
   const shouldVirtualize = displayEntries.length > 200;
@@ -571,7 +585,7 @@ export default function Knowledge({ onNavigate }) {
   };
 
   // ── Navigation helper ──
-  const handleNavigateToTriage = (taskId) => {
+  const handleNavigateToTriage = () => {
     onNavigate?.('triage');
   };
 
@@ -710,20 +724,40 @@ export default function Knowledge({ onNavigate }) {
           {/* Top spacer for virtualization */}
           {paddingTop > 0 && <div style={{ height: paddingTop }} />}
 
-          <AnimatePresence mode="popLayout" initial={false}>
+          {/*
+            AnimatePresence is only used when NOT virtualizing. When virtualizing,
+            items leaving visibleEntries (due to scroll) would each trigger an exit
+            animation, creating invisible animated elements at the viewport edge.
+          */}
+          {shouldVirtualize ? (
             <div className="space-y-2">
               {visibleEntries.map(entry => (
                 <MemoryCard
                   key={`${entry.entityType}-${entry.id}`}
                   entry={entry}
-                  queryWords={queryWords}
+                  highlightRegex={highlightRegex}
                   aiActive={aiActive}
                   aiReason={aiReasons[entry.id]}
                   onClick={setSelectedEntry}
                 />
               ))}
             </div>
-          </AnimatePresence>
+          ) : (
+            <AnimatePresence mode="popLayout" initial={false}>
+              <div className="space-y-2">
+                {visibleEntries.map(entry => (
+                  <MemoryCard
+                    key={`${entry.entityType}-${entry.id}`}
+                    entry={entry}
+                    highlightRegex={highlightRegex}
+                    aiActive={aiActive}
+                    aiReason={aiReasons[entry.id]}
+                    onClick={setSelectedEntry}
+                  />
+                ))}
+              </div>
+            </AnimatePresence>
+          )}
 
           {/* Bottom spacer for virtualization */}
           {paddingBottom > 0 && <div style={{ height: paddingBottom }} />}
