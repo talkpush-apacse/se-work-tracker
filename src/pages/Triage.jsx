@@ -1784,7 +1784,7 @@ function TaskDetailView({ task, customer, onBack }) {
 export default function Triage() {
   const {
     tasks, customers, updateTask, addTask, reorderTasks, addPoint, okrs,
-    aiSettings,
+    aiSettings, addAnnotation,
   } = useAppStore();
   const { isRunning, taskId: runningTaskId, startTimer, stopTimer } = useTimerContext();
   const [taskDetailId, setTaskDetailId] = useState(null);
@@ -1795,7 +1795,11 @@ export default function Triage() {
 
   // Voice note state
   const [voiceState, setVoiceState] = useState('idle'); // 'idle' | 'recording' | 'processing'
-  const [voiceToast, setVoiceToast] = useState(null); // { type: 'success'|'error', message } | null
+  const [voiceResult, setVoiceResult] = useState(null); // { draft, transcript } | null
+  const [voiceError, setVoiceError] = useState(null);   // error string | null
+  const [voiceTranscriptOpen, setVoiceTranscriptOpen] = useState(false);
+  const [voiceCopied, setVoiceCopied] = useState(false);
+  const [voiceSaved, setVoiceSaved] = useState(false);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
 
@@ -1949,7 +1953,7 @@ export default function Triage() {
     switchToClosedTab();
   };
 
-  // ── Voice note: record → Whisper → Claude → auto-create task ────────────────
+  // ── Voice note: record → Whisper → Claude draft → show modal ───────────────
   const handleVoiceNote = useCallback(async () => {
     if (voiceState === 'recording') {
       mediaRecorderRef.current?.stop();
@@ -1988,7 +1992,7 @@ export default function Triage() {
           const { text: transcript } = await whisperRes.json();
           if (!transcript?.trim()) throw new Error('No speech detected');
 
-          // 2. Parse with Claude
+          // 2. Draft with Claude — produce a clean, ready-to-send email or message
           const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
             headers: {
@@ -1999,46 +2003,32 @@ export default function Triage() {
             },
             body: JSON.stringify({
               model: 'claude-sonnet-4-6',
-              max_tokens: 256,
+              max_tokens: 600,
+              system: `You are a writing assistant that turns voice notes into clean, ready-to-send emails or messages.
+Style: direct, professional, no filler phrases, no fluff. Get to the point immediately.
+- If it sounds like an email (has a recipient, formal context, or detailed ask): include "Subject: ..." on the first line, then the email body.
+- If it sounds like a Slack message or quick update: write it as a short, direct message — no subject line.
+- Never add explanations, meta-commentary, or anything outside the draft itself.
+- Output only the draft text.`,
               messages: [{
                 role: 'user',
-                content: `Extract a task from this voice note. Return ONLY a JSON object with no extra text:
-{"description":"<clear task description>","workType":"<deep_work|meetings|comms|admin>","customerName":"<client name or null>"}
-
-workType guide: deep_work=focused building/investigation, meetings=calls/syncs, comms=emails/messages/follow-ups, admin=planning/admin.
-Transcript: "${transcript.replace(/"/g, '\\"')}"`,
+                content: `Voice note transcript:\n"${transcript.replace(/"/g, '\\"')}"`,
               }],
             }),
           });
-          if (!claudeRes.ok) throw new Error('AI parsing failed');
+          if (!claudeRes.ok) throw new Error('AI drafting failed');
           const claudeData = await claudeRes.json();
-          const parsed = JSON.parse(claudeData.content[0].text.trim());
+          const draft = claudeData.content[0].text.trim();
 
-          // 3. Fuzzy-match customer name if mentioned
-          const matchedCustomer = parsed.customerName
-            ? customers.find(c =>
-                c.name.toLowerCase().includes(parsed.customerName.toLowerCase()) ||
-                parsed.customerName.toLowerCase().includes(c.name.toLowerCase()))
-            : null;
-
-          // 4. Create task directly
-          addTask({
-            customerId:  matchedCustomer?.id || null,
-            description: parsed.description,
-            workType:    ['deep_work', 'meetings', 'comms', 'admin'].includes(parsed.workType)
-              ? parsed.workType : 'comms',
-            status: 'open',
-          });
-
-          const label = parsed.description.length > 55
-            ? parsed.description.slice(0, 55) + '…'
-            : parsed.description;
-          setVoiceToast({ type: 'success', message: `Task added: "${label}"` });
-          setTimeout(() => setVoiceToast(null), 4000);
+          // 3. Show result modal — no task created
+          setVoiceTranscriptOpen(false);
+          setVoiceCopied(false);
+          setVoiceSaved(false);
+          setVoiceResult({ draft, transcript });
         } catch (err) {
           console.error('Voice note error:', err);
-          setVoiceToast({ type: 'error', message: err.message || 'Failed to process voice note' });
-          setTimeout(() => setVoiceToast(null), 4000);
+          setVoiceError(err.message || 'Failed to process voice note');
+          setTimeout(() => setVoiceError(null), 4000);
         } finally {
           setVoiceState('idle');
         }
@@ -2049,10 +2039,10 @@ Transcript: "${transcript.replace(/"/g, '\\"')}"`,
       setVoiceState('recording');
     } catch (err) {
       console.error('Mic access error:', err);
-      setVoiceToast({ type: 'error', message: 'Microphone access denied' });
-      setTimeout(() => setVoiceToast(null), 4000);
+      setVoiceError('Microphone access denied');
+      setTimeout(() => setVoiceError(null), 4000);
     }
-  }, [voiceState, customers, addTask]);
+  }, [voiceState]);
 
   // ── Auto-timer: start on task open, stop + auto-save points on close ───
   // Wrapped in useCallback so handleOpenDetail's own useCallback dep array stays stable
@@ -2611,14 +2601,14 @@ Transcript: "${transcript.replace(/"/g, '\\"')}"`,
       </div>
     )}
 
-    {/* Voice FAB + toast — portalled to document.body to escape motion.div transform context */}
+    {/* Voice FAB + modals — portalled to document.body to escape motion.div transform context */}
     {createPortal(
       <>
         {/* Voice note FAB — floats above the green Start button */}
         <button
           onClick={handleVoiceNote}
           disabled={voiceState === 'processing'}
-          title={voiceState === 'recording' ? 'Tap to stop recording' : 'Add a task by voice'}
+          title={voiceState === 'recording' ? 'Tap to stop recording' : 'Record a voice note'}
           className={`fixed bottom-20 right-6 z-40 flex items-center gap-2 rounded-full text-white shadow-lg px-5 py-3.5 transition-all active:scale-95 md:bottom-[5.5rem] md:right-8 ${
             voiceState === 'recording'
               ? 'bg-red-500 hover:bg-red-400 shadow-red-900/30 animate-pulse'
@@ -2634,15 +2624,99 @@ Transcript: "${transcript.replace(/"/g, '\\"')}"`,
             : <><Mic size={18} /><span className="text-sm font-semibold">Voice</span></>}
         </button>
 
-        {/* Voice note toast — appears above both FABs */}
-        {voiceToast && (
-          <div className={`fixed bottom-36 right-6 z-50 flex items-center gap-2 text-sm
+        {/* Voice error toast */}
+        {voiceError && (
+          <div className="fixed bottom-36 right-6 z-50 flex items-center gap-2 text-sm
                           border rounded-xl px-4 py-2.5 shadow-lg pointer-events-none md:right-8
-                          ${voiceToast.type === 'success'
-                            ? 'text-emerald-400 bg-card border-emerald-500/20'
-                            : 'text-red-400 bg-card border-red-500/20'}`}>
-            {voiceToast.type === 'success' ? <Check size={14} /> : <AlertCircle size={14} />}
-            {voiceToast.message}
+                          text-red-400 bg-card border-red-500/20">
+            <AlertCircle size={14} />
+            {voiceError}
+          </div>
+        )}
+
+        {/* Voice Draft result modal */}
+        {voiceResult && (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/50">
+            <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl flex flex-col max-h-[85vh]">
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                <div className="flex items-center gap-2">
+                  <Mic size={16} className="text-indigo-500" />
+                  <span className="text-sm font-semibold text-gray-900">Voice Draft</span>
+                </div>
+                <button
+                  onClick={() => setVoiceResult(null)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Draft */}
+              <div className="flex-1 overflow-y-auto px-5 pt-4 pb-2">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Draft</span>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(voiceResult.draft);
+                      setVoiceCopied(true);
+                      setTimeout(() => setVoiceCopied(false), 2000);
+                    }}
+                    className="flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-800 transition-colors"
+                  >
+                    {voiceCopied ? <Check size={13} /> : <Copy size={13} />}
+                    {voiceCopied ? 'Copied!' : 'Copy'}
+                  </button>
+                </div>
+                <pre className="whitespace-pre-wrap text-sm text-gray-800 font-sans leading-relaxed bg-gray-50 rounded-lg px-4 py-3 border border-gray-200">
+                  {voiceResult.draft}
+                </pre>
+
+                {/* Transcript toggle */}
+                <button
+                  onClick={() => setVoiceTranscriptOpen(o => !o)}
+                  className="mt-3 flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <ChevronDown size={13} className={`transition-transform ${voiceTranscriptOpen ? 'rotate-180' : ''}`} />
+                  {voiceTranscriptOpen ? 'Hide' : 'Show'} transcript
+                </button>
+                {voiceTranscriptOpen && (
+                  <p className="mt-2 text-xs text-gray-500 bg-gray-50 rounded-lg px-4 py-3 border border-gray-200 italic leading-relaxed">
+                    {voiceResult.transcript}
+                  </p>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="flex items-center justify-between gap-3 px-5 py-4 border-t border-gray-100">
+                <button
+                  onClick={() => setVoiceResult(null)}
+                  className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                >
+                  Dismiss
+                </button>
+                <button
+                  onClick={() => {
+                    addAnnotation({
+                      text: `[Voice Draft]\n${voiceResult.draft}\n\n[Transcript]\n${voiceResult.transcript}`,
+                      date: new Date().toISOString().slice(0, 10),
+                      tag: null,
+                      customerId: null,
+                    });
+                    setVoiceSaved(true);
+                    setTimeout(() => { setVoiceResult(null); setVoiceSaved(false); }, 1200);
+                  }}
+                  disabled={voiceSaved}
+                  className={`flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg transition-all ${
+                    voiceSaved
+                      ? 'bg-emerald-100 text-emerald-700 cursor-default'
+                      : 'bg-teal-600 hover:bg-teal-500 text-white'
+                  }`}
+                >
+                  {voiceSaved ? <><Check size={14} /> Saved!</> : <><Save size={14} /> Save to Knowledge</>}
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </>,
