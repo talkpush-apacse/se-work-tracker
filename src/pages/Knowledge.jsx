@@ -421,7 +421,7 @@ export default function Knowledge() {
       {/* Page header */}
       <div className="flex items-center gap-2 mb-1">
         <Brain size={20} className="text-brand-lavender" />
-        <h1 className="text-xl font-semibold text-foreground">Knowledge Hub</h1>
+        <h1 className="text-2xl font-bold text-foreground">Knowledge Hub</h1>
         <span className="text-xs text-muted-foreground ml-1">Search across all your work history</span>
       </div>
 
@@ -434,7 +434,7 @@ export default function Knowledge() {
           value={query}
           onChange={e => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Search your client knowledge... (press Enter for AI search)"
+          placeholder="Search tasks, highlights, meetings, and more..."
           className="w-full h-12 bg-card border border-border rounded-2xl pl-11 pr-32 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
         />
         <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
@@ -494,17 +494,6 @@ export default function Knowledge() {
             ))}
           </div>
 
-          {/* Provider selector */}
-          <select
-            value={provider}
-            onChange={e => setProvider(e.target.value)}
-            className="ml-auto h-7 bg-secondary border border-border rounded-lg px-2 text-[11px] text-muted-foreground focus:outline-none focus:border-ring"
-            title="AI provider for smart search"
-          >
-            <option value="claude">Claude</option>
-            <option value="openai">OpenAI</option>
-          </select>
-
           {hasFilters && (
             <button
               onClick={clearAll}
@@ -528,6 +517,19 @@ export default function Knowledge() {
               >
                 <option value="">All clients</option>
                 {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+
+            {/* AI provider */}
+            <div>
+              <label className="block text-[10px] font-medium text-muted-foreground mb-1">AI Provider (Smart Search)</label>
+              <select
+                value={provider}
+                onChange={e => setProvider(e.target.value)}
+                className="h-8 bg-secondary border border-border rounded-lg px-2 text-sm text-foreground focus:outline-none focus:border-ring"
+              >
+                <option value="claude">Claude</option>
+                <option value="openai">OpenAI</option>
               </select>
             </div>
 
@@ -656,7 +658,8 @@ export default function Knowledge() {
             return (
               <div
                 key={`${item.type}-${item.id}`}
-                className="bg-card border border-border rounded-2xl px-4 py-3 hover:border-border/80 transition-colors"
+                className="bg-card border border-border rounded-2xl px-4 py-3 hover:shadow-sm hover:bg-secondary/20 transition-all cursor-default"
+                style={{ borderLeft: `3px solid ${cfg.color}` }}
               >
                 <div className="flex items-start gap-3">
                   {/* Type badge */}

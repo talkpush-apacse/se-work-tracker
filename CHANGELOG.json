@@ -1,6 +1,31 @@
 {
   "versions": [
     {
+      "version": "2.4.0",
+      "codename": "Pipeline Crisp",
+      "date": "2026-03-15",
+      "summary": "UX audit P1–P3 — accessibility, typography, colour, and interaction polish across all pages",
+      "changes": [
+        { "type": "fix", "description": "Bump muted-foreground contrast to meet WCAG AA (55% → 58% lightness)" },
+        { "type": "fix", "description": "Keyboard focus rings on all interactive elements throughout the app" },
+        { "type": "fix", "description": "Status dots in Weekly Report use semantic gray (not red) for disconnected state" },
+        { "type": "feat", "description": "Integration onboarding banner in Weekly Report when no integrations are connected" },
+        { "type": "feat", "description": "Report type filter pills (All / Update / Highlight / Blocker / Win) in Weekly Report" },
+        { "type": "feat", "description": "ADD LOG ENTRIES read/write separator in Weekly Report" },
+        { "type": "feat", "description": "Unified text-2xl font-bold h1 across all pages (Weekly Report, Pulse, TimeBudget, Knowledge, Integrations)" },
+        { "type": "feat", "description": "KPI stat cards accented: Points=amber, Hours=lavender, Tasks=sage, Customers=pink" },
+        { "type": "feat", "description": "Category labels replaced with pill-badge + divider line in Weekly Report" },
+        { "type": "feat", "description": "Week nav arrows always visible with bg-secondary/40 (Weekly Report + TimeBudget)" },
+        { "type": "feat", "description": "Decimal hours display replaced with Xh Ym format across TimeBudget" },
+        { "type": "feat", "description": "Focus session label compacted to General Focus Time — 33% · 3 customers" },
+        { "type": "feat", "description": "Emoji Y-axis labels on Pulse 7-day stress trend chart" },
+        { "type": "feat", "description": "TODAY section in sidebar: background tint, bolder date, tabular-nums timer" },
+        { "type": "feat", "description": "UTILITIES overline label added above sidebar utility buttons" },
+        { "type": "fix", "description": "Available hours in TimeBudget now neutral (not green) when not over budget" },
+        { "type": "fix", "description": "Pulse Save/Update button recoloured from rose to brand sage" }
+      ]
+    },
+    {
       "version": "2.3.1",
       "codename": "Open Gate",
       "date": "2026-03-15",

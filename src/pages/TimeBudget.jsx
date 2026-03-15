@@ -54,6 +54,17 @@ function eventToMeeting(event) {
   };
 }
 
+/** Format a decimal hour value as "Xh Ym" (e.g. 5.75 → "5h 45m", 2 → "2h", 0.5 → "30m") */
+function fmtHrs(h) {
+  const abs = Math.abs(h);
+  const hrs = Math.floor(abs);
+  const mins = Math.round((abs - hrs) * 60);
+  const sign = h < 0 ? '-' : '';
+  if (mins === 0) return `${sign}${hrs}h`;
+  if (hrs === 0) return `${sign}${mins}m`;
+  return `${sign}${hrs}h ${mins}m`;
+}
+
 export default function TimeBudget() {
   const { customers, addTask, okrs, points, timeLogs, getTimeBudget, upsertTimeBudget, getWorkTypeTargets, upsertWorkTypeTargets } = useAppStore();
   const { googleToken, logout } = useGoogleAuth();
@@ -360,7 +371,7 @@ export default function TimeBudget() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-foreground flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
             <Clock size={20} className="text-brand-lavender" />
             Time Budget
           </h1>
@@ -370,6 +381,7 @@ export default function TimeBudget() {
           onClick={() => setShowSettings(!showSettings)}
           className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary transition-all"
           title="Budget settings"
+          aria-label="Budget settings"
         >
           <Settings size={16} />
         </button>
@@ -396,21 +408,25 @@ export default function TimeBudget() {
 
       {/* Week navigation */}
       <div className="flex items-center justify-between bg-card border border-border rounded-2xl px-4 py-3">
-        <button onClick={goToPrevWeek} className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-all">
+        <button onClick={goToPrevWeek} className="p-1.5 rounded-lg bg-secondary/40 hover:bg-secondary text-foreground transition-all">
           <ChevronLeft size={16} />
         </button>
         <div className="text-center">
           <p className="text-sm font-semibold text-foreground">
             {format(weekStart, 'MMM d')} – {format(weekEnd, 'MMM d, yyyy')}
           </p>
-          <button
-            onClick={goToThisWeek}
-            className="text-[10px] text-brand-lavender hover:text-brand-lavender/80 font-medium transition-colors mt-0.5"
-          >
-            Go to this week
-          </button>
+          {weekKey !== getMonday(new Date()) ? (
+            <button
+              onClick={goToThisWeek}
+              className="text-[10px] text-brand-lavender hover:text-brand-lavender/80 font-medium transition-colors mt-0.5"
+            >
+              Go to this week
+            </button>
+          ) : (
+            <span className="text-[10px] text-muted-foreground mt-0.5">Current week</span>
+          )}
         </div>
-        <button onClick={goToNextWeek} className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-all">
+        <button onClick={goToNextWeek} className="p-1.5 rounded-lg bg-secondary/40 hover:bg-secondary text-foreground transition-all">
           <ChevronRight size={16} />
         </button>
       </div>
@@ -542,6 +558,7 @@ export default function TimeBudget() {
       {/* ── Health Indicators ─────────────────────────────────────────────────── */}
       {healthAlerts.length > 0 && (
         <div className="space-y-2">
+          <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide px-1">Week Health</p>
           {healthAlerts.map((alert, i) => (
             <div
               key={i}
@@ -562,7 +579,7 @@ export default function TimeBudget() {
       <div>
         <button
           onClick={() => setShowDetailSections(v => !v)}
-          className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors mb-3"
+          className="w-full flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors mb-3"
         >
           {showDetailSections ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           Budget Planning Details
@@ -584,24 +601,24 @@ export default function TimeBudget() {
         <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
           <div className="text-center">
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Meetings</p>
-            <p className="text-lg font-bold text-foreground">{meetingHours}h</p>
+            <p className="text-lg font-bold text-foreground">{fmtHrs(meetingHours)}</p>
           </div>
           <div className="text-center">
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Tasks</p>
-            <p className="text-lg font-bold text-foreground">{taskHours}h</p>
+            <p className="text-lg font-bold text-foreground">{fmtHrs(taskHours)}</p>
           </div>
           <div className="text-center">
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Logged</p>
-            <p className="text-lg font-bold text-purple-400">{loggedHours}h</p>
+            <p className="text-lg font-bold text-purple-400">{fmtHrs(loggedHours)}</p>
           </div>
           <div className="text-center">
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Budgeted</p>
-            <p className="text-lg font-bold text-foreground">{budgeted}h <span className="text-xs font-normal text-muted-foreground">/ {totalBudgetHours}h</span></p>
+            <p className="text-lg font-bold text-foreground">{fmtHrs(budgeted)} <span className="text-xs font-normal text-muted-foreground">/ {totalBudgetHours}h</span></p>
           </div>
           <div className="text-center">
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Available</p>
-            <p className={`text-lg font-bold ${isOverBudget ? 'text-red-400' : 'text-emerald-400'}`}>
-              {isOverBudget ? `${Math.abs(remaining)}h over` : `${remaining}h`}
+            <p className={`text-lg font-bold ${isOverBudget ? 'text-red-400' : 'text-foreground'}`}>
+              {isOverBudget ? `${fmtHrs(Math.abs(remaining))} over` : fmtHrs(remaining)}
             </p>
           </div>
         </div>
@@ -613,7 +630,7 @@ export default function TimeBudget() {
           <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
             <Timer size={14} className="text-purple-400" />
             Focus Time Logged
-            <span className="text-xs font-normal text-muted-foreground">({loggedHours}h)</span>
+            <span className="text-xs font-normal text-muted-foreground">({fmtHrs(loggedHours)})</span>
           </h2>
         </div>
 
@@ -667,7 +684,7 @@ export default function TimeBudget() {
                     <span className={`text-xs font-semibold flex-shrink-0 ${
                       isIncluded ? 'text-foreground' : 'text-muted-foreground'
                     }`}>
-                      {Math.round(s.hours * 100) / 100}h
+                      {fmtHrs(s.hours)}
                     </span>
                   </div>
                 );

@@ -216,16 +216,16 @@ export default function Navigation({ activeTab, onTabChange }) {
         </nav>
 
         {/* Today at a glance — only visible on expanded sidebar (lg) */}
-        <div className="hidden lg:block px-3 py-3 border-t border-sidebar-border">
-          <p className="text-[10px] font-medium text-sidebar-foreground/40 uppercase tracking-wider mb-2 font-nav">Today</p>
-          <p className="text-xs text-sidebar-foreground/60 mb-1.5">{format(now, 'EEEE, MMM d')}</p>
+        <div className="hidden lg:block px-3 py-3 border-t border-sidebar-border bg-sidebar-accent/20">
+          <p className="text-[10px] font-semibold text-sidebar-foreground/50 uppercase tracking-wider mb-2 font-nav">Today</p>
+          <p className="text-sm font-medium text-sidebar-foreground mb-0.5">{format(now, 'EEEE, MMM d')}</p>
           <p className="text-xs text-sidebar-foreground/50">
-            <span className="text-sidebar-foreground font-semibold">{todayPoints}</span> pts logged
+            <span className="text-sidebar-foreground font-bold">{todayPoints}</span> pts logged
           </p>
           {isRunning ? (
             <div className="mt-2 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-brand-sage animate-pulse flex-shrink-0" />
-              <span className="text-[10px] text-brand-sage font-mono">{fmtTimer(elapsedSeconds)}</span>
+              <span className="text-[10px] text-brand-sage font-mono tabular-nums">{fmtTimer(elapsedSeconds)}</span>
               {timerTaskDesc && (
                 <span className="text-[10px] text-sidebar-foreground/40 truncate">{timerTaskDesc}</span>
               )}
@@ -236,6 +236,8 @@ export default function Navigation({ activeTab, onTabChange }) {
         </div>
 
         <div className="p-2 lg:p-3 border-t border-sidebar-border space-y-1">
+          {/* Utilities label — lg only */}
+          <p className="hidden lg:block text-[10px] font-semibold text-sidebar-foreground/30 uppercase tracking-wider px-3 pt-1 pb-0.5 font-nav">Utilities</p>
           {/* Sync status indicator */}
           <div className="flex items-center justify-center lg:justify-start gap-2 px-2 lg:px-3 py-1.5 text-xs">
             {syncStatus === 'loading' && (

@@ -48,6 +48,17 @@ function StressGuide() {
   );
 }
 
+// ── Custom Y-axis tick — shows emoji label instead of a numeral ───────────────
+function EmojiYTick({ x, y, payload }) {
+  const sl = STRESS_LEVELS.find(s => s.level === payload.value);
+  if (!sl) return null;
+  return (
+    <text x={x - 2} y={y} textAnchor="end" dominantBaseline="middle" fontSize={13}>
+      {sl.emoji}
+    </text>
+  );
+}
+
 // ── Custom tooltip for the trend chart ────────────────────────────────────────
 function ChartTooltip({ active, payload }) {
   if (!active || !payload?.length) return null;
@@ -156,15 +167,9 @@ export default function Pulse() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
+        <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
           <Heart size={20} className="text-rose-400" /> Pulse
         </h1>
-        {weekAvg && (
-          <div className="text-sm text-muted-foreground">
-            7-day avg: <span className="font-semibold text-foreground">{weekAvg}/5</span>
-            {' '}{STRESS_LEVELS.find(s => s.level === Math.round(Number(weekAvg)))?.emoji}
-          </div>
-        )}
       </div>
 
       {/* ── Today's Check-in ──────────────────────────────────────────────────── */}
@@ -181,7 +186,7 @@ export default function Pulse() {
               onClick={() => setLevel(sl.level)}
               className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl border transition-all ${
                 level === sl.level
-                  ? 'border-rose-500/50 bg-rose-500/10 ring-1 ring-rose-500/30 scale-105'
+                  ? 'border-brand-sage-darker bg-brand-sage-lightest ring-1 ring-brand-sage-lighter scale-105'
                   : 'border-border bg-secondary/30 hover:bg-secondary/60'
               }`}
             >
@@ -225,7 +230,7 @@ export default function Pulse() {
           <button
             onClick={handleSave}
             disabled={!level || !stressor}
-            className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-semibold text-white transition-colors"
+            className="px-4 py-2 rounded-xl bg-brand-sage-darker hover:bg-brand-sage-darker/80 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-semibold text-foreground transition-colors"
           >
             {saved ? 'Saved!' : editingId ? 'Update' : todayLog ? 'Update' : 'Save'}
           </button>
@@ -242,15 +247,40 @@ export default function Pulse() {
 
       {/* ── 7-Day Trend Chart ─────────────────────────────────────────────────── */}
       <div className="bg-card border border-border rounded-2xl p-5">
-        <h2 className="font-semibold text-foreground mb-4">7-Day Trend</h2>
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h2 className="font-semibold text-foreground leading-tight">7-Day Trend</h2>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Stress level — 1 (calm) to 5 (overwhelmed)</p>
+          </div>
+          {weekAvg && (
+            <div className="text-right">
+              <p className="text-sm font-semibold text-foreground">
+                {weekAvg}/5 {STRESS_LEVELS.find(s => s.level === Math.round(Number(weekAvg)))?.emoji}
+              </p>
+              <p className="text-[10px] text-muted-foreground">7-day avg</p>
+            </div>
+          )}
+        </div>
         {!hasAnyTrend ? (
           <div className="text-center py-8 text-muted-foreground text-sm">
             No check-ins yet this week. Log today's pulse above to start tracking.
           </div>
+        ) : trendData.filter(d => d.level !== null).length < 2 ? (
+          <div className="flex items-center gap-4 py-5 px-2">
+            <span className="text-3xl leading-none">
+              {STRESS_LEVELS.find(s => s.level === trendData.find(d => d.level !== null)?.level)?.emoji}
+            </span>
+            <div>
+              <p className="text-sm text-foreground font-medium">
+                {trendData.find(d => d.level !== null)?.dayLabel}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">Check in for 2+ days to see your trend chart.</p>
+            </div>
+          </div>
         ) : (
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={trendData.filter(d => d.level !== null)} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
+              <AreaChart data={trendData.filter(d => d.level !== null)} margin={{ top: 10, right: 10, bottom: 0, left: 4 }}>
                 <defs>
                   <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#f43f5e" stopOpacity={0.3} />
@@ -266,7 +296,8 @@ export default function Pulse() {
                 <YAxis
                   domain={[1, 5]}
                   ticks={[1, 2, 3, 4, 5]}
-                  tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
+                  tick={<EmojiYTick />}
+                  width={28}
                   axisLine={false}
                   tickLine={false}
                 />
@@ -287,7 +318,7 @@ export default function Pulse() {
                       </text>
                     );
                   }}
-                  activeDot={false}
+                  activeDot={{ r: 5, fill: '#f43f5e', stroke: 'hsl(var(--card))', strokeWidth: 2 }}
                 />
               </AreaChart>
             </ResponsiveContainer>

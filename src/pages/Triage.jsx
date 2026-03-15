@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, memo, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ChevronDown, Plus, Mic, MicOff, Copy, Save, Check,
   Loader2, Sparkles, ChevronLeft, ChevronRight,
@@ -1038,32 +1039,60 @@ function QuickAddTaskForm({ customers, onSubmit, onCancel }) {
     okrId:           '',
     isEvergreen:     false,
   });
-  const [bulkText, setBulkText] = useState('');
+  const [bulkRows, setBulkRows] = useState([
+    { id: crypto.randomUUID(), description: '', customerId: '', okrId: '' }
+  ]);
 
   // Live list grows when user creates new entries via InlineCustomerCreate
   const [localCustomers, setLocalCustomers] = useState(customers);
   const [showInlineCreate, setShowInlineCreate] = useState(false);
 
-  // Parse bulk textarea into individual task descriptions (one per non-empty line)
-  const bulkLines = useMemo(
-    () => bulkText.split('\n').map(l => l.trim()).filter(Boolean),
-    [bulkText]
-  );
+  const addBulkRow = useCallback(() => {
+    setBulkRows(prev => [...prev, { id: crypto.randomUUID(), description: '', customerId: '', okrId: '' }]);
+  }, []);
+
+  const deleteBulkRow = useCallback((id) => {
+    setBulkRows(prev => prev.length > 1 ? prev.filter(r => r.id !== id) : prev);
+  }, []);
+
+  const updateBulkRow = useCallback((id, field, value) => {
+    setBulkRows(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r));
+  }, []);
+
+  // When pasting multi-line text into a row, split into multiple rows
+  const handleRowPaste = useCallback((e, rowId) => {
+    const text = e.clipboardData.getData('text');
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.length <= 1) return;
+    e.preventDefault();
+    setBulkRows(prev => {
+      const idx = prev.findIndex(r => r.id === rowId);
+      const newRows = lines.map((desc, i) => ({
+        id: i === 0 ? rowId : crypto.randomUUID(),
+        description: desc,
+        customerId: prev[idx].customerId,
+        okrId: prev[idx].okrId,
+      }));
+      return [...prev.slice(0, idx), ...newRows, ...prev.slice(idx + 1)];
+    });
+  }, []);
+
+  const filledBulkRows = bulkRows.filter(r => r.description.trim().length > 0);
 
   const canSubmit = mode === 'single'
     ? form.description.trim().length > 0
-    : bulkLines.length > 0;
+    : filledBulkRows.length > 0;
 
   const handleSubmit = () => {
     if (mode === 'single') {
       onSubmit([{ ...form, description: form.description.trim() }]);
     } else {
-      onSubmit(bulkLines.map(desc => ({
-        customerId:  form.customerId || null,
-        description: desc,
+      onSubmit(filledBulkRows.map(row => ({
+        customerId:  row.customerId || null,
+        okrId:       row.okrId     || null,
+        description: row.description.trim(),
         workType:    form.workType,
         status:      form.status,
-        okrId:       form.okrId,
         isEvergreen: form.isEvergreen,
       })));
     }
@@ -1092,40 +1121,65 @@ function QuickAddTaskForm({ customers, onSubmit, onCancel }) {
         </div>
       </div>
 
-      {/* Customer selector — optional for both modes */}
-      <div>
-        <div className="flex items-center justify-between mb-1">
-          <label className="text-xs text-muted-foreground">
-            Customer <span className="text-muted-foreground/50">(optional)</span>
-          </label>
-          <button
-            type="button"
-            onClick={() => setShowInlineCreate(v => !v)}
-            className="text-[10px] font-semibold text-brand-lavender hover:text-brand-lavender/80 transition-colors"
+      {/* Customer selector — single mode only (bulk mode has per-row dropdowns) */}
+      {mode === 'single' && (
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-xs text-muted-foreground">
+              Customer <span className="text-muted-foreground/50">(optional)</span>
+            </label>
+            <button
+              type="button"
+              onClick={() => setShowInlineCreate(v => !v)}
+              className="text-[10px] font-semibold text-brand-lavender hover:text-brand-lavender/80 transition-colors"
+            >
+              {showInlineCreate ? '✕ Cancel' : '+ New Customer'}
+            </button>
+          </div>
+          <select
+            value={form.customerId}
+            onChange={e => setForm(p => ({ ...p, customerId: e.target.value }))}
+            className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
           >
-            {showInlineCreate ? '✕ Cancel' : '+ New Customer'}
-          </button>
+            <option value="">— No customer —</option>
+            {localCustomers.map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+          {showInlineCreate && (
+            <InlineCustomerCreate
+              onCustomerCreated={c => {
+                setLocalCustomers(prev => [...prev, c]);
+                setForm(f => ({ ...f, customerId: c.id }));
+                setShowInlineCreate(false);
+              }}
+            />
+          )}
         </div>
-        <select
-          value={form.customerId}
-          onChange={e => setForm(p => ({ ...p, customerId: e.target.value }))}
-          className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
-        >
-          <option value="">— No customer —</option>
-          {localCustomers.map(c => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </select>
-        {showInlineCreate && (
-          <InlineCustomerCreate
-            onCustomerCreated={c => {
-              setLocalCustomers(prev => [...prev, c]);
-              setForm(f => ({ ...f, customerId: c.id }));
-              setShowInlineCreate(false);
-            }}
-          />
-        )}
-      </div>
+      )}
+
+      {/* Bulk mode: "+ New Customer" button only — customer is selected per-row */}
+      {mode === 'bulk' && (
+        <div>
+          <div className="flex items-center justify-end">
+            <button
+              type="button"
+              onClick={() => setShowInlineCreate(v => !v)}
+              className="text-[10px] font-semibold text-brand-lavender hover:text-brand-lavender/80 transition-colors"
+            >
+              {showInlineCreate ? '✕ Cancel' : '+ New Customer'}
+            </button>
+          </div>
+          {showInlineCreate && (
+            <InlineCustomerCreate
+              onCustomerCreated={c => {
+                setLocalCustomers(prev => [...prev, c]);
+                setShowInlineCreate(false);
+              }}
+            />
+          )}
+        </div>
+      )}
 
       {/* Single mode: single description textarea */}
       {mode === 'single' && (
@@ -1142,25 +1196,81 @@ function QuickAddTaskForm({ customers, onSubmit, onCancel }) {
         </div>
       )}
 
-      {/* Bulk mode: multi-line textarea, one task per line */}
+      {/* Bulk mode: per-row table with individual customer + OKR assignment */}
       {mode === 'bulk' && (
         <div>
-          <div className="flex items-center justify-between mb-1">
-            <label className="block text-xs text-muted-foreground">Tasks — one per line *</label>
-            {bulkLines.length > 0 && (
+          {/* Column headers */}
+          <div className="grid grid-cols-[minmax(0,1fr)_90px_90px_24px] gap-1.5 px-1 mb-1.5">
+            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Description *</span>
+            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Customer</span>
+            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">OKR</span>
+            <span />
+          </div>
+
+          {/* Rows */}
+          <div className="space-y-1.5 max-h-[280px] overflow-y-auto pr-0.5">
+            {bulkRows.map((row, idx) => (
+              <div key={row.id} className="grid grid-cols-[minmax(0,1fr)_90px_90px_24px] gap-1.5 items-center">
+                <input
+                  autoFocus={idx === 0}
+                  value={row.description}
+                  onChange={e => updateBulkRow(row.id, 'description', e.target.value)}
+                  onPaste={e => handleRowPaste(e, row.id)}
+                  placeholder={idx === 0 ? 'Task description…' : ''}
+                  className="min-w-0 bg-secondary border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40 w-full"
+                />
+                <select
+                  value={row.customerId}
+                  onChange={e => updateBulkRow(row.id, 'customerId', e.target.value)}
+                  className="min-w-0 bg-secondary border border-border rounded-lg px-2 py-1.5 text-xs text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40 w-full"
+                >
+                  <option value="">— None —</option>
+                  {localCustomers.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+                {okrs.length > 0 ? (
+                  <select
+                    value={row.okrId}
+                    onChange={e => updateBulkRow(row.id, 'okrId', e.target.value)}
+                    className="min-w-0 bg-secondary border border-border rounded-lg px-2 py-1.5 text-xs text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40 w-full"
+                  >
+                    <option value="">— None —</option>
+                    {okrs.map(o => (
+                      <option key={o.id} value={o.id}>{o.quarter} — {o.title}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="text-[10px] text-muted-foreground/40 text-center">—</div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => deleteBulkRow(row.id)}
+                  disabled={bulkRows.length === 1}
+                  className="flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-red-400 hover:bg-red-500/10 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+                  title="Remove row"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {/* Footer: add row + task count */}
+          <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/50">
+            <button
+              type="button"
+              onClick={addBulkRow}
+              className="flex items-center gap-1 text-[10px] font-semibold text-brand-lavender hover:text-brand-lavender/80 transition-colors"
+            >
+              <Plus size={11} /> Add row
+            </button>
+            {filledBulkRows.length > 0 && (
               <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-brand-lavender/15 text-brand-lavender border border-brand-lavender/20">
-                {bulkLines.length} task{bulkLines.length !== 1 ? 's' : ''}
+                {filledBulkRows.length} task{filledBulkRows.length !== 1 ? 's' : ''}
               </span>
             )}
           </div>
-          <textarea
-            rows={6}
-            autoFocus
-            value={bulkText}
-            onChange={e => setBulkText(e.target.value)}
-            placeholder={"Follow up on deployment timeline\nSchedule kickoff call with client\nReview UAT feedback doc"}
-            className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40 resize-none"
-          />
         </div>
       )}
 
@@ -1204,8 +1314,8 @@ function QuickAddTaskForm({ customers, onSubmit, onCancel }) {
         </span>
       </label>
 
-      {/* Optional OKR selector */}
-      {okrs.length > 0 && (
+      {/* OKR selector — single mode only (bulk mode has per-row OKR dropdowns) */}
+      {mode === 'single' && okrs.length > 0 && (
         <div>
           <label className="block text-xs text-muted-foreground mb-1">OKR <span className="text-muted-foreground/70">(optional)</span></label>
           <select
@@ -1235,8 +1345,8 @@ function QuickAddTaskForm({ customers, onSubmit, onCancel }) {
           onClick={handleSubmit}
           className="flex-1 py-2 rounded-xl bg-brand-lavender hover:bg-brand-lavender/80 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-foreground transition-colors"
         >
-          {mode === 'bulk' && bulkLines.length > 1
-            ? `Create ${bulkLines.length} Tasks`
+          {mode === 'bulk' && filledBulkRows.length > 1
+            ? `Create ${filledBulkRows.length} Tasks`
             : 'Create Task'}
         </button>
       </div>
@@ -1683,6 +1793,12 @@ export default function Triage() {
   const [autoSaveToast, setAutoSaveToast] = useState(null); // { pts, customerName } | null
   const [aiAssistOpen, setAiAssistOpen] = useState(false);
 
+  // Voice note state
+  const [voiceState, setVoiceState] = useState('idle'); // 'idle' | 'recording' | 'processing'
+  const [voiceToast, setVoiceToast] = useState(null); // { type: 'success'|'error', message } | null
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+
   // Filter state
   const [filterCustomerId, setFilterCustomerId] = useState('');
   const [filterWorkType,   setFilterWorkType]   = useState('');
@@ -1832,6 +1948,108 @@ export default function Triage() {
     selectedTaskIds.forEach(id => updateTask(id, { status: 'archived' }));
     switchToClosedTab();
   };
+
+  // ── Voice note: record → Whisper → Claude → auto-create task ────────────────
+  const handleVoiceNote = useCallback(async () => {
+    if (voiceState === 'recording') {
+      mediaRecorderRef.current?.stop();
+      return;
+    }
+    if (voiceState === 'processing') return;
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+      const recorder = new MediaRecorder(stream, { mimeType });
+      audioChunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        setVoiceState('processing');
+        try {
+          // 1. Transcribe with Whisper
+          const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+          const formData = new FormData();
+          formData.append('file', audioBlob, mimeType === 'audio/webm' ? 'voice.webm' : 'voice.mp4');
+          formData.append('model', 'whisper-1');
+          const whisperRes = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${import.meta.env.VITE_OPENAI_API_KEY}` },
+            body: formData,
+          });
+          if (!whisperRes.ok) throw new Error('Transcription failed');
+          const { text: transcript } = await whisperRes.json();
+          if (!transcript?.trim()) throw new Error('No speech detected');
+
+          // 2. Parse with Claude
+          const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': import.meta.env.VITE_ANTHROPIC_API_KEY,
+              'anthropic-version': '2023-06-01',
+              'anthropic-dangerous-direct-browser-access': 'true',
+            },
+            body: JSON.stringify({
+              model: 'claude-sonnet-4-6',
+              max_tokens: 256,
+              messages: [{
+                role: 'user',
+                content: `Extract a task from this voice note. Return ONLY a JSON object with no extra text:
+{"description":"<clear task description>","workType":"<deep_work|meetings|comms|admin>","customerName":"<client name or null>"}
+
+workType guide: deep_work=focused building/investigation, meetings=calls/syncs, comms=emails/messages/follow-ups, admin=planning/admin.
+Transcript: "${transcript.replace(/"/g, '\\"')}"`,
+              }],
+            }),
+          });
+          if (!claudeRes.ok) throw new Error('AI parsing failed');
+          const claudeData = await claudeRes.json();
+          const parsed = JSON.parse(claudeData.content[0].text.trim());
+
+          // 3. Fuzzy-match customer name if mentioned
+          const matchedCustomer = parsed.customerName
+            ? customers.find(c =>
+                c.name.toLowerCase().includes(parsed.customerName.toLowerCase()) ||
+                parsed.customerName.toLowerCase().includes(c.name.toLowerCase()))
+            : null;
+
+          // 4. Create task directly
+          addTask({
+            customerId:  matchedCustomer?.id || null,
+            description: parsed.description,
+            workType:    ['deep_work', 'meetings', 'comms', 'admin'].includes(parsed.workType)
+              ? parsed.workType : 'comms',
+            status: 'open',
+          });
+
+          const label = parsed.description.length > 55
+            ? parsed.description.slice(0, 55) + '…'
+            : parsed.description;
+          setVoiceToast({ type: 'success', message: `Task added: "${label}"` });
+          setTimeout(() => setVoiceToast(null), 4000);
+        } catch (err) {
+          console.error('Voice note error:', err);
+          setVoiceToast({ type: 'error', message: err.message || 'Failed to process voice note' });
+          setTimeout(() => setVoiceToast(null), 4000);
+        } finally {
+          setVoiceState('idle');
+        }
+      };
+
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setVoiceState('recording');
+    } catch (err) {
+      console.error('Mic access error:', err);
+      setVoiceToast({ type: 'error', message: 'Microphone access denied' });
+      setTimeout(() => setVoiceToast(null), 4000);
+    }
+  }, [voiceState, customers, addTask]);
 
   // ── Auto-timer: start on task open, stop + auto-save points on close ───
   // Wrapped in useCallback so handleOpenDetail's own useCallback dep array stays stable
@@ -2388,6 +2606,44 @@ export default function Triage() {
         <Check size={14} />
         Auto-saved {autoSaveToast.pts} pts · {autoSaveToast.customerName}
       </div>
+    )}
+
+    {/* Voice FAB + toast — portalled to document.body to escape motion.div transform context */}
+    {createPortal(
+      <>
+        {/* Voice note FAB — floats above the green Start button */}
+        <button
+          onClick={handleVoiceNote}
+          disabled={voiceState === 'processing'}
+          title={voiceState === 'recording' ? 'Tap to stop recording' : 'Add a task by voice'}
+          className={`fixed bottom-20 right-6 z-40 flex items-center gap-2 rounded-full text-white shadow-lg px-5 py-3.5 transition-all active:scale-95 md:bottom-[5.5rem] md:right-8 ${
+            voiceState === 'recording'
+              ? 'bg-red-500 hover:bg-red-400 shadow-red-900/30 animate-pulse'
+              : voiceState === 'processing'
+              ? 'bg-slate-600 opacity-60 cursor-not-allowed shadow-slate-900/30'
+              : 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/30'
+          }`}
+        >
+          {voiceState === 'processing'
+            ? <><Loader2 size={18} className="animate-spin" /><span className="text-sm font-semibold">Processing…</span></>
+            : voiceState === 'recording'
+            ? <><MicOff size={18} /><span className="text-sm font-semibold">Stop</span></>
+            : <><Mic size={18} /><span className="text-sm font-semibold">Voice</span></>}
+        </button>
+
+        {/* Voice note toast — appears above both FABs */}
+        {voiceToast && (
+          <div className={`fixed bottom-36 right-6 z-50 flex items-center gap-2 text-sm
+                          border rounded-xl px-4 py-2.5 shadow-lg pointer-events-none md:right-8
+                          ${voiceToast.type === 'success'
+                            ? 'text-emerald-400 bg-card border-emerald-500/20'
+                            : 'text-red-400 bg-card border-red-500/20'}`}>
+            {voiceToast.type === 'success' ? <Check size={14} /> : <AlertCircle size={14} />}
+            {voiceToast.message}
+          </div>
+        )}
+      </>,
+      document.body
     )}
 
     {/* AI Assist standalone modal */}

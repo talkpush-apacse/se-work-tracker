@@ -336,6 +336,7 @@ export default function WeeklyReport({ onNavigate }) {
   const [emailSummaryError,  setEmailSummaryError]  = useState(null);
   const [emailSelections,    setEmailSelections]    = useState({});  // { emailId: boolean } — true = included
   const [expandedEmailId,    setExpandedEmailId]    = useState(null);
+  const [reportTypeFilter,   setReportTypeFilter]   = useState('all'); // 'all' | one of REPORT_TYPES
 
   const emailOutputRef = useRef(null);
 
@@ -653,11 +654,32 @@ export default function WeeklyReport({ onNavigate }) {
     <div className="space-y-5 max-w-3xl">
       {/* Page header */}
       <div>
-        <h1 className="text-xl font-semibold text-foreground">Weekly Report</h1>
+        <h1 className="text-2xl font-bold text-foreground">Weekly Report</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
           Summarize your week and generate a professional status email.
         </p>
       </div>
+
+      {/* ── Integration onboarding banner — only when any integration is missing ── */}
+      {(!googleToken || !gmailToken) && (
+        <div className="flex flex-wrap items-center gap-2 bg-secondary border border-border rounded-xl px-4 py-2.5">
+          <span className="text-xs text-muted-foreground">Connect integrations to unlock calendar and email insights:</span>
+          <div className="flex gap-2 ml-auto flex-wrap">
+            <IntegrationButton
+              label="Google Calendar"
+              connected={!!googleToken}
+              onNavigate={onNavigate}
+              onError={msg => { setNavError(msg); setTimeout(() => setNavError(null), 3000); }}
+            />
+            <IntegrationButton
+              label="Gmail"
+              connected={!!gmailToken}
+              onNavigate={onNavigate}
+              onError={msg => { setNavError(msg); setTimeout(() => setNavError(null), 3000); }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* ── Success banner ── */}
       {genSuccess && (
@@ -670,7 +692,7 @@ export default function WeeklyReport({ onNavigate }) {
       <div className="rounded-2xl border border-border bg-card px-5 py-4 flex items-center justify-between gap-4">
         <button
           onClick={() => setWeekOffset(o => o - 1)}
-          className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+          className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-foreground bg-secondary/40 hover:bg-secondary transition-colors"
           title="Previous week"
         >
           <ChevronLeft size={18} />
@@ -684,7 +706,7 @@ export default function WeeklyReport({ onNavigate }) {
         <button
           onClick={() => setWeekOffset(o => o + 1)}
           disabled={weekOffset >= 0}
-          className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-foreground bg-secondary/40 hover:bg-secondary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
           title="Next week"
         >
           <ChevronRight size={18} />
@@ -694,19 +716,21 @@ export default function WeeklyReport({ onNavigate }) {
       {/* ── B: Stats chips — Tasks Done & Customers are expandable ── */}
       <div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <StatChip label="Points"    value={Number(totalPts).toFixed(1)} />
-          <StatChip label="Hours"     value={`${totalHrs}h`} />
+          <StatChip label="Points"    value={Number(totalPts).toFixed(1)} valueColor="text-brand-amber" />
+          <StatChip label="Hours"     value={`${totalHrs}h`} valueColor="text-brand-lavender" />
           <ExpandableTile
             label="Tasks Done"
             value={weekTasksList.length}
             isExpanded={expandedTile === 'tasks'}
             onToggle={() => setExpandedTile(expandedTile === 'tasks' ? null : 'tasks')}
+            valueColor="text-brand-sage"
           />
           <ExpandableTile
             label="Customers"
             value={activeCustomers}
             isExpanded={expandedTile === 'customers'}
             onToggle={() => setExpandedTile(expandedTile === 'customers' ? null : 'customers')}
+            valueColor="text-brand-pink"
           />
         </div>
 
@@ -758,21 +782,6 @@ export default function WeeklyReport({ onNavigate }) {
         </div>
       )}
 
-      {/* ── Integration buttons ── */}
-      <div className="flex flex-wrap gap-2">
-        <IntegrationButton
-          label="Google Calendar"
-          connected={!!googleToken}
-          onNavigate={onNavigate}
-          onError={msg => { setNavError(msg); setTimeout(() => setNavError(null), 3000); }}
-        />
-        <IntegrationButton
-          label="Gmail"
-          connected={!!gmailToken}
-          onNavigate={onNavigate}
-          onError={msg => { setNavError(msg); setTimeout(() => setNavError(null), 3000); }}
-        />
-      </div>
 
       {/* ── Week in Review ── */}
       <div className="rounded-2xl border border-border bg-card overflow-hidden">
@@ -827,7 +836,7 @@ export default function WeeklyReport({ onNavigate }) {
                     className="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0"
                     style={{
                       backgroundColor: !gmailToken
-                        ? '#ef4444'
+                        ? '#6b7280'
                         : (isFetchingData || gmailEmails === null)
                           ? '#6b7280'
                           : gmailEmails.length > 0
@@ -870,7 +879,7 @@ export default function WeeklyReport({ onNavigate }) {
                     className="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0"
                     style={{
                       backgroundColor: !googleToken
-                        ? '#ef4444'
+                        ? '#6b7280'
                         : (isFetchingData || calendarEvents === null)
                           ? '#6b7280'
                           : calendarEvents.length > 0
@@ -1072,18 +1081,52 @@ export default function WeeklyReport({ onNavigate }) {
       {/* ── B2: Highlights, Learnings & Shoutouts ── */}
       {reportLogs.length > 0 && (
         <div className="rounded-2xl border border-border bg-card px-5 py-4 space-y-4">
-          <h3 className="text-sm font-semibold text-foreground">
-            Weekly Log Entries
-            <span className="ml-2 text-xs font-normal text-muted-foreground">{reportLogs.length} logged</span>
-          </h3>
-          {REPORT_TYPES.filter(t => logsByType[t]?.length > 0).map(t => (
-            <div key={t} className="space-y-1.5">
-              <p
-                className="text-[11px] font-semibold uppercase tracking-wide"
-                style={{ color: WEEKLY_UPDATE_LOG_COLORS[t] }}
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-sm font-semibold text-foreground">
+              Weekly Log Entries
+              <span className="ml-2 text-xs font-normal text-muted-foreground">{reportLogs.length} logged</span>
+            </h3>
+            <div className="flex flex-wrap gap-1 ml-auto">
+              <button
+                onClick={() => setReportTypeFilter('all')}
+                className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                  reportTypeFilter === 'all'
+                    ? 'bg-secondary border-border text-foreground font-medium'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
               >
-                {WEEKLY_UPDATE_LOG_LABELS[t]}
-              </p>
+                All
+              </button>
+              {REPORT_TYPES.filter(t => logsByType[t]?.length > 0).map(t => (
+                <button
+                  key={t}
+                  onClick={() => setReportTypeFilter(prev => prev === t ? 'all' : t)}
+                  className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                    reportTypeFilter === t
+                      ? 'border-transparent font-medium'
+                      : 'border-transparent text-muted-foreground hover:text-foreground'
+                  }`}
+                  style={reportTypeFilter === t ? {
+                    backgroundColor: WEEKLY_UPDATE_LOG_COLORS[t] + '20',
+                    color: WEEKLY_UPDATE_LOG_COLORS[t],
+                  } : {}}
+                >
+                  {WEEKLY_UPDATE_LOG_LABELS[t]}
+                </button>
+              ))}
+            </div>
+          </div>
+          {REPORT_TYPES.filter(t => (reportTypeFilter === 'all' ? logsByType[t]?.length > 0 : reportTypeFilter === t && logsByType[t]?.length > 0)).map(t => (
+            <div key={t} className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <span
+                  className="text-[10px] font-semibold px-2 py-0.5 rounded-md flex-shrink-0"
+                  style={{ backgroundColor: WEEKLY_UPDATE_LOG_COLORS[t] + '20', color: WEEKLY_UPDATE_LOG_COLORS[t] }}
+                >
+                  {WEEKLY_UPDATE_LOG_LABELS[t]}
+                </span>
+                <div className="flex-1 h-px bg-border" />
+              </div>
               {logsByType[t].map(log => {
                 const customer = log.customerId ? customers.find(c => c.id === log.customerId) : null;
                 return (
@@ -1142,6 +1185,13 @@ export default function WeeklyReport({ onNavigate }) {
           </div>
         </div>
       )}
+
+      {/* ── Read / Write separator ── */}
+      <div className="flex items-center gap-3">
+        <div className="flex-1 h-px bg-border" />
+        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide whitespace-nowrap">Add Log Entries</span>
+        <div className="flex-1 h-px bg-border" />
+      </div>
 
       {/* ── B4: Weekly Update Log (add entries before generating) ── */}
       <WeeklyUpdateLog weekStart={weekStart} weekEnd={weekEnd} />
@@ -1334,25 +1384,25 @@ export default function WeeklyReport({ onNavigate }) {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function StatChip({ label, value }) {
+function StatChip({ label, value, valueColor = 'text-foreground' }) {
   return (
     <div className="rounded-xl border border-border bg-card px-4 py-3 text-center">
-      <p className="text-lg font-bold text-foreground">{value}</p>
+      <p className={`text-lg font-bold ${valueColor}`}>{value}</p>
       <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
     </div>
   );
 }
 
 /** Stat tile with a chevron indicator — expanded content is rendered separately below the grid */
-function ExpandableTile({ label, value, isExpanded, onToggle }) {
+function ExpandableTile({ label, value, isExpanded, onToggle, valueColor = 'text-foreground' }) {
   return (
     <div
       className={`rounded-xl border bg-card transition-colors cursor-pointer ${
         isExpanded ? 'border-brand-lavender/40' : 'border-border'
       }`}
     >
-      <button onClick={onToggle} className="w-full px-4 py-3 text-center">
-        <p className="text-lg font-bold text-foreground">{value}</p>
+      <button onClick={onToggle} className="w-full px-4 py-3 text-center hover:bg-secondary/30 transition-colors rounded-xl">
+        <p className={`text-lg font-bold ${valueColor}`}>{value}</p>
         <p className="text-xs text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
           {label}
           {isExpanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />}

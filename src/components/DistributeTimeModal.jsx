@@ -141,7 +141,7 @@ export default function DistributeTimeModal({ session, onClose, initialCustomerI
       const pct        = parseFloat(percentages[customerId]) || 0;
       const custPoints = Math.round(totalPoints * (pct / 100) * 100) / 100;
       const custHours  = Math.round(totalHours  * (pct / 100) * 100) / 100;
-      const splitLabel = `General Focus Time — ${pct.toFixed(1)}% of session (${selectedCount} customer${selectedCount > 1 ? 's' : ''} total)`;
+      const splitLabel = `General Focus Time — ${Math.round(pct)}%${selectedCount > 1 ? ` · ${selectedCount} customers` : ''}`;
       addPoint({
         customerId,
         okrId: okrId || null,
