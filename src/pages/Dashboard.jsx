@@ -114,7 +114,7 @@ export default function Dashboard({ onNavigate }) {
   );
 
   // This week's work type breakdown from timeLogs
-  const weekKey = useMemo(() => format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd'), []);
+  const weekKey = useMemo(() => format(startOfWeek(new Date(), { weekStartsOn: 0 }), 'yyyy-MM-dd'), []);
   const workTypeHours = useMemo(() => {
     const hours = { deep_work: 0, meetings: 0, comms: 0, admin: 0 };
     timeLogs.forEach(log => {

@@ -54,7 +54,7 @@ function formatEntryDate(dateStr) {
 function getDateCutoff(rangeValue) {
   const now = new Date();
   switch (rangeValue) {
-    case 'week':    return startOfWeek(now, { weekStartsOn: 1 });
+    case 'week':    return startOfWeek(now, { weekStartsOn: 0 });
     case 'month':   return startOfMonth(now);
     case '3months': return subMonths(now, 3);
     case '6months': return subMonths(now, 6);

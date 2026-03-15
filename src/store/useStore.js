@@ -225,18 +225,17 @@ function createBatchedSaver(getMounted, onError) {
 
 // ─── Evergreen task weekly reset ──────────────────────────────────
 // Resets 'evergreen' tasks with status 'done' back to 'open' at the
-// start of each new week (Monday). Runs once per week, gated by a
-// localStorage flag storing the Monday date of the last reset.
+// start of each new week (Sunday). Runs once per week, gated by a
+// localStorage flag storing the Sunday date of the last reset.
 function resetEvergreenTasks() {
   const now = new Date();
   const day = now.getDay();
-  // Calculate this Monday (weekStartsOn = 1)
-  const diffToMonday = day === 0 ? -6 : 1 - day;
-  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday);
-  const mondayStr = monday.toISOString().slice(0, 10);
+  // Calculate this Sunday (weekStartsOn = 0); getDay() returns 0 for Sunday
+  const sunday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day);
+  const sundayStr = sunday.toISOString().slice(0, 10);
 
   const lastReset = localStorage.getItem('gpt-evergreen-last-reset');
-  if (lastReset === mondayStr) return; // already reset this week
+  if (lastReset === sundayStr) return; // already reset this week
 
   const tasks = load('gpt-tasks', []);
   let changed = false;
@@ -250,9 +249,9 @@ function resetEvergreenTasks() {
   });
   if (changed) {
     save('gpt-tasks', updated);
-    console.log('[evergreen] Reset done evergreen tasks for week of', mondayStr);
+    console.log('[evergreen] Reset done evergreen tasks for week of', sundayStr);
   }
-  localStorage.setItem('gpt-evergreen-last-reset', mondayStr);
+  localStorage.setItem('gpt-evergreen-last-reset', sundayStr);
 }
 
 // ─── V3 Migration: Backfill timeLogs from existing points ──────────────────
@@ -275,12 +274,11 @@ function runV3Migration() {
 
   const timeLogs = points.map(pt => {
     const loggedAt = pt.timestamp;
-    // Derive weekStart (Monday) from the point's timestamp
+    // Derive weekStart (Sunday) from the point's timestamp
     const d = new Date(loggedAt);
     const day = d.getDay();
-    const diffToMonday = day === 0 ? -6 : 1 - day;
-    const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate() + diffToMonday);
-    const weekStart = monday.toISOString().slice(0, 10);
+    const sunday = new Date(d.getFullYear(), d.getMonth(), d.getDate() - day);
+    const weekStart = sunday.toISOString().slice(0, 10);
 
     return {
       id: crypto.randomUUID(),

@@ -85,7 +85,7 @@ export default function SaveSessionModal({ session, onClose }) {
 
     // Derive weekStart from session startedAt
     const sessionDate = new Date(session.startedAt);
-    const weekStart = format(startOfWeek(sessionDate, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+    const weekStart = format(startOfWeek(sessionDate, { weekStartsOn: 0 }), 'yyyy-MM-dd');
 
     const workTypeLabel = WORK_TYPE_LABELS[workType] || '';
 

@@ -2,13 +2,13 @@ import { startOfWeek, endOfWeek, isWithinInterval, parseISO, format, subWeeks, a
 
 export function getThisWeekRange() {
   const now = new Date();
-  return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }) };
+  return { start: startOfWeek(now, { weekStartsOn: 0 }), end: endOfWeek(now, { weekStartsOn: 0 }) };
 }
 
 export function getLastWeekRange() {
   const now = new Date();
   const lastWeek = subWeeks(now, 1);
-  return { start: startOfWeek(lastWeek, { weekStartsOn: 1 }), end: endOfWeek(lastWeek, { weekStartsOn: 1 }) };
+  return { start: startOfWeek(lastWeek, { weekStartsOn: 0 }), end: endOfWeek(lastWeek, { weekStartsOn: 0 }) };
 }
 
 export function isInRange(timestamp, start, end) {

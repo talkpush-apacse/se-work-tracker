@@ -32,9 +32,9 @@ const HOUR_OPTIONS = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6, 8];
 // Stable empty array to prevent infinite re-render when budget has no excludedPointIds
 const EMPTY_EXCLUDED = [];
 
-/** Compute the Monday date string (YYYY-MM-DD) for a given date */
-function getMonday(date) {
-  return format(startOfWeek(date, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+/** Compute the week-start date string (YYYY-MM-DD) for a given date */
+function getWeekStartKey(date) {
+  return format(startOfWeek(date, { weekStartsOn: 0 }), 'yyyy-MM-dd');
 }
 
 /** Convert calendar event to a meeting entry with computed duration */
@@ -71,9 +71,9 @@ export default function TimeBudget() {
 
   // Week navigation — default to current week
   const [currentDate, setCurrentDate] = useState(new Date());
-  const weekStart = useMemo(() => startOfWeek(currentDate, { weekStartsOn: 1 }), [currentDate]);
-  const weekEnd = useMemo(() => endOfWeek(currentDate, { weekStartsOn: 1 }), [currentDate]);
-  const weekKey = getMonday(currentDate);
+  const weekStart = useMemo(() => startOfWeek(currentDate, { weekStartsOn: 0 }), [currentDate]);
+  const weekEnd = useMemo(() => endOfWeek(currentDate, { weekStartsOn: 0 }), [currentDate]);
+  const weekKey = getWeekStartKey(currentDate);
 
   // Load persisted budget for this week (or create fresh)
   const savedBudget = getTimeBudget(weekKey);
@@ -199,7 +199,7 @@ export default function TimeBudget() {
   }, []);
 
   // Copy meetings from last week
-  const lastWeekKey = getMonday(subWeeks(currentDate, 1));
+  const lastWeekKey = getWeekStartKey(subWeeks(currentDate, 1));
   const lastWeekBudget = getTimeBudget(lastWeekKey);
   const canCopyFromLastWeek = !googleToken && meetings.length === 0 && lastWeekBudget?.meetings?.length > 0;
 
@@ -350,7 +350,7 @@ export default function TimeBudget() {
     }
     const now = new Date();
     const isLateWeek = isThursday(now) || isFriday(now) || isSaturday(now) || isSunday(now);
-    const isCurrentWeek = weekKey === getMonday(new Date());
+    const isCurrentWeek = weekKey === getWeekStartKey(new Date());
     if (isLateWeek && isCurrentWeek && totalLogged < 30 && totalLogged > 0) {
       alerts.push({ type: 'info', text: 'Underlogged — are sessions being tracked? You have less than 30h logged late in the week.' });
     }
@@ -415,7 +415,7 @@ export default function TimeBudget() {
           <p className="text-sm font-semibold text-foreground">
             {format(weekStart, 'MMM d')} – {format(weekEnd, 'MMM d, yyyy')}
           </p>
-          {weekKey !== getMonday(new Date()) ? (
+          {weekKey !== getWeekStartKey(new Date()) ? (
             <button
               onClick={goToThisWeek}
               className="text-[10px] text-brand-lavender hover:text-brand-lavender/80 font-medium transition-colors mt-0.5"

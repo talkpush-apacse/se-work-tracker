@@ -1,6 +1,21 @@
 {
   "versions": [
     {
+      "version": "2.6.1",
+      "codename": "Runway Open",
+      "date": "2026-03-15",
+      "summary": "Week boundary fix (Sun–Sat) + Triage voice button CORS fix",
+      "changes": [
+        { "type": "fix", "description": "Week start/end now uses Sunday (weekStartsOn: 0) in dateHelpers, Dashboard, TimeBudget, WeeklyReport" },
+        { "type": "fix", "description": "Evergreen task auto-reset now triggers on Sunday instead of Monday" },
+        { "type": "fix", "description": "SaveSessionModal weekStart key now anchors to Sunday" },
+        { "type": "fix", "description": "CalendarEmailImport default date range now opens on Sunday–Saturday" },
+        { "type": "fix", "description": "V3 migration week-bucketing logic corrected to Sunday anchor" },
+        { "type": "fix", "description": "Knowledge page 'this week' filter now starts from Sunday" },
+        { "type": "fix", "description": "Triage Voice FAB now routes Whisper through /api/transcribe proxy (fixes 'Failed to Fetch' CORS error)" }
+      ]
+    },
+    {
       "version": "2.6.0",
       "codename": "Runway Open",
       "date": "2026-03-15",

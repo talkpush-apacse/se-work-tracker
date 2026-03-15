@@ -1976,12 +1976,15 @@ export default function Triage() {
           const formData = new FormData();
           formData.append('file', audioBlob, mimeType === 'audio/webm' ? 'voice.webm' : 'voice.mp4');
           formData.append('model', 'whisper-1');
-          const whisperRes = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+          const whisperRes = await fetch('/api/transcribe', {
             method: 'POST',
-            headers: { Authorization: `Bearer ${import.meta.env.VITE_OPENAI_API_KEY}` },
+            headers: { Authorization: `Bearer ${import.meta.env.VITE_API_SECRET}` },
             body: formData,
           });
-          if (!whisperRes.ok) throw new Error('Transcription failed');
+          if (!whisperRes.ok) {
+            const errBody = await whisperRes.json().catch(() => ({}));
+            throw new Error(errBody.error || 'Transcription failed');
+          }
           const { text: transcript } = await whisperRes.json();
           if (!transcript?.trim()) throw new Error('No speech detected');
 

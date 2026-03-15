@@ -38,9 +38,9 @@ export default function CalendarEmailImport({ customers, addWeeklyUpdateLog, aiS
   // Panel open/closed
   const [isOpen, setIsOpen]     = useState(false);
 
-  // Date range — defaults to current week (Mon–Sun)
-  const [dateFrom, setDateFrom] = useState(() => format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd'));
-  const [dateTo, setDateTo]     = useState(() => format(endOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd'));
+  // Date range — defaults to current week (Sun–Sat)
+  const [dateFrom, setDateFrom] = useState(() => format(startOfWeek(new Date(), { weekStartsOn: 0 }), 'yyyy-MM-dd'));
+  const [dateTo, setDateTo]     = useState(() => format(endOfWeek(new Date(), { weekStartsOn: 0 }), 'yyyy-MM-dd'));
 
   // Email source filter: starred, sent, or both (starred shown first)
   const [emailSource, setEmailSource] = useState('both');
