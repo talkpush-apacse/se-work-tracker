@@ -373,7 +373,7 @@ export default function AIAssistModal({ onClose }) {
             className="w-full h-9 bg-card border border-border rounded-md px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
           >
             <option value="">— Select client —</option>
-            {customers.map(c => (
+            {[...customers].sort((a, b) => a.name.localeCompare(b.name)).map(c => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>

@@ -1,6 +1,18 @@
 {
   "versions": [
     {
+      "version": "2.9.0",
+      "codename": "Uptime Fresh",
+      "date": "2026-03-16",
+      "summary": "Bulk task reassignment + A-Z customer sorting throughout",
+      "changes": [
+        { "type": "feat", "description": "Bulk assign selected tasks to a customer from Triage action bar" },
+        { "type": "feat", "description": "Customers sorted A-Z within Priority and Non-Priority sections" },
+        { "type": "feat", "description": "All customer dropdowns across the app now sorted A-Z" },
+        { "type": "chore", "description": "Removed manual drag-reorder from Customers page (superseded by A-Z sort)" }
+      ]
+    },
+    {
       "version": "2.8.0",
       "codename": "Throughput Rising",
       "date": "2026-03-15",

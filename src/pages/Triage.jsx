@@ -994,7 +994,7 @@ function TimerQuickTaskForm({ customers, onSubmit, onStartWithoutTask, onCancel 
           className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
         >
           <option value="">— No specific client —</option>
-          {customers.map(c => (
+          {[...customers].sort((a, b) => a.name.localeCompare(b.name)).map(c => (
             <option key={c.id} value={c.id}>{c.name}</option>
           ))}
         </select>
@@ -1143,7 +1143,7 @@ function QuickAddTaskForm({ customers, onSubmit, onCancel }) {
             className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
           >
             <option value="">— No customer —</option>
-            {localCustomers.map(c => (
+            {[...localCustomers].sort((a, b) => a.name.localeCompare(b.name)).map(c => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
@@ -1226,7 +1226,7 @@ function QuickAddTaskForm({ customers, onSubmit, onCancel }) {
                   className="min-w-0 bg-secondary border border-border rounded-lg px-2 py-1.5 text-xs text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40 w-full"
                 >
                   <option value="">— None —</option>
-                  {localCustomers.map(c => (
+                  {[...localCustomers].sort((a, b) => a.name.localeCompare(b.name)).map(c => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
@@ -1828,9 +1828,9 @@ export default function Triage() {
     [customers]
   );
 
-  // Derived customer list for filter dropdown (only customers that have tasks)
+  // Derived customer list for filter dropdown (only customers that have tasks), sorted A-Z
   const customersWithTasks = useMemo(
-    () => customers.filter(c => tasks.some(t => t.customerId === c.id)),
+    () => customers.filter(c => tasks.some(t => t.customerId === c.id)).sort((a, b) => a.name.localeCompare(b.name)),
     [customers, tasks]
   );
 
@@ -1945,6 +1945,10 @@ export default function Triage() {
   const handleBulkArchive = () => {
     selectedTaskIds.forEach(id => updateTask(id, { status: 'archived' }));
     switchToClosedTab();
+  };
+  const handleBulkAssign = (customerId) => {
+    selectedTaskIds.forEach(id => updateTask(id, { customerId: customerId || null }));
+    clearSelection();
   };
 
 
@@ -2317,6 +2321,22 @@ export default function Triage() {
               >
                 <Archive size={11} /> Archive
               </button>
+              <select
+                onChange={e => {
+                  const val = e.target.value;
+                  if (!val) return;
+                  handleBulkAssign(val === '__unset__' ? null : val);
+                  e.target.value = '';
+                }}
+                className="bg-secondary border border-border rounded-lg px-2.5 py-1 text-[10px] font-medium text-foreground/80 focus:outline-none focus:border-ring cursor-pointer"
+                defaultValue=""
+              >
+                <option value="" disabled>Reassign to…</option>
+                <option value="__unset__" className="bg-secondary text-muted-foreground">— No customer —</option>
+                {[...customers].sort((a, b) => a.name.localeCompare(b.name)).map(c => (
+                  <option key={c.id} value={c.id} className="bg-secondary text-foreground">{c.name}</option>
+                ))}
+              </select>
             </div>
           </div>
         )}

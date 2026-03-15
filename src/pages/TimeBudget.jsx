@@ -897,7 +897,7 @@ export default function TimeBudget() {
                 className="h-8 bg-secondary border border-border rounded-lg px-1.5 text-xs text-foreground focus:outline-none focus:border-ring max-w-[8rem]"
               >
                 <option value="">No client</option>
-                {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {[...customers].sort((a, b) => a.name.localeCompare(b.name)).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
 
               {/* Hours */}

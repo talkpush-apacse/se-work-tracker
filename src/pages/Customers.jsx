@@ -1,19 +1,5 @@
 import { useState, useCallback, useMemo, memo } from 'react';
-import { Plus, Pencil, Trash2, Users, ListPlus, Star, GripVertical, ChevronRight, Search } from 'lucide-react';
-import {
-  DndContext,
-  closestCenter,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core';
-import {
-  SortableContext,
-  useSortable,
-  verticalListSortingStrategy,
-  arrayMove,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+import { Plus, Pencil, Trash2, Users, ListPlus, Star, ChevronRight, Search } from 'lucide-react';
 import { useAppStore } from '../context/StoreContext';
 import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -68,32 +54,15 @@ function CustomerForm({ initial = {}, onSubmit, onCancel }) {
   );
 }
 
-// ─── Sortable customer row ────────────────────────────────────────────────────
-const SortableCustomerRow = memo(function SortableCustomerRow({ customer, taskCount, totalPoints, totalHours, taskPts, onEdit, onDelete, onPin, onView }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: customer.id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
-
+// ─── Customer row ─────────────────────────────────────────────────────────────
+const CustomerRow = memo(function CustomerRow({ customer, taskCount, totalPoints, totalHours, taskPts, onEdit, onDelete, onPin, onView }) {
   return (
     <div
-      ref={setNodeRef}
-      style={style}
       className={`rounded-2xl transition-all ${
         customer.pinned
           ? 'bg-amber-950/20 border border-amber-700/40'
           : 'bg-card border border-border'
-      } ${isDragging ? 'shadow-2xl shadow-black/40 z-10' : ''}`}
+      }`}
     >
       {/* Entire row is clickable — opens detail view */}
       <div
@@ -101,18 +70,6 @@ const SortableCustomerRow = memo(function SortableCustomerRow({ customer, taskCo
         style={{ borderLeft: `4px solid ${customer.color}`, borderRadius: 'inherit' }}
         onClick={() => onView(customer)}
       >
-        {/* Drag grip — stop propagation so drag doesn't navigate */}
-        <button
-          {...attributes}
-          {...listeners}
-          onClick={e => e.stopPropagation()}
-          className="cursor-grab active:cursor-grabbing text-muted-foreground/70 hover:text-muted-foreground transition-colors flex-shrink-0 touch-none"
-          title="Drag to reorder"
-          aria-label="Drag to reorder"
-        >
-          <GripVertical size={16} />
-        </button>
-
         {/* Customer avatar */}
         <div
           className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center font-bold text-sm"
@@ -176,7 +133,7 @@ const SortableCustomerRow = memo(function SortableCustomerRow({ customer, taskCo
 
 // ─── Main Customers page ──────────────────────────────────────────────────────
 export default function Customers() {
-  const { customers, points, tasks, addCustomer, updateCustomer, deleteCustomer, reorderCustomers } = useAppStore();
+  const { customers, points, tasks, addCustomer, updateCustomer, deleteCustomer } = useAppStore();
   const [createModal, setCreateModal] = useState(false);
   const [bulkModal,   setBulkModal]   = useState(false);
   const [editTarget,   setEditTarget]   = useState(null);
@@ -186,17 +143,17 @@ export default function Customers() {
   // Customer detail view state
   const [selectedCustomer, setSelectedCustomer] = useState(null);
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
-
   // Used for the "no results" empty state message in the JSX
   const searchLower = search.trim().toLowerCase();
 
-  // Split into pinned / unpinned, filtered by search — memoized to avoid recomputing on every render
+  // Split into pinned / unpinned, filtered by search, sorted A-Z within each section
   const { pinnedCustomers, unpinnedCustomers } = useMemo(() => {
     const lower = search.trim().toLowerCase();
+    const filtered = customers.filter(c => !lower || c.name.toLowerCase().includes(lower));
+    const sorted = [...filtered].sort((a, b) => a.name.localeCompare(b.name));
     return {
-      pinnedCustomers:   customers.filter(c =>  !!c.pinned && (!lower || c.name.toLowerCase().includes(lower))),
-      unpinnedCustomers: customers.filter(c => !c.pinned  && (!lower || c.name.toLowerCase().includes(lower))),
+      pinnedCustomers:   sorted.filter(c =>  !!c.pinned),
+      unpinnedCustomers: sorted.filter(c => !c.pinned),
     };
   }, [customers, search]);
 
@@ -216,35 +173,11 @@ export default function Customers() {
     return cache;
   }, [customers, points, tasks]);
 
-  // Stable ID arrays for SortableContext — prevents reference churn that defeats dnd-kit equality checks
-  const pinnedIds   = useMemo(() => pinnedCustomers.map(c => c.id),   [pinnedCustomers]);
-  const unpinnedIds = useMemo(() => unpinnedCustomers.map(c => c.id), [unpinnedCustomers]);
-
-  // Stable handlers — useCallback prevents new refs on every render, making memo() on SortableCustomerRow effective
+  // Stable handlers
   const handlePin    = useCallback((id, value) => updateCustomer(id, { pinned: value }), [updateCustomer]);
   const handleEdit   = useCallback(c => setEditTarget(c),    []);
   const handleDelete = useCallback(c => setDeleteTarget(c),  []);
   const handleView   = useCallback(c => setSelectedCustomer(c), []);
-
-  // Drag handler for pinned section — reorder within pinned, keep unpinned order
-  const handlePinnedDragEnd = useCallback((event) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const oldIndex = pinnedCustomers.findIndex(c => c.id === active.id);
-    const newIndex = pinnedCustomers.findIndex(c => c.id === over.id);
-    const reordered = arrayMove(pinnedCustomers, oldIndex, newIndex);
-    reorderCustomers([...reordered.map(c => c.id), ...unpinnedCustomers.map(c => c.id)]);
-  }, [pinnedCustomers, unpinnedCustomers, reorderCustomers]);
-
-  // Drag handler for unpinned section — reorder within unpinned, keep pinned order
-  const handleUnpinnedDragEnd = useCallback((event) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const oldIndex = unpinnedCustomers.findIndex(c => c.id === active.id);
-    const newIndex = unpinnedCustomers.findIndex(c => c.id === over.id);
-    const reordered = arrayMove(unpinnedCustomers, oldIndex, newIndex);
-    reorderCustomers([...pinnedCustomers.map(c => c.id), ...reordered.map(c => c.id)]);
-  }, [pinnedCustomers, unpinnedCustomers, reorderCustomers]);
 
   // ── Customer detail view ──────────────────────────────────────────────────
   // Keep selectedCustomer in sync with the store (e.g. after edit)
@@ -317,29 +250,25 @@ export default function Customers() {
                 <span className="text-sm font-semibold text-amber-300">Priority</span>
                 <span className="text-xs text-muted-foreground/70">({pinnedCustomers.length})</span>
               </div>
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handlePinnedDragEnd}>
-                <SortableContext items={pinnedIds} strategy={verticalListSortingStrategy}>
-                  <div className="flex flex-col gap-3">
-                    {pinnedCustomers.map(customer => {
-                      const stats = customerStatsCache[customer.id] || {};
-                      return (
-                        <SortableCustomerRow
-                          key={customer.id}
-                          customer={customer}
-                          taskCount={stats.taskCount ?? 0}
-                          totalPoints={stats.totalPoints ?? 0}
-                          totalHours={stats.totalHours ?? 0}
-                          taskPts={stats.taskPts ?? 0}
-                          onEdit={handleEdit}
-                          onDelete={handleDelete}
-                          onPin={handlePin}
-                          onView={handleView}
-                        />
-                      );
-                    })}
-                  </div>
-                </SortableContext>
-              </DndContext>
+              <div className="flex flex-col gap-3">
+                {pinnedCustomers.map(customer => {
+                  const stats = customerStatsCache[customer.id] || {};
+                  return (
+                    <CustomerRow
+                      key={customer.id}
+                      customer={customer}
+                      taskCount={stats.taskCount ?? 0}
+                      totalPoints={stats.totalPoints ?? 0}
+                      totalHours={stats.totalHours ?? 0}
+                      taskPts={stats.taskPts ?? 0}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                      onPin={handlePin}
+                      onView={handleView}
+                    />
+                  );
+                })}
+              </div>
             </div>
           )}
 
@@ -350,29 +279,25 @@ export default function Customers() {
                 <span className="text-sm font-semibold text-muted-foreground">Non Priority</span>
                 <span className="text-xs text-muted-foreground/70">({unpinnedCustomers.length})</span>
               </div>
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleUnpinnedDragEnd}>
-                <SortableContext items={unpinnedIds} strategy={verticalListSortingStrategy}>
-                  <div className="flex flex-col gap-3">
-                    {unpinnedCustomers.map(customer => {
-                      const stats = customerStatsCache[customer.id] || {};
-                      return (
-                        <SortableCustomerRow
-                          key={customer.id}
-                          customer={customer}
-                          taskCount={stats.taskCount ?? 0}
-                          totalPoints={stats.totalPoints ?? 0}
-                          totalHours={stats.totalHours ?? 0}
-                          taskPts={stats.taskPts ?? 0}
-                          onEdit={handleEdit}
-                          onDelete={handleDelete}
-                          onPin={handlePin}
-                          onView={handleView}
-                        />
-                      );
-                    })}
-                  </div>
-                </SortableContext>
-              </DndContext>
+              <div className="flex flex-col gap-3">
+                {unpinnedCustomers.map(customer => {
+                  const stats = customerStatsCache[customer.id] || {};
+                  return (
+                    <CustomerRow
+                      key={customer.id}
+                      customer={customer}
+                      taskCount={stats.taskCount ?? 0}
+                      totalPoints={stats.totalPoints ?? 0}
+                      totalHours={stats.totalHours ?? 0}
+                      taskPts={stats.taskPts ?? 0}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                      onPin={handlePin}
+                      onView={handleView}
+                    />
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>

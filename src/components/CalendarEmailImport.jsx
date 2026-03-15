@@ -609,7 +609,7 @@ export default function CalendarEmailImport({ customers, addWeeklyUpdateLog, aiS
                                 className="h-6 bg-secondary border border-border rounded-lg px-1.5 text-[10px] text-foreground focus:outline-none focus:border-ring ml-auto max-w-[8rem]"
                               >
                                 <option value="">No client</option>
-                                {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                {[...customers].sort((a, b) => a.name.localeCompare(b.name)).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                               </select>
                             )}
 

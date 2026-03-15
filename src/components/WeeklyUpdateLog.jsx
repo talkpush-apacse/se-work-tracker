@@ -159,7 +159,7 @@ export default function WeeklyUpdateLog({ weekStart, weekEnd } = {}) {
               className="w-full h-9 bg-secondary border border-border rounded-lg px-2 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
             >
               <option value="">No specific client</option>
-              {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {[...customers].sort((a, b) => a.name.localeCompare(b.name)).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
         </div>
@@ -225,7 +225,7 @@ export default function WeeklyUpdateLog({ weekStart, weekEnd } = {}) {
           className="h-8 bg-secondary border border-border rounded-lg px-2 text-xs text-foreground focus:outline-none focus:border-ring"
         >
           <option value="">All Clients</option>
-          {customers.filter(c => weeklyUpdateLogs.some(l => l.customerId === c.id)).map(c => (
+          {customers.filter(c => weeklyUpdateLogs.some(l => l.customerId === c.id)).sort((a, b) => a.name.localeCompare(b.name)).map(c => (
             <option key={c.id} value={c.id}>{c.name}</option>
           ))}
         </select>
