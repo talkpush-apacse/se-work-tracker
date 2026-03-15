@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import Modal from './Modal';
 import WorkTypeSelector from './WorkTypeSelector';
@@ -38,8 +38,10 @@ export default function SaveSessionModal({ session, onClose }) {
     okrId: session.okrId || '',
   }]);
 
-  const [errors, setErrors]         = useState({});
-  const [showDiscard, setShowDiscard] = useState(false);
+  const [errors, setErrors]           = useState({});
+  const [showDiscard, setShowDiscard]   = useState(false);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState(null);
+  const confirmTimerRef = useRef(null);
 
   // Sort customers: pinned first, then alphabetical
   const sortedCustomers = useMemo(
@@ -138,7 +140,17 @@ export default function SaveSessionModal({ session, onClose }) {
 
   const removeRow = (id) => {
     if (taskRows.length <= 1) return;
-    setTaskRows(prev => prev.filter(r => r.id !== id));
+    if (confirmingDeleteId === id) {
+      // Second click — execute delete
+      if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
+      setConfirmingDeleteId(null);
+      setTaskRows(prev => prev.filter(r => r.id !== id));
+    } else {
+      // First click — arm confirm state, auto-reset after 3s
+      if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
+      setConfirmingDeleteId(id);
+      confirmTimerRef.current = setTimeout(() => setConfirmingDeleteId(null), 3000);
+    }
   };
 
   const workTypeLabel = WORK_TYPE_LABELS[workType] || workType;
@@ -230,8 +242,12 @@ export default function SaveSessionModal({ session, onClose }) {
                     <button
                       type="button"
                       onClick={() => removeRow(row.id)}
-                      className="text-muted-foreground hover:text-destructive transition-colors p-0.5"
-                      title="Remove task"
+                      title={confirmingDeleteId === row.id ? 'Click again to remove' : 'Remove task'}
+                      className={`p-0.5 transition-all duration-150 ${
+                        confirmingDeleteId === row.id
+                          ? 'text-destructive scale-110'
+                          : 'text-muted-foreground hover:text-destructive'
+                      }`}
                     >
                       <Trash2 size={12} />
                     </button>

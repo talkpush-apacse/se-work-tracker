@@ -1,6 +1,18 @@
 {
   "versions": [
     {
+      "version": "2.10.0",
+      "codename": "Velocity Power",
+      "date": "2026-03-16",
+      "summary": "Power user UX — bulk select in Knowledge + 2-click delete confirm in timer pop-up",
+      "changes": [
+        { "type": "feat", "description": "Knowledge: bulk select memory entries with checkboxes and shift-click range selection" },
+        { "type": "feat", "description": "Knowledge: sticky bulk action toolbar — deselect all + bulk delete with count" },
+        { "type": "feat", "description": "Knowledge: bulk delete confirmation dialog before permanently removing entries" },
+        { "type": "feat", "description": "SaveSessionModal: 2-click inline confirm before removing a task row (first click arms red state, second executes)" }
+      ]
+    },
+    {
       "version": "2.9.0",
       "codename": "Uptime Fresh",
       "date": "2026-03-16",

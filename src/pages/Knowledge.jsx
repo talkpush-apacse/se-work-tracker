@@ -1,7 +1,8 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  Brain, Search, Sparkles, X, Loader2, ChevronDown, Plus, AlertCircle, PencilLine, Trash2
+  Brain, Search, Sparkles, X, Loader2, ChevronDown, Plus, AlertCircle, PencilLine, Trash2,
+  CheckSquare, Square, CheckCheck,
 } from 'lucide-react';
 import {
   format, parseISO, formatDistanceToNow, differenceInDays,
@@ -313,9 +314,22 @@ function AddNoteModal({ customers, initialData, onSave, onClose }) {
 }
 
 // ── Memory card ───────────────────────────────────────────────────────────────
-function MemoryCard({ entry, highlightRegex, aiActive, aiReason, onClick }) {
+function MemoryCard({ entry, highlightRegex, aiActive, aiReason, onClick, isSelected, isSelectMode, onSelect, entryIndex }) {
   const colors = getEntryColors(entry);
   const dateStr = formatEntryDate(entry.date);
+
+  const handleCardClick = (e) => {
+    if (isSelectMode) {
+      onSelect(entry, entryIndex, e.shiftKey);
+    } else {
+      onClick(entry);
+    }
+  };
+
+  const handleCheckboxClick = (e) => {
+    e.stopPropagation();
+    onSelect(entry, entryIndex, e.shiftKey);
+  };
 
   return (
     <motion.div
@@ -324,9 +338,24 @@ function MemoryCard({ entry, highlightRegex, aiActive, aiReason, onClick }) {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -4 }}
       transition={{ duration: 0.18 }}
-      onClick={() => onClick(entry)}
-      className="bg-card border border-border rounded-2xl px-4 py-3 hover:bg-accent/30 hover:shadow-sm transition-all cursor-pointer group"
+      onClick={handleCardClick}
+      className={`relative border rounded-2xl px-4 py-3 hover:shadow-sm transition-all cursor-pointer group ${
+        isSelected
+          ? 'bg-teal-500/10 border-teal-500/40 ring-1 ring-teal-500/30'
+          : 'bg-card border-border hover:bg-accent/30'
+      }`}
     >
+      {/* Checkbox — visible on hover or when in select mode */}
+      <div
+        className={`absolute top-3 right-3 transition-opacity ${isSelectMode || isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+        onClick={handleCheckboxClick}
+      >
+        {isSelected
+          ? <CheckSquare size={16} className="text-teal-500" />
+          : <Square size={16} className="text-muted-foreground/50" />
+        }
+      </div>
+
       <div className="flex items-start gap-3">
         {/* Icon + type badge */}
         <div className="flex flex-col items-center gap-1 flex-shrink-0 mt-0.5">
@@ -422,9 +451,20 @@ function useWindowVirtualizer(totalItems, enabled) {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
+// Maps entityType → store delete function name
+const DELETABLE_TYPES = new Set(['annotation', 'task', 'meeting', 'milestone', 'activityLog', 'weeklyLog']);
+
+function getEntryKey(entry) {
+  return `${entry.entityType}-${entry.id}`;
+}
+
 export default function Knowledge({ onNavigate }) {
   const store = useAppStore();
-  const { customers, annotations, addAnnotation, updateAnnotation, deleteAnnotation, aiSettings } = store;
+  const {
+    customers, annotations, addAnnotation, updateAnnotation, deleteAnnotation,
+    deleteTask, deleteMeetingEntry, deleteMilestone, deletePoint, deleteWeeklyUpdateLog,
+    aiSettings,
+  } = store;
 
   // ── State ──
   const [query, setQuery]                 = useState('');
@@ -444,6 +484,11 @@ export default function Knowledge({ onNavigate }) {
   const [selectedEntry, setSelectedEntry] = useState(null);
   const [showAddNote, setShowAddNote]     = useState(false);
   const [editingAnnotation, setEditingAnnotation] = useState(null);
+
+  // Bulk select
+  const [selectedIds, setSelectedIds]     = useState(new Set());
+  const [showBulkConfirm, setShowBulkConfirm] = useState(false);
+  const lastSelectedIndexRef              = useRef(null);
 
   const debounceRef = useRef(null);
   const searchRef   = useRef(null);
@@ -559,6 +604,60 @@ export default function Knowledge({ onNavigate }) {
     setSelectedTypes(new Set());
     setSelectedCustomer('');
     setDateRange('all');
+  };
+
+  // ── Bulk select ──
+  const isSelectMode = selectedIds.size > 0;
+
+  const handleSelectEntry = useCallback((entry, index, shiftKey) => {
+    if (!DELETABLE_TYPES.has(entry.entityType)) return;
+    const key = getEntryKey(entry);
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (shiftKey && lastSelectedIndexRef.current !== null) {
+        const from = Math.min(lastSelectedIndexRef.current, index);
+        const to = Math.max(lastSelectedIndexRef.current, index);
+        displayEntries.slice(from, to + 1)
+          .filter(e => DELETABLE_TYPES.has(e.entityType))
+          .forEach(e => next.add(getEntryKey(e)));
+      } else {
+        next.has(key) ? next.delete(key) : next.add(key);
+        lastSelectedIndexRef.current = index;
+      }
+      return next;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayEntries]);
+
+  const handleSelectAll = () => {
+    if (selectedIds.size > 0) {
+      setSelectedIds(new Set());
+      lastSelectedIndexRef.current = null;
+    } else {
+      const all = new Set(
+        displayEntries.filter(e => DELETABLE_TYPES.has(e.entityType)).map(getEntryKey)
+      );
+      setSelectedIds(all);
+    }
+  };
+
+  const handleBulkDelete = () => {
+    selectedIds.forEach(key => {
+      const [entityType, ...idParts] = key.split('-');
+      const id = idParts.join('-');
+      switch (entityType) {
+        case 'annotation':  deleteAnnotation(id); break;
+        case 'task':        deleteTask(id); break;
+        case 'meeting':     deleteMeetingEntry(id); break;
+        case 'milestone':   deleteMilestone(id); break;
+        case 'activityLog': deletePoint(id); break;
+        case 'weeklyLog':   deleteWeeklyUpdateLog(id); break;
+        default: break;
+      }
+    });
+    setSelectedIds(new Set());
+    setShowBulkConfirm(false);
+    lastSelectedIndexRef.current = null;
   };
 
   // ── Annotation CRUD ──
@@ -687,16 +786,32 @@ export default function Knowledge({ onNavigate }) {
       )}
 
       {/* ── Stats bar ── */}
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <span>
-          Showing <span className="font-medium text-foreground">{displayEntries.length}</span> of{' '}
-          <span className="font-medium text-foreground">{memoryIndex.length}</span> entries
-        </span>
-        {aiActive && (
-          <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-lavender/15 text-brand-lavender text-[10px] font-semibold border border-brand-lavender/20">
-            <Sparkles size={9} />
-            AI ranked
+      <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+        <div className="flex items-center gap-2">
+          <span>
+            Showing <span className="font-medium text-foreground">{displayEntries.length}</span> of{' '}
+            <span className="font-medium text-foreground">{memoryIndex.length}</span> entries
           </span>
+          {aiActive && (
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-lavender/15 text-brand-lavender text-[10px] font-semibold border border-brand-lavender/20">
+              <Sparkles size={9} />
+              AI ranked
+            </span>
+          )}
+        </div>
+        {/* Select All toggle */}
+        {displayEntries.length > 0 && (
+          <button
+            onClick={handleSelectAll}
+            className={`flex items-center gap-1.5 text-[11px] font-medium transition-colors ${
+              selectedIds.size > 0
+                ? 'text-teal-600 hover:text-teal-700'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <CheckCheck size={13} />
+            {selectedIds.size > 0 ? `${selectedIds.size} selected` : 'Select all'}
+          </button>
         )}
       </div>
 
@@ -731,21 +846,9 @@ export default function Knowledge({ onNavigate }) {
           */}
           {shouldVirtualize ? (
             <div className="space-y-2">
-              {visibleEntries.map(entry => (
-                <MemoryCard
-                  key={`${entry.entityType}-${entry.id}`}
-                  entry={entry}
-                  highlightRegex={highlightRegex}
-                  aiActive={aiActive}
-                  aiReason={aiReasons[entry.id]}
-                  onClick={setSelectedEntry}
-                />
-              ))}
-            </div>
-          ) : (
-            <AnimatePresence mode="popLayout" initial={false}>
-              <div className="space-y-2">
-                {visibleEntries.map(entry => (
+              {visibleEntries.map((entry, i) => {
+                const absoluteIndex = slice.start + i;
+                return (
                   <MemoryCard
                     key={`${entry.entityType}-${entry.id}`}
                     entry={entry}
@@ -753,6 +856,29 @@ export default function Knowledge({ onNavigate }) {
                     aiActive={aiActive}
                     aiReason={aiReasons[entry.id]}
                     onClick={setSelectedEntry}
+                    isSelected={selectedIds.has(getEntryKey(entry))}
+                    isSelectMode={isSelectMode}
+                    onSelect={handleSelectEntry}
+                    entryIndex={absoluteIndex}
+                  />
+                );
+              })}
+            </div>
+          ) : (
+            <AnimatePresence mode="popLayout" initial={false}>
+              <div className="space-y-2">
+                {visibleEntries.map((entry, i) => (
+                  <MemoryCard
+                    key={`${entry.entityType}-${entry.id}`}
+                    entry={entry}
+                    highlightRegex={highlightRegex}
+                    aiActive={aiActive}
+                    aiReason={aiReasons[entry.id]}
+                    onClick={setSelectedEntry}
+                    isSelected={selectedIds.has(getEntryKey(entry))}
+                    isSelectMode={isSelectMode}
+                    onSelect={handleSelectEntry}
+                    entryIndex={i}
                   />
                 ))}
               </div>
@@ -797,6 +923,63 @@ export default function Knowledge({ onNavigate }) {
           onSave={handleSaveNote}
           onClose={() => { setShowAddNote(false); setEditingAnnotation(null); }}
         />
+      )}
+
+      {/* ── Bulk actions toolbar ── */}
+      <AnimatePresence>
+        {selectedIds.size > 0 && (
+          <motion.div
+            initial={{ y: 80, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 80, opacity: 0 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-card border border-border shadow-xl"
+          >
+            <span className="text-xs font-semibold text-foreground tabular-nums">
+              {selectedIds.size} selected
+            </span>
+            <div className="w-px h-4 bg-border" />
+            <button
+              onClick={() => { setSelectedIds(new Set()); lastSelectedIndexRef.current = null; }}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Deselect all
+            </button>
+            <button
+              onClick={() => setShowBulkConfirm(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/10 text-red-500 text-xs font-semibold hover:bg-red-500/20 transition-all border border-red-500/20"
+            >
+              <Trash2 size={12} />
+              Delete {selectedIds.size}
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Bulk delete confirmation dialog ── */}
+      {showBulkConfirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-sm bg-card border border-border rounded-2xl shadow-2xl p-6">
+            <h3 className="text-base font-semibold text-foreground mb-2">Delete {selectedIds.size} item{selectedIds.size !== 1 ? 's' : ''}?</h3>
+            <p className="text-sm text-muted-foreground mb-5">
+              This will permanently delete {selectedIds.size} item{selectedIds.size !== 1 ? 's' : ''} from your memory. This cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowBulkConfirm(false)}
+                className="px-4 py-2 rounded-xl border border-border text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkDelete}
+                className="px-4 py-2 rounded-xl bg-red-500 text-white text-xs font-semibold hover:bg-red-600 transition-all"
+              >
+                Delete {selectedIds.size} item{selectedIds.size !== 1 ? 's' : ''}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
