@@ -551,6 +551,12 @@ export function useStore() {
   const markMeetingEntryTriaged = useCallback((id) => {
     setMeetingEntries(prev => prev.map(m => m.id === id ? { ...m, isTriaged: true } : m));
   }, []);
+  const updateMeetingEntry = useCallback((id, data) => {
+    setMeetingEntries(prev => prev.map(m => m.id === id ? { ...m, ...data } : m));
+  }, []);
+  const deleteMeetingEntry = useCallback((id) => {
+    setMeetingEntries(prev => prev.filter(m => m.id !== id));
+  }, []);
   const getCustomerMeetingEntries = useCallback((customerId) => {
     return meetingEntries.filter(m => m.customerId === customerId);
   }, [meetingEntries]);
@@ -831,7 +837,7 @@ export function useStore() {
     addCustomer, updateCustomer, deleteCustomer, reorderCustomers,
     addPoint, deletePoint, updatePoint,
     getCustomerPoints, getCustomerTotals,
-    addMeetingEntry, markMeetingEntryTriaged, getCustomerMeetingEntries,
+    addMeetingEntry, markMeetingEntryTriaged, updateMeetingEntry, deleteMeetingEntry, getCustomerMeetingEntries,
     addTask, updateTask, deleteTask, reorderTasks, getCustomerTasks,
     addMilestone, updateMilestone, deleteMilestone, getCustomerMilestones,
     addAnnotation, updateAnnotation, deleteAnnotation, getCustomerAnnotations,

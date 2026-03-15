@@ -73,7 +73,7 @@ function AppContent() {
                 {activeTab === 'weekly'       && <WeeklyReport onNavigate={handleTabChange} />}
                 {activeTab === 'timebudget'   && <TimeBudget />}
                 {activeTab === 'pulse'        && <Pulse />}
-                {activeTab === 'knowledge'    && <Knowledge />}
+                {activeTab === 'knowledge'    && <Knowledge onNavigate={handleTabChange} />}
                 {activeTab === 'integrations' && <Integrations />}
               </motion.div>
             </AnimatePresence>

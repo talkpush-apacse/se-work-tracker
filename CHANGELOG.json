@@ -1,6 +1,37 @@
 {
   "versions": [
     {
+      "version": "2.6.0",
+      "codename": "Runway Open",
+      "date": "2026-03-15",
+      "summary": "Meeting Intelligence — AI-powered meeting notes with structured summaries, action items, and customer Meetings tab",
+      "changes": [
+        { "type": "feat", "description": "MeetingEntryModal — full create/edit modal with title, attendees, date, and raw notes fields" },
+        { "type": "feat", "description": "Summarize with AI button generates structured summary: decisions, open questions, and action items" },
+        { "type": "feat", "description": "Re-generate AI summary without losing existing converted-to-task links on action items" },
+        { "type": "feat", "description": "Convert to Task button on each AI action item creates a linked task in one click" },
+        { "type": "feat", "description": "Meetings tab added to Customer Detail view — rich cards with AI summary chips and expand detail" },
+        { "type": "feat", "description": "Inline Summarize button on meeting cards for quick AI summary without opening the modal" },
+        { "type": "feat", "description": "Memory Index now uses AI summary (when available) as the primary text for meeting entries" }
+      ]
+    },
+    {
+      "version": "2.5.0",
+      "codename": "Queue Rising",
+      "date": "2026-03-15",
+      "summary": "Unified Memory Index — Knowledge page rebuilt as a searchable second brain",
+      "changes": [
+        { "type": "feat", "description": "Knowledge page replaced with Unified Memory Index (all logged entities in one searchable timeline)" },
+        { "type": "feat", "description": "AI semantic search (Claude) re-ranks memory entries by relevance with per-entry reason tooltips" },
+        { "type": "feat", "description": "Type multi-select filter, customer filter, and 6-option date range filter" },
+        { "type": "feat", "description": "MemoryDetailDrawer — right-side sheet with full entry detail, copy text, and Go to Triage link" },
+        { "type": "feat", "description": "Add Note / Edit / Delete annotation CRUD from the Memory page" },
+        { "type": "feat", "description": "Scroll-based virtualization for large indexes (> 200 entries)" },
+        { "type": "feat", "description": "Animated list transitions via Framer Motion AnimatePresence" },
+        { "type": "feat", "description": "Skeleton shimmer loading state during AI search" }
+      ]
+    },
+    {
       "version": "2.4.0",
       "codename": "Pipeline Crisp",
       "date": "2026-03-15",

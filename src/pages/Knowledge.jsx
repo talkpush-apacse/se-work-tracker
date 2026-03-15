@@ -1,157 +1,93 @@
-import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { Brain, Search, Sparkles, ChevronDown, ChevronUp, X, Loader2, AlertCircle, Clock, Filter } from 'lucide-react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import {
+  Brain, Search, Sparkles, X, Loader2, ChevronDown, Plus, AlertCircle, PencilLine, Trash2
+} from 'lucide-react';
+import {
+  format, parseISO, formatDistanceToNow, differenceInDays,
+  startOfWeek, startOfMonth, subMonths, startOfYear, isAfter,
+} from 'date-fns';
 import { useAppStore } from '../context/StoreContext';
-import { formatDistanceToNow, parseISO, isAfter, isBefore, startOfDay, subDays, format } from 'date-fns';
-import { WEEKLY_UPDATE_LOG_LABELS, WEEKLY_UPDATE_LOG_COLORS } from '../constants';
+import { buildMemoryIndex, getEntryColors } from '../utils/memoryIndex';
+import { aiMemorySearch } from '../utils/memorySearch';
+import { ANNOTATION_TAGS, ANNOTATION_TAG_LABELS } from '../constants';
+import MemoryDetailDrawer from '../components/MemoryDetailDrawer';
 
-// ── Entity type config ──────────────────────────────────────────────────────────
-const ENTITY_TYPES = {
-  task:       { label: 'Task',       color: '#6b7280' },
-  highlight:  { label: 'Highlight',  color: WEEKLY_UPDATE_LOG_COLORS.highlight },
-  lowlight:   { label: 'Lowlight',   color: WEEKLY_UPDATE_LOG_COLORS.lowlight },
-  learning:   { label: 'Learning',   color: WEEKLY_UPDATE_LOG_COLORS.learning },
-  shoutout:   { label: 'Shoutout',   color: WEEKLY_UPDATE_LOG_COLORS.shoutout },
-  neutral:    { label: 'Neutral',    color: WEEKLY_UPDATE_LOG_COLORS.neutral },
-  annotation: { label: 'Annotation', color: WEEKLY_UPDATE_LOG_COLORS.annotation },
-  'next-week-priority': { label: 'Priority', color: WEEKLY_UPDATE_LOG_COLORS['next-week-priority'] },
-  meeting:    { label: 'Meeting',    color: '#8b5cf6' },
-  'ai-output': { label: 'AI Output', color: '#6366f1' },
-  milestone:  { label: 'Milestone',  color: '#14b8a6' },
-};
-
-// Entity types available for the filter multi-select
-const FILTERABLE_TYPES = [
-  { value: 'task',       label: 'Tasks' },
-  { value: 'highlight',  label: 'Highlights' },
-  { value: 'lowlight',   label: 'Lowlights' },
-  { value: 'learning',   label: 'Learnings' },
-  { value: 'shoutout',   label: 'Shoutouts' },
-  { value: 'neutral',    label: 'Neutral' },
-  { value: 'annotation', label: 'Annotations' },
-  { value: 'next-week-priority', label: 'Priorities' },
-  { value: 'meeting',    label: 'Meetings' },
-  { value: 'ai-output',  label: 'AI Outputs' },
-  { value: 'milestone',  label: 'Milestones' },
+// ── Type filter options ────────────────────────────────────────────────────────
+const TYPE_FILTER_OPTIONS = [
+  { value: 'task',        label: 'Task' },
+  { value: 'meeting',     label: 'Meeting' },
+  { value: 'highlight',   label: 'Highlight',  weeklyLogType: true },
+  { value: 'lowlight',    label: 'Lowlight',   weeklyLogType: true },
+  { value: 'learning',    label: 'Learning',   weeklyLogType: true },
+  { value: 'shoutout',    label: 'Shoutout',   weeklyLogType: true },
+  { value: 'aiOutput',    label: 'AI Draft' },
+  { value: 'milestone',   label: 'Milestone' },
+  { value: 'activityLog', label: 'Activity' },
+  { value: 'annotation',  label: 'Note' },
 ];
 
-const DATE_PRESETS = [
-  { value: '7',   label: 'Last 7 days' },
-  { value: '30',  label: 'Last 30 days' },
-  { value: '90',  label: 'Last 90 days' },
-  { value: 'all', label: 'All time' },
+const DATE_RANGE_OPTIONS = [
+  { value: 'all',      label: 'All time' },
+  { value: 'week',     label: 'This week' },
+  { value: 'month',    label: 'This month' },
+  { value: '3months',  label: 'Last 3 months' },
+  { value: '6months',  label: 'Last 6 months' },
+  { value: 'year',     label: 'This year' },
 ];
 
-// ── Knowledge search system prompt ──────────────────────────────────────────────
-const KNOWLEDGE_SYSTEM_PROMPT = `You are a knowledge retrieval assistant for a Solutions Engineer at Talkpush, a hiring tech SaaS company. The user is searching their personal work history across tasks, weekly highlights/lowlights/learnings, meeting notes, AI outputs, and milestones.
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-Given the search query and the data below, return the most relevant results ranked by relevance. For each result, include:
-- The source type (task, highlight, meeting, etc.)
-- The date
-- The customer name (if applicable)
-- A brief explanation of why it's relevant to the query
-
-If the query asks a factual question (e.g. "When did I last..."), answer it directly first, then list supporting evidence.
-
-Format as a clean numbered list. Plain text only. Be concise and direct.`;
-
-// ── Helpers ─────────────────────────────────────────────────────────────────────
-
-/** Build a flat, searchable array of all entities with normalised shape */
-function buildSearchIndex(tasks, weeklyUpdateLogs, meetingEntries, aiOutputs, milestones, customerMap) {
-  const items = [];
-
-  // Tasks
-  (tasks || []).forEach(t => {
-    const customer = t.customerId ? customerMap.get(t.customerId) : null;
-    items.push({
-      id: t.id,
-      type: 'task',
-      text: t.description || '',
-      date: t.createdAt,
-      customerId: t.customerId || null,
-      customerName: customer?.name || null,
-      customerColor: customer?.color || null,
-      meta: { status: t.status, workType: t.workType },
-    });
-  });
-
-  // Weekly update logs
-  (weeklyUpdateLogs || []).forEach(l => {
-    const customer = l.customerId ? customerMap.get(l.customerId) : null;
-    items.push({
-      id: l.id,
-      type: l.type, // highlight, lowlight, learning, shoutout, neutral, next-week-priority
-      text: l.text || '',
-      date: l.date ? l.date + 'T00:00:00' : l.createdAt,
-      customerId: l.customerId || null,
-      customerName: customer?.name || null,
-      customerColor: customer?.color || null,
-      meta: {},
-    });
-  });
-
-  // Meeting entries
-  (meetingEntries || []).forEach(m => {
-    const customer = m.customerId ? customerMap.get(m.customerId) : null;
-    items.push({
-      id: m.id,
-      type: 'meeting',
-      text: m.rawNotes || '',
-      date: m.meetingDate || m.createdAt,
-      customerId: m.customerId || null,
-      customerName: customer?.name || null,
-      customerColor: customer?.color || null,
-      meta: { isTriaged: m.isTriaged },
-    });
-  });
-
-  // AI outputs
-  (aiOutputs || []).forEach(o => {
-    // Find the parent task's customer
-    const parentTask = (tasks || []).find(t => t.id === o.taskId);
-    const customer = parentTask?.customerId ? customerMap.get(parentTask.customerId) : null;
-    items.push({
-      id: o.id,
-      type: 'ai-output',
-      text: [o.inputText, o.outputText].filter(Boolean).join(' | '),
-      date: o.createdAt,
-      customerId: parentTask?.customerId || null,
-      customerName: customer?.name || null,
-      customerColor: customer?.color || null,
-      meta: { outputType: o.outputType },
-    });
-  });
-
-  // Milestones
-  (milestones || []).forEach(m => {
-    const customer = m.customerId ? customerMap.get(m.customerId) : null;
-    items.push({
-      id: m.id,
-      type: 'milestone',
-      text: m.title || '',
-      date: m.targetDate ? m.targetDate + 'T00:00:00' : m.createdAt,
-      customerId: m.customerId || null,
-      customerName: customer?.name || null,
-      customerColor: customer?.color || null,
-      meta: { status: m.status },
-    });
-  });
-
-  return items;
+function formatEntryDate(dateStr) {
+  try {
+    const d = parseISO(dateStr);
+    const now = new Date();
+    const diff = differenceInDays(now, d);
+    if (diff < 7) return formatDistanceToNow(d, { addSuffix: true });
+    if (d.getFullYear() !== now.getFullYear()) return format(d, 'MMM d, yyyy');
+    return format(d, 'MMM d');
+  } catch {
+    return '';
+  }
 }
 
-/** Case-insensitive substring match — returns true if all query words are found */
-function matchesQuery(text, queryWords) {
-  if (!text || queryWords.length === 0) return false;
-  const lower = text.toLowerCase();
-  return queryWords.every(w => lower.includes(w));
+function getDateCutoff(rangeValue) {
+  const now = new Date();
+  switch (rangeValue) {
+    case 'week':    return startOfWeek(now, { weekStartsOn: 1 });
+    case 'month':   return startOfMonth(now);
+    case '3months': return subMonths(now, 3);
+    case '6months': return subMonths(now, 6);
+    case 'year':    return startOfYear(now);
+    default:        return null;
+  }
 }
 
-/** Highlight matching portions of text */
-function highlightText(text, queryWords) {
-  if (!text || queryWords.length === 0) return text;
-  // Build a regex that matches any of the query words (case-insensitive)
-  const escaped = queryWords.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+function matchesTypeFilter(entry, selectedTypes) {
+  if (selectedTypes.size === 0) return true;
+  for (const type of selectedTypes) {
+    const opt = TYPE_FILTER_OPTIONS.find(o => o.value === type);
+    if (opt?.weeklyLogType) {
+      if (entry.entityType === 'weeklyLog' && entry.sourceRef?.type === type) return true;
+    } else {
+      if (entry.entityType === type) return true;
+    }
+  }
+  return false;
+}
+
+function matchesKeyword(entry, words) {
+  if (words.length === 0) return true;
+  const haystack = [entry.text, entry.subtext, entry.label, entry.customerName]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+  return words.every(w => haystack.includes(w));
+}
+
+function highlightText(text, words) {
+  if (!text || words.length === 0) return text;
+  const escaped = words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
   const regex = new RegExp(`(${escaped.join('|')})`, 'gi');
   const parts = text.split(regex);
   return parts.map((part, i) =>
@@ -161,571 +97,672 @@ function highlightText(text, queryWords) {
   );
 }
 
-/** Truncate text to ~maxLen chars, breaking at word boundary */
-function truncateText(text, maxLen = 200) {
-  if (!text || text.length <= maxLen) return text;
-  const truncated = text.slice(0, maxLen);
-  const lastSpace = truncated.lastIndexOf(' ');
-  return (lastSpace > maxLen * 0.6 ? truncated.slice(0, lastSpace) : truncated) + '…';
+// ── Skeleton loader ───────────────────────────────────────────────────────────
+function SkeletonCard() {
+  return (
+    <div className="bg-card border border-border rounded-2xl px-4 py-3 animate-pulse">
+      <div className="flex items-start gap-3">
+        <div className="h-5 w-16 bg-secondary rounded-lg flex-shrink-0 mt-0.5" />
+        <div className="flex-1 space-y-2">
+          <div className="flex gap-2">
+            <div className="h-3 w-16 bg-secondary rounded" />
+            <div className="h-3 w-12 bg-secondary rounded" />
+          </div>
+          <div className="h-3 w-full bg-secondary rounded" />
+          <div className="h-3 w-3/4 bg-secondary rounded" />
+        </div>
+      </div>
+    </div>
+  );
 }
 
-/** Build context string for AI from search results */
-function buildAIContext(query, results, maxItems = 50) {
-  const items = results.slice(0, maxItems);
-  const lines = [`Search query: "${query}"`, '', `Found ${items.length} matching items:`, ''];
+// ── Type multi-select dropdown ────────────────────────────────────────────────
+function TypeDropdown({ selectedTypes, onToggle, onClear }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
 
-  items.forEach((item, i) => {
-    const dateStr = item.date ? format(parseISO(item.date), 'MMM d, yyyy') : 'unknown date';
-    const typeLabel = ENTITY_TYPES[item.type]?.label || item.type;
-    const customer = item.customerName || 'No client';
-    const textPreview = truncateText(item.text, 300);
-    lines.push(`${i + 1}. [${typeLabel}] ${dateStr} — ${customer}`);
-    lines.push(`   ${textPreview}`);
-    lines.push('');
-  });
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
-  return lines.join('\n');
+  const label = selectedTypes.size === 0
+    ? 'Type'
+    : selectedTypes.size === 1
+      ? TYPE_FILTER_OPTIONS.find(o => selectedTypes.has(o.value))?.label || 'Type'
+      : `${selectedTypes.size} types`;
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(p => !p)}
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all ${
+          selectedTypes.size > 0
+            ? 'bg-brand-lavender/15 text-brand-lavender border-brand-lavender/30'
+            : 'bg-secondary border-border text-muted-foreground hover:text-foreground'
+        }`}
+      >
+        {label}
+        {selectedTypes.size > 0 && (
+          <span
+            className="ml-0.5 p-0.5 rounded-full hover:bg-brand-lavender/20"
+            onClick={(e) => { e.stopPropagation(); onClear(); }}
+          >
+            <X size={10} />
+          </span>
+        )}
+        <ChevronDown size={12} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute top-full left-0 mt-1 z-30 bg-card border border-border rounded-2xl shadow-lg py-1.5 min-w-[160px]">
+          {TYPE_FILTER_OPTIONS.map(opt => {
+            const active = selectedTypes.has(opt.value);
+            return (
+              <button
+                key={opt.value}
+                onClick={() => onToggle(opt.value)}
+                className={`w-full text-left px-4 py-1.5 text-xs flex items-center gap-2 transition-colors ${
+                  active ? 'text-brand-lavender font-semibold' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <span className={`w-3 h-3 rounded-sm border flex-shrink-0 flex items-center justify-center ${
+                  active ? 'bg-brand-lavender border-brand-lavender' : 'border-border'
+                }`}>
+                  {active && <span className="text-white text-[8px] leading-none">✓</span>}
+                </span>
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
+// ── Customer dropdown ─────────────────────────────────────────────────────────
+function CustomerDropdown({ customers, value, onChange }) {
+  const selected = customers.find(c => c.id === value);
+  const label = selected ? selected.name : 'Customer';
 
-// ─── Component ──────────────────────────────────────────────────────────────────
+  return (
+    <div className="relative">
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className={`appearance-none pl-3 pr-7 py-1.5 rounded-xl border text-xs font-medium transition-all focus:outline-none cursor-pointer ${
+          value
+            ? 'bg-brand-lavender/15 text-brand-lavender border-brand-lavender/30'
+            : 'bg-secondary border-border text-muted-foreground'
+        }`}
+        style={{ backgroundImage: 'none' }}
+      >
+        <option value="">Customer</option>
+        {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+      </select>
+      <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground" />
+    </div>
+  );
+}
 
-export default function Knowledge() {
-  const {
-    tasks, weeklyUpdateLogs, meetingEntries, aiOutputs, milestones,
-    customers, aiSettings, updateAiSettings,
-  } = useAppStore();
+// ── Date range dropdown ───────────────────────────────────────────────────────
+function DateRangeDropdown({ value, onChange }) {
+  const selected = DATE_RANGE_OPTIONS.find(o => o.value === value);
+  return (
+    <div className="relative">
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className={`appearance-none pl-3 pr-7 py-1.5 rounded-xl border text-xs font-medium transition-all focus:outline-none cursor-pointer ${
+          value !== 'all'
+            ? 'bg-brand-lavender/15 text-brand-lavender border-brand-lavender/30'
+            : 'bg-secondary border-border text-muted-foreground'
+        }`}
+        style={{ backgroundImage: 'none' }}
+      >
+        {DATE_RANGE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+      <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground" />
+    </div>
+  );
+}
+
+// ── Add Note modal ────────────────────────────────────────────────────────────
+function AddNoteModal({ customers, initialData, onSave, onClose }) {
+  const [text, setText] = useState(initialData?.text || '');
+  const [customerId, setCustomerId] = useState(initialData?.customerId || '');
+  const [tag, setTag] = useState(initialData?.tag || '');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!text.trim()) return;
+    onSave({ text: text.trim(), customerId: customerId || null, tag: tag || null });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+      <div className="relative bg-background border border-border rounded-2xl shadow-2xl w-full max-w-md p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-foreground">
+            {initialData ? 'Edit Note' : 'Add Note'}
+          </h3>
+          <button onClick={onClose} className="p-1 text-muted-foreground hover:text-foreground">
+            <X size={16} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <textarea
+            autoFocus
+            value={text}
+            onChange={e => setText(e.target.value)}
+            placeholder="Write your note…"
+            rows={4}
+            className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40 resize-none"
+          />
+
+          <div className="grid grid-cols-2 gap-2">
+            <div className="relative">
+              <select
+                value={customerId}
+                onChange={e => setCustomerId(e.target.value)}
+                className="w-full appearance-none bg-secondary border border-border rounded-xl px-3 pr-8 py-2 text-xs text-foreground focus:outline-none focus:border-ring cursor-pointer"
+              >
+                <option value="">No client</option>
+                {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground" />
+            </div>
+
+            <div className="relative">
+              <select
+                value={tag}
+                onChange={e => setTag(e.target.value)}
+                className="w-full appearance-none bg-secondary border border-border rounded-xl px-3 pr-8 py-2 text-xs text-foreground focus:outline-none focus:border-ring cursor-pointer"
+              >
+                <option value="">No tag</option>
+                {ANNOTATION_TAGS.map(t => (
+                  <option key={t} value={t}>{ANNOTATION_TAG_LABELS[t]}</option>
+                ))}
+              </select>
+              <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground" />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-1">
+            <button type="button" onClick={onClose} className="px-4 py-2 rounded-xl border border-border text-xs text-muted-foreground hover:text-foreground transition-colors">
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={!text.trim()}
+              className="px-4 py-2 rounded-xl bg-brand-lavender text-white text-xs font-semibold hover:bg-brand-lavender/80 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+            >
+              {initialData ? 'Save changes' : 'Add note'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── Memory card ───────────────────────────────────────────────────────────────
+function MemoryCard({ entry, queryWords, aiActive, aiReason, onClick }) {
+  const colors = getEntryColors(entry);
+  const dateStr = formatEntryDate(entry.date);
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -4 }}
+      transition={{ duration: 0.18 }}
+      onClick={() => onClick(entry)}
+      className="bg-card border border-border rounded-2xl px-4 py-3 hover:bg-accent/30 hover:shadow-sm transition-all cursor-pointer group"
+    >
+      <div className="flex items-start gap-3">
+        {/* Icon + type badge */}
+        <div className="flex flex-col items-center gap-1 flex-shrink-0 mt-0.5">
+          <span className="text-base leading-none">{entry.icon}</span>
+          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md border ${colors.bg} ${colors.text} ${colors.border} whitespace-nowrap`}>
+            {entry.label}
+          </span>
+        </div>
+
+        {/* Content */}
+        <div className="min-w-0 flex-1">
+          {/* Meta: customer + date */}
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            {entry.customerName && (
+              <span className="flex items-center gap-1 text-[11px] font-medium text-foreground">
+                <span
+                  className="w-2 h-2 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: entry.customerColor || '#6366f1' }}
+                />
+                {entry.customerName}
+              </span>
+            )}
+            {dateStr && (
+              <span className="text-[10px] text-muted-foreground">
+                {dateStr}
+              </span>
+            )}
+            {entry.subtext && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground border border-border">
+                {entry.subtext}
+              </span>
+            )}
+          </div>
+
+          {/* Text — 2-line clamp */}
+          <p className="text-xs text-foreground/90 leading-relaxed line-clamp-2">
+            {queryWords.length > 0 ? highlightText(entry.text, queryWords) : entry.text}
+          </p>
+
+          {/* AI reason */}
+          {aiActive && aiReason && (
+            <p className="text-[10px] text-muted-foreground/70 mt-1 italic line-clamp-1">
+              {aiReason}
+            </p>
+          )}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// ── Simple window virtualizer ─────────────────────────────────────────────────
+const ITEM_HEIGHT = 92;
+const BUFFER_COUNT = 20;
+
+function useWindowVirtualizer(totalItems, enabled) {
+  const containerRef = useRef(null);
+  const [slice, setSlice] = useState({ start: 0, end: Math.min(totalItems, 60) });
+
+  useEffect(() => {
+    if (!enabled) {
+      setSlice({ start: 0, end: totalItems });
+      return;
+    }
+
+    const update = () => {
+      const container = containerRef.current;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const containerTop = rect.top + window.scrollY;
+      const scrollY = window.scrollY;
+      const viewH = window.innerHeight;
+
+      const relScroll = Math.max(0, scrollY - containerTop);
+      const start = Math.max(0, Math.floor(relScroll / ITEM_HEIGHT) - BUFFER_COUNT);
+      const end = Math.min(totalItems, Math.ceil((relScroll + viewH) / ITEM_HEIGHT) + BUFFER_COUNT);
+      setSlice({ start, end });
+    };
+
+    // Give DOM time to settle on first render
+    const raf = requestAnimationFrame(update);
+    window.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update, { passive: true });
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+  }, [totalItems, enabled]);
+
+  return { containerRef, slice };
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
+
+export default function Knowledge({ onNavigate }) {
+  const store = useAppStore();
+  const { customers, annotations, addAnnotation, updateAnnotation, deleteAnnotation, aiSettings } = store;
 
   // ── State ──
-  const [query, setQuery]               = useState('');
-  const [filterCustomer, setFilterCustomer] = useState('');
-  const [filterDatePreset, setFilterDatePreset] = useState('all');
-  const [filterTypes, setFilterTypes]       = useState(new Set());
-  const [filtersOpen, setFiltersOpen]       = useState(false);
-  const [expandedCards, setExpandedCards]   = useState(new Set());
-  const [provider, setProvider]             = useState(aiSettings.providers?.knowledge || 'claude');
-
-  // AI search state
-  const [aiResult, setAiResult]       = useState('');
-  const [isAiSearching, setIsAiSearching] = useState(false);
-  const [aiError, setAiError]         = useState(null);
-
-  const searchRef = useRef(null);
-  const debounceRef = useRef(null);
+  const [query, setQuery]                 = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [selectedTypes, setSelectedTypes] = useState(new Set());
+  const [selectedCustomer, setSelectedCustomer] = useState('');
+  const [dateRange, setDateRange]         = useState('all');
 
-  // Debounce the query (300ms)
+  // AI search
+  const [aiActive, setAiActive]         = useState(false);
+  const [aiSearching, setAiSearching]   = useState(false);
+  const [aiError, setAiError]           = useState(null);
+  const [aiReasons, setAiReasons]       = useState({});
+  const [aiRankedEntries, setAiRankedEntries] = useState(null);
+
+  // UI
+  const [selectedEntry, setSelectedEntry] = useState(null);
+  const [showAddNote, setShowAddNote]     = useState(false);
+  const [editingAnnotation, setEditingAnnotation] = useState(null);
+
+  const debounceRef = useRef(null);
+  const searchRef   = useRef(null);
+
+  // ── Debounce query (200ms) ──
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => setDebouncedQuery(query), 300);
+    debounceRef.current = setTimeout(() => setDebouncedQuery(query), 200);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [query]);
 
-  // O(1) customer lookup
-  const customerMap = useMemo(
-    () => new Map(customers.map(c => [c.id, c])),
-    [customers]
-  );
-
-  // Build search index — memoised to avoid rebuilding on every keystroke
-  const searchIndex = useMemo(
-    () => buildSearchIndex(tasks, weeklyUpdateLogs, meetingEntries, aiOutputs, milestones, customerMap),
-    [tasks, weeklyUpdateLogs, meetingEntries, aiOutputs, milestones, customerMap]
-  );
-
-  // ── Tier 1: Local keyword search (instant) ──
-  const keywordResults = useMemo(() => {
-    const queryWords = debouncedQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
-
-    let items = searchIndex;
-
-    // Apply customer filter
-    if (filterCustomer) {
-      items = items.filter(i => i.customerId === filterCustomer);
+  // Reset AI results when query or filters change
+  useEffect(() => {
+    if (aiActive) {
+      setAiActive(false);
+      setAiRankedEntries(null);
+      setAiReasons({});
+      setAiError(null);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedQuery, selectedTypes, selectedCustomer, dateRange]);
 
-    // Apply date filter
-    if (filterDatePreset !== 'all') {
-      const days = parseInt(filterDatePreset, 10);
-      const cutoff = startOfDay(subDays(new Date(), days));
-      items = items.filter(i => {
-        try { return isAfter(parseISO(i.date), cutoff); }
-        catch { return true; }
-      });
-    }
+  // ── Build memory index ──
+  const memoryIndex = useMemo(() => buildMemoryIndex(store), [
+    store.tasks, store.weeklyUpdateLogs, store.meetingEntries,
+    store.aiOutputs, store.milestones, store.points,
+    store.annotations, store.customers,
+  ]);
 
-    // Apply entity type filter
-    if (filterTypes.size > 0) {
-      items = items.filter(i => filterTypes.has(i.type));
-    }
+  // ── Apply filters (keyword + type + customer + date) ──
+  const filteredEntries = useMemo(() => {
+    const words = debouncedQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const cutoff = getDateCutoff(dateRange);
 
-    // If no query, show everything (filtered) sorted by date desc
-    if (queryWords.length === 0) {
-      return [...items].sort((a, b) => {
-        try { return parseISO(b.date) - parseISO(a.date); }
-        catch { return 0; }
-      });
-    }
-
-    // Match and score — simple substring matching with all query words
-    // Also match against customerName for queries like "TaskUs"
-    const matched = items.filter(i =>
-      matchesQuery(i.text, queryWords) || matchesQuery(i.customerName, queryWords)
-    );
-
-    // Sort: prioritise customer name matches, then by date desc
-    return matched.sort((a, b) => {
-      const aCustomerMatch = matchesQuery(a.customerName, queryWords) ? 1 : 0;
-      const bCustomerMatch = matchesQuery(b.customerName, queryWords) ? 1 : 0;
-      if (bCustomerMatch !== aCustomerMatch) return bCustomerMatch - aCustomerMatch;
-      try { return parseISO(b.date) - parseISO(a.date); }
-      catch { return 0; }
+    return memoryIndex.filter(entry => {
+      if (!matchesTypeFilter(entry, selectedTypes)) return false;
+      if (selectedCustomer && entry.customerId !== selectedCustomer) return false;
+      if (cutoff && !isAfter(parseISO(entry.date), cutoff)) return false;
+      if (!matchesKeyword(entry, words)) return false;
+      return true;
     });
-  }, [searchIndex, debouncedQuery, filterCustomer, filterDatePreset, filterTypes]);
+  }, [memoryIndex, debouncedQuery, selectedTypes, selectedCustomer, dateRange]);
 
-  // Recent activity (last 7 days) — shown when no search query
-  const recentActivity = useMemo(() => {
-    const cutoff = startOfDay(subDays(new Date(), 7));
-    return searchIndex
-      .filter(i => { try { return isAfter(parseISO(i.date), cutoff); } catch { return false; } })
-      .sort((a, b) => { try { return parseISO(b.date) - parseISO(a.date); } catch { return 0; } })
-      .slice(0, 30);
-  }, [searchIndex]);
+  // ── Display entries: AI-ranked or keyword-filtered ──
+  const displayEntries = aiActive && aiRankedEntries
+    ? aiRankedEntries.filter(e => filteredEntries.some(f => f.id === e.id))
+    : filteredEntries;
 
-  // ── Tier 2: AI-powered semantic search ──
+  const queryWords = debouncedQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
+
+  // ── Virtualization ──
+  const shouldVirtualize = displayEntries.length > 200;
+  const { containerRef, slice } = useWindowVirtualizer(displayEntries.length, shouldVirtualize);
+  const visibleEntries = shouldVirtualize ? displayEntries.slice(slice.start, slice.end) : displayEntries;
+  const paddingTop = shouldVirtualize ? slice.start * ITEM_HEIGHT : 0;
+  const paddingBottom = shouldVirtualize ? Math.max(0, (displayEntries.length - slice.end) * ITEM_HEIGHT) : 0;
+
+  // ── AI search ──
   const handleAiSearch = useCallback(async () => {
     if (!query.trim()) return;
-    setIsAiSearching(true);
-    setAiError(null);
-    setAiResult('');
+    if (aiActive) {
+      // Toggle off
+      setAiActive(false);
+      setAiRankedEntries(null);
+      setAiReasons({});
+      return;
+    }
 
-    const context = buildAIContext(query, keywordResults);
+    setAiSearching(true);
+    setAiError(null);
 
     try {
-      let output = '';
-
-      if (provider === 'claude') {
-        const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
-        if (!apiKey) throw new Error('VITE_ANTHROPIC_API_KEY is not set. Add it to your .env.local file.');
-
-        const res = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type':            'application/json',
-            'x-api-key':               apiKey,
-            'anthropic-version':       '2023-06-01',
-            'anthropic-dangerous-direct-browser-access': 'true',
-          },
-          body: JSON.stringify({
-            model:      aiSettings.claudeModel || 'claude-sonnet-4-6',
-            max_tokens: 1500,
-            system:     KNOWLEDGE_SYSTEM_PROMPT,
-            messages:   [{ role: 'user', content: context }],
-          }),
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error?.message || `Claude API error ${res.status}`);
-        }
-        const data = await res.json();
-        output = data.content?.[0]?.text || '';
-      } else {
-        const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-        if (!apiKey) throw new Error('VITE_OPENAI_API_KEY is not set. Add it to your .env.local file.');
-
-        const res = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type':  'application/json',
-            'Authorization': `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-            model:       aiSettings.openaiModel || 'gpt-4o',
-            temperature: 0.5,
-            messages: [
-              { role: 'system', content: KNOWLEDGE_SYSTEM_PROMPT },
-              { role: 'user',   content: context },
-            ],
-          }),
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error?.message || `OpenAI API error ${res.status}`);
-        }
-        const data = await res.json();
-        output = data.choices?.[0]?.message?.content || '';
-      }
-
-      setAiResult(output);
+      const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
+      const { rankedEntries, reasons } = await aiMemorySearch(
+        query,
+        filteredEntries,
+        apiKey
+      );
+      setAiRankedEntries(rankedEntries);
+      setAiReasons(reasons);
+      setAiActive(true);
     } catch (err) {
       setAiError(err.message);
     } finally {
-      setIsAiSearching(false);
+      setAiSearching(false);
     }
-  }, [query, keywordResults, provider, aiSettings]);
+  }, [query, aiActive, filteredEntries]);
 
-  // Handle Enter key to trigger AI search
-  const handleKeyDown = useCallback((e) => {
-    if (e.key === 'Enter' && query.trim()) {
-      e.preventDefault();
-      handleAiSearch();
-    }
-  }, [query, handleAiSearch]);
-
-  // Toggle a type in the filter set
-  const toggleTypeFilter = (type) => {
-    setFilterTypes(prev => {
+  // ── Filter helpers ──
+  const toggleType = (type) => {
+    setSelectedTypes(prev => {
       const next = new Set(prev);
-      if (next.has(type)) next.delete(type);
-      else next.add(type);
+      if (next.has(type)) next.delete(type); else next.add(type);
       return next;
     });
   };
 
-  // Toggle card expansion
-  const toggleCardExpand = (id) => {
-    setExpandedCards(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  const hasActiveFilters = selectedTypes.size > 0 || selectedCustomer || dateRange !== 'all';
+
+  const clearFilters = () => {
+    setSelectedTypes(new Set());
+    setSelectedCustomer('');
+    setDateRange('all');
   };
 
-  // Clear all filters and query
-  const clearAll = () => {
-    setQuery('');
-    setDebouncedQuery('');
-    setFilterCustomer('');
-    setFilterDatePreset('all');
-    setFilterTypes(new Set());
-    setAiResult('');
-    setAiError(null);
-  };
-
-  // Persist provider to AI settings when changed
-  useEffect(() => {
-    if (provider !== aiSettings.providers?.knowledge) {
-      updateAiSettings({ providers: { knowledge: provider } });
+  // ── Annotation CRUD ──
+  const handleSaveNote = ({ text, customerId, tag }) => {
+    const today = format(new Date(), 'yyyy-MM-dd');
+    if (editingAnnotation) {
+      updateAnnotation(editingAnnotation.id, { text, customerId, tag, date: editingAnnotation.date || today });
+      setEditingAnnotation(null);
+    } else {
+      addAnnotation({ text, customerId, tag, date: today });
     }
-  }, [provider]); // eslint-disable-line react-hooks/exhaustive-deps
+    setShowAddNote(false);
+  };
 
-  const hasQuery = debouncedQuery.trim().length > 0;
-  const hasFilters = filterCustomer || filterDatePreset !== 'all' || filterTypes.size > 0;
-  const displayResults = hasQuery || hasFilters ? keywordResults : recentActivity;
-  const queryWords = debouncedQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const handleEditAnnotation = (entry) => {
+    setSelectedEntry(null);
+    setEditingAnnotation(entry.sourceRef);
+    setShowAddNote(true);
+  };
+
+  const handleDeleteAnnotation = (entry) => {
+    deleteAnnotation(entry.sourceRef.id);
+    setSelectedEntry(null);
+  };
+
+  // ── Navigation helper ──
+  const handleNavigateToTriage = (taskId) => {
+    onNavigate?.('triage');
+  };
 
   // ── Render ──
   return (
     <div className="space-y-4">
       {/* Page header */}
-      <div className="flex items-center gap-2 mb-1">
-        <Brain size={20} className="text-brand-lavender" />
-        <h1 className="text-2xl font-bold text-foreground">Knowledge Hub</h1>
-        <span className="text-xs text-muted-foreground ml-1">Search across all your work history</span>
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <Brain size={20} className="text-brand-lavender" />
+            <h1 className="text-2xl font-bold text-foreground">Memory</h1>
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5 ml-7">Everything you've logged, searchable.</p>
+        </div>
+        <button
+          onClick={() => { setEditingAnnotation(null); setShowAddNote(true); }}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-brand-lavender/15 text-brand-lavender text-xs font-semibold hover:bg-brand-lavender/25 transition-all border border-brand-lavender/20"
+        >
+          <Plus size={13} />
+          Add Note
+        </button>
       </div>
 
       {/* ── Search bar ── */}
       <div className="relative">
-        <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
+        <Search size={17} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
         <input
           ref={searchRef}
           type="text"
           value={query}
           onChange={e => setQuery(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Search tasks, highlights, meetings, and more..."
-          className="w-full h-12 bg-card border border-border rounded-2xl pl-11 pr-32 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+          placeholder="Search tasks, meetings, learnings, decisions…"
+          className="w-full h-12 bg-card border border-border rounded-2xl pl-11 pr-28 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40 transition-all"
         />
-        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
           {query && (
             <button
-              onClick={() => { setQuery(''); setDebouncedQuery(''); setAiResult(''); setAiError(null); }}
+              onClick={() => { setQuery(''); setDebouncedQuery(''); }}
               className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
-              title="Clear search"
             >
               <X size={14} />
             </button>
           )}
           <button
             onClick={handleAiSearch}
-            disabled={!query.trim() || isAiSearching}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-lavender/20 text-brand-lavender text-xs font-semibold hover:bg-brand-lavender/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-            title="AI-powered smart search"
+            disabled={!query.trim() || aiSearching}
+            title={aiActive ? 'Reset AI results' : 'AI semantic search'}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+              aiActive
+                ? 'bg-brand-lavender text-white hover:bg-brand-lavender/80'
+                : 'bg-brand-lavender/15 text-brand-lavender hover:bg-brand-lavender/25'
+            }`}
           >
-            {isAiSearching ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
-            Smart Search
+            {aiSearching
+              ? <Loader2 size={13} className="animate-spin" />
+              : <Sparkles size={13} />
+            }
+            {aiActive ? 'AI on' : 'AI'}
           </button>
         </div>
       </div>
 
-      {/* ── Filters ── */}
-      <div className="space-y-2">
-        {/* Filter toggle + active count */}
-        <div className="flex items-center gap-2 flex-wrap">
+      {/* ── Filter row ── */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <TypeDropdown
+          selectedTypes={selectedTypes}
+          onToggle={toggleType}
+          onClear={() => setSelectedTypes(new Set())}
+        />
+        <CustomerDropdown
+          customers={customers}
+          value={selectedCustomer}
+          onChange={setSelectedCustomer}
+        />
+        <DateRangeDropdown value={dateRange} onChange={setDateRange} />
+        {hasActiveFilters && (
           <button
-            onClick={() => setFiltersOpen(p => !p)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-secondary border border-border text-xs font-medium text-muted-foreground hover:text-foreground transition-all"
+            onClick={clearFilters}
+            className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
           >
-            <Filter size={12} />
-            Filters
-            {hasFilters && (
-              <span className="bg-brand-lavender/20 text-brand-lavender text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-0.5">
-                {(filterCustomer ? 1 : 0) + (filterDatePreset !== 'all' ? 1 : 0) + (filterTypes.size > 0 ? 1 : 0)}
-              </span>
-            )}
-            {filtersOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+            <X size={11} /> Clear filters
           </button>
-
-          {/* Date presets — always visible */}
-          <div className="flex gap-1 flex-wrap">
-            {DATE_PRESETS.map(p => (
-              <button
-                key={p.value}
-                onClick={() => setFilterDatePreset(p.value)}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all ${
-                  filterDatePreset === p.value
-                    ? 'bg-brand-lavender/20 text-brand-lavender border-brand-lavender/30'
-                    : 'bg-transparent border-border text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-
-          {hasFilters && (
-            <button
-              onClick={clearAll}
-              className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1"
-            >
-              <X size={11} /> Clear all
-            </button>
-          )}
-        </div>
-
-        {/* Expanded filters */}
-        {filtersOpen && (
-          <div className="bg-card border border-border rounded-2xl p-4 space-y-3">
-            {/* Customer filter */}
-            <div>
-              <label className="block text-[10px] font-medium text-muted-foreground mb-1">Client</label>
-              <select
-                value={filterCustomer}
-                onChange={e => setFilterCustomer(e.target.value)}
-                className="w-full h-9 bg-secondary border border-border rounded-lg px-2 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
-              >
-                <option value="">All clients</option>
-                {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </div>
-
-            {/* AI provider */}
-            <div>
-              <label className="block text-[10px] font-medium text-muted-foreground mb-1">AI Provider (Smart Search)</label>
-              <select
-                value={provider}
-                onChange={e => setProvider(e.target.value)}
-                className="h-8 bg-secondary border border-border rounded-lg px-2 text-sm text-foreground focus:outline-none focus:border-ring"
-              >
-                <option value="claude">Claude</option>
-                <option value="openai">OpenAI</option>
-              </select>
-            </div>
-
-            {/* Entity type multi-select (pill toggles) */}
-            <div>
-              <label className="block text-[10px] font-medium text-muted-foreground mb-1.5">Entity Types</label>
-              <div className="flex gap-1.5 flex-wrap">
-                {FILTERABLE_TYPES.map(ft => {
-                  const active = filterTypes.has(ft.value);
-                  const cfg = ENTITY_TYPES[ft.value];
-                  return (
-                    <button
-                      key={ft.value}
-                      onClick={() => toggleTypeFilter(ft.value)}
-                      className="px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all"
-                      style={active ? {
-                        backgroundColor: cfg.color + '25',
-                        color: cfg.color,
-                        borderColor: cfg.color + '60',
-                      } : { borderColor: 'var(--border)', color: 'var(--muted-foreground)', backgroundColor: 'transparent' }}
-                    >
-                      {ft.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
         )}
       </div>
 
-      {/* ── AI Smart Results ── */}
-      {aiResult && (
-        <div className="rounded-2xl border border-brand-lavender/30 bg-brand-lavender/5 px-5 py-4 space-y-2">
-          <div className="flex items-center gap-2">
-            <Sparkles size={14} className="text-brand-lavender" />
-            <h3 className="text-sm font-semibold text-foreground">Smart Results</h3>
-            <button
-              onClick={() => setAiResult('')}
-              className="ml-auto p-1 text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <X size={13} />
-            </button>
-          </div>
-          <div className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{aiResult}</div>
-        </div>
-      )}
-
+      {/* ── AI error ── */}
       {aiError && (
-        <div className="rounded-2xl border border-red-500/30 bg-red-500/5 px-5 py-3 flex items-start gap-2">
+        <div className="rounded-2xl border border-red-500/30 bg-red-500/5 px-4 py-3 flex items-start gap-2">
           <AlertCircle size={14} className="text-red-400 mt-0.5 flex-shrink-0" />
-          <div>
-            <p className="text-sm font-medium text-red-400">AI search failed</p>
-            <p className="text-xs text-red-400/70 mt-0.5">{aiError}</p>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium text-red-400">AI search failed</p>
+            <p className="text-[11px] text-red-400/70 mt-0.5">{aiError}</p>
           </div>
-          <button
-            onClick={() => setAiError(null)}
-            className="ml-auto p-1 text-red-400/60 hover:text-red-400 transition-colors"
-          >
+          <button onClick={() => setAiError(null)} className="text-red-400/60 hover:text-red-400">
             <X size={13} />
           </button>
         </div>
       )}
 
-      {isAiSearching && (
-        <div className="rounded-2xl border border-brand-lavender/20 bg-card px-5 py-4 flex items-center gap-3">
-          <Loader2 size={16} className="text-brand-lavender animate-spin" />
-          <span className="text-sm text-muted-foreground">Searching with AI…</span>
-        </div>
-      )}
-
-      {/* ── Section label ── */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          {hasQuery || hasFilters ? (
-            <>
-              <Search size={13} className="text-muted-foreground" />
-              <span className="text-xs font-medium text-muted-foreground">
-                {displayResults.length} result{displayResults.length !== 1 ? 's' : ''}
-                {hasQuery && <> for &ldquo;{debouncedQuery}&rdquo;</>}
-              </span>
-            </>
-          ) : (
-            <>
-              <Clock size={13} className="text-muted-foreground" />
-              <span className="text-xs font-medium text-muted-foreground">
-                Recent Activity
-                <span className="ml-1 text-muted-foreground/60">— last 7 days</span>
-              </span>
-            </>
-          )}
-        </div>
+      {/* ── Stats bar ── */}
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <span>
+          Showing <span className="font-medium text-foreground">{displayEntries.length}</span> of{' '}
+          <span className="font-medium text-foreground">{memoryIndex.length}</span> entries
+        </span>
+        {aiActive && (
+          <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-lavender/15 text-brand-lavender text-[10px] font-semibold border border-brand-lavender/20">
+            <Sparkles size={9} />
+            AI ranked
+          </span>
+        )}
       </div>
 
       {/* ── Results list ── */}
-      {displayResults.length === 0 ? (
-        <div className="bg-card border border-border rounded-2xl px-6 py-10 text-center">
-          <Search size={28} className="text-muted-foreground/40 mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground">
-            {hasQuery ? 'No results match your search.' : 'No recent activity in the last 7 days.'}
-          </p>
-          <p className="text-xs text-muted-foreground/60 mt-1">
-            {hasQuery ? 'Try different keywords or broaden your filters.' : 'Start logging tasks and highlights to build your knowledge base.'}
-          </p>
-        </div>
-      ) : (
+      {aiSearching ? (
         <div className="space-y-2">
-          {displayResults.slice(0, 100).map(item => {
-            const cfg = ENTITY_TYPES[item.type] || ENTITY_TYPES.task;
-            const isExpanded = expandedCards.has(item.id);
-            const needsTruncation = item.text.length > 200;
-            const displayText = isExpanded ? item.text : truncateText(item.text, 200);
-
-            // Relative time
-            let relativeDate = '';
-            let absoluteDate = '';
-            try {
-              const d = parseISO(item.date);
-              relativeDate = formatDistanceToNow(d, { addSuffix: true });
-              absoluteDate = format(d, 'MMM d, yyyy');
-            } catch {
-              relativeDate = '';
-              absoluteDate = '';
-            }
-
-            return (
-              <div
-                key={`${item.type}-${item.id}`}
-                className="bg-card border border-border rounded-2xl px-4 py-3 hover:shadow-sm hover:bg-secondary/20 transition-all cursor-default"
-                style={{ borderLeft: `3px solid ${cfg.color}` }}
-              >
-                <div className="flex items-start gap-3">
-                  {/* Type badge */}
-                  <span
-                    className="text-[10px] font-semibold px-2 py-0.5 rounded-lg flex-shrink-0 mt-0.5 whitespace-nowrap"
-                    style={{ backgroundColor: cfg.color + '20', color: cfg.color }}
-                  >
-                    {cfg.label}
-                  </span>
-
-                  {/* Content */}
-                  <div className="min-w-0 flex-1">
-                    {/* Meta line: customer + date */}
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      {item.customerName && (
-                        <span className="flex items-center gap-1 text-[11px] font-medium text-foreground">
-                          <span
-                            className="w-2 h-2 rounded-full flex-shrink-0"
-                            style={{ backgroundColor: item.customerColor || '#6366f1' }}
-                          />
-                          {item.customerName}
-                        </span>
-                      )}
-                      {relativeDate && (
-                        <span
-                          className="text-[10px] text-muted-foreground"
-                          title={absoluteDate}
-                        >
-                          {relativeDate}
-                        </span>
-                      )}
-                      {/* Extra meta badges */}
-                      {item.meta?.status && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground border border-border">
-                          {item.meta.status}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Text content */}
-                    <p className="text-xs text-foreground/90 leading-relaxed whitespace-pre-wrap">
-                      {hasQuery ? highlightText(displayText, queryWords) : displayText}
-                    </p>
-
-                    {/* Show more / less toggle */}
-                    {needsTruncation && (
-                      <button
-                        onClick={() => toggleCardExpand(item.id)}
-                        className="text-[10px] text-brand-lavender hover:text-brand-lavender/80 font-medium mt-1 transition-colors"
-                      >
-                        {isExpanded ? 'Show less' : 'Show more'}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-
-          {/* Pagination hint */}
-          {displayResults.length > 100 && (
-            <p className="text-center text-xs text-muted-foreground py-2">
-              Showing first 100 of {displayResults.length} results. Refine your search to narrow down.
-            </p>
+          {Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} />)}
+        </div>
+      ) : displayEntries.length === 0 ? (
+        <div className="bg-card border border-border rounded-2xl px-6 py-12 text-center">
+          <Search size={28} className="text-muted-foreground/30 mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground font-medium">No entries match your search.</p>
+          <p className="text-xs text-muted-foreground/60 mt-1">Try different keywords or adjust your filters.</p>
+          {hasActiveFilters && (
+            <button
+              onClick={clearFilters}
+              className="mt-3 text-xs text-brand-lavender hover:underline"
+            >
+              Clear all filters
+            </button>
           )}
         </div>
+      ) : (
+        <div ref={containerRef}>
+          {/* Top spacer for virtualization */}
+          {paddingTop > 0 && <div style={{ height: paddingTop }} />}
+
+          <AnimatePresence mode="popLayout" initial={false}>
+            <div className="space-y-2">
+              {visibleEntries.map(entry => (
+                <MemoryCard
+                  key={`${entry.entityType}-${entry.id}`}
+                  entry={entry}
+                  queryWords={queryWords}
+                  aiActive={aiActive}
+                  aiReason={aiReasons[entry.id]}
+                  onClick={setSelectedEntry}
+                />
+              ))}
+            </div>
+          </AnimatePresence>
+
+          {/* Bottom spacer for virtualization */}
+          {paddingBottom > 0 && <div style={{ height: paddingBottom }} />}
+        </div>
+      )}
+
+      {/* ── Memory detail drawer ── */}
+      {selectedEntry && (
+        <MemoryDetailDrawer
+          entry={selectedEntry}
+          onClose={() => setSelectedEntry(null)}
+          onNavigateToTriage={handleNavigateToTriage}
+          extraActions={selectedEntry.entityType === 'annotation' ? (
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleEditAnnotation(selectedEntry)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all"
+              >
+                <PencilLine size={12} /> Edit
+              </button>
+              <button
+                onClick={() => handleDeleteAnnotation(selectedEntry)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-500/30 text-xs text-red-400 hover:bg-red-500/10 transition-all"
+              >
+                <Trash2 size={12} /> Delete
+              </button>
+            </div>
+          ) : null}
+        />
+      )}
+
+      {/* ── Add / Edit Note modal ── */}
+      {showAddNote && (
+        <AddNoteModal
+          customers={customers}
+          initialData={editingAnnotation}
+          onSave={handleSaveNote}
+          onClose={() => { setShowAddNote(false); setEditingAnnotation(null); }}
+        />
       )}
     </div>
   );

@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import {
   ArrowLeft, Plus, ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
   Pencil, Trash2, Flag, CheckCircle2, Circle, Ban,
-  ClipboardList, Calendar, Check, Clock,
+  ClipboardList, Calendar, Check, Clock, MessageSquare, Sparkles, Loader2,
 } from 'lucide-react';
 import { useAppStore } from '../context/StoreContext';
 import {
@@ -16,6 +16,8 @@ import {
 import { formatDate } from '../utils/dateHelpers';
 import Modal from './Modal';
 import ConfirmDialog from './ConfirmDialog';
+import MeetingEntryModal from './MeetingEntryModal';
+import { generateMeetingSummary } from '../utils/meetingAI';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 
@@ -774,6 +776,241 @@ function TimelineTab({ tasks, milestones, annotations, customer, onAdd, onEdit, 
   );
 }
 
+// ── Meetings tab ──────────────────────────────────────────────────────────────
+function MeetingsTab({ meetings, customers, customer, onSave, onDelete, onConvertActionItem }) {
+  const [showModal, setShowModal]       = useState(false);
+  const [editEntry, setEditEntry]       = useState(null);
+  const [expandedId, setExpandedId]     = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [summarizingId, setSummarizingId] = useState(null);
+
+  const sorted = useMemo(
+    () => [...meetings].sort((a, b) => {
+      const da = a.meetingDate || a.createdAt || '';
+      const db = b.meetingDate || b.createdAt || '';
+      return db.localeCompare(da);
+    }),
+    [meetings]
+  );
+
+  const handleInlineSummarize = async (meeting) => {
+    const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
+    if (!apiKey) return;
+    setSummarizingId(meeting.id);
+    try {
+      const result = await generateMeetingSummary(meeting, apiKey);
+      if (result) onSave({ ...meeting, ...result });
+    } catch { /* ignore */ }
+    finally { setSummarizingId(null); }
+  };
+
+  return (
+    <div>
+      {/* Add Meeting button */}
+      <div className="mb-4">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => { setEditEntry(null); setShowModal(true); }}
+          className="flex items-center gap-1.5"
+        >
+          <Plus size={13} /> Add Meeting
+        </Button>
+      </div>
+
+      {sorted.length === 0 ? (
+        <div className="text-center py-12 bg-card border border-border rounded-2xl border-dashed">
+          <MessageSquare size={24} className="text-muted-foreground/40 mx-auto mb-2" />
+          <p className="text-sm text-muted-foreground mb-1">No meetings logged yet.</p>
+          <button
+            onClick={() => { setEditEntry(null); setShowModal(true); }}
+            className="text-xs text-brand-lavender hover:text-brand-lavender/80 font-semibold transition-colors"
+          >
+            Log your first meeting →
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {sorted.map(m => {
+            const isExpanded  = expandedId === m.id;
+            const hasAI       = !!m.aiSummary;
+            const summarizing = summarizingId === m.id;
+            const canExpand   = hasAI || !!m.attendees;
+
+            return (
+              <div key={m.id} className="bg-card border border-border rounded-xl overflow-hidden">
+                {/* Main row */}
+                <div className="px-4 py-3 flex items-start gap-3">
+                  <MessageSquare size={14} className="text-blue-400 flex-shrink-0 mt-0.5" />
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                      <p className="text-sm font-medium text-foreground leading-snug">
+                        {m.title || 'Meeting'}
+                      </p>
+                      <span className="text-[10px] text-muted-foreground">
+                        {formatDate(m.meetingDate || m.createdAt)}
+                      </span>
+                    </div>
+
+                    {hasAI ? (
+                      <p className="text-xs text-foreground/80 leading-relaxed line-clamp-2">{m.aiSummary}</p>
+                    ) : (
+                      m.rawNotes && (
+                        <p className="text-xs text-muted-foreground/70 line-clamp-2">{m.rawNotes}</p>
+                      )
+                    )}
+
+                    {/* AI chips */}
+                    {hasAI && (
+                      <div className="flex flex-wrap gap-1.5 mt-1.5">
+                        {m.decisions?.length > 0 && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+                            ✅ {m.decisions.length} decision{m.decisions.length !== 1 ? 's' : ''}
+                          </span>
+                        )}
+                        {m.openQuestions?.length > 0 && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20">
+                            ❓ {m.openQuestions.length} question{m.openQuestions.length !== 1 ? 's' : ''}
+                          </span>
+                        )}
+                        {m.actionItems?.length > 0 && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/20">
+                            📋 {m.actionItems.length} action item{m.actionItems.length !== 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {!hasAI && !summarizing && (
+                      <button
+                        onClick={() => handleInlineSummarize(m)}
+                        disabled={!m.rawNotes?.trim()}
+                        className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg border border-brand-lavender/20 text-brand-lavender hover:bg-brand-lavender/10 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                        title="Summarize with AI"
+                      >
+                        <Sparkles size={10} /> Summarize
+                      </button>
+                    )}
+                    {summarizing && (
+                      <span className="flex items-center gap-1 text-[10px] text-muted-foreground px-2">
+                        <Loader2 size={10} className="animate-spin" /> Summarizing…
+                      </span>
+                    )}
+                    <button
+                      onClick={() => { setEditEntry(m); setShowModal(true); }}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                      title="Edit meeting"
+                    >
+                      <Pencil size={12} />
+                    </button>
+                    <button
+                      onClick={() => setDeleteTarget(m)}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-secondary transition-colors"
+                      title="Delete meeting"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                    {canExpand && (
+                      <button
+                        onClick={() => setExpandedId(isExpanded ? null : m.id)}
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground transition-colors"
+                        title={isExpanded ? 'Collapse' : 'Expand'}
+                      >
+                        {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Expanded detail */}
+                {isExpanded && (
+                  <div className="border-t border-border/50 bg-secondary/20 px-4 py-3 space-y-3 text-xs text-muted-foreground">
+                    {m.attendees && (
+                      <p><span className="font-medium text-foreground/70">Attendees:</span> {m.attendees}</p>
+                    )}
+                    {m.decisions?.length > 0 && (
+                      <div>
+                        <p className="font-semibold text-foreground/70 mb-1">✅ Decisions</p>
+                        <ul className="space-y-1 pl-1">
+                          {m.decisions.map((d, i) => (
+                            <li key={i} className="flex items-start gap-1.5 text-foreground/80">
+                              <span className="text-emerald-400 flex-shrink-0">•</span>{d}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {m.openQuestions?.length > 0 && (
+                      <div>
+                        <p className="font-semibold text-foreground/70 mb-1">❓ Open Questions</p>
+                        <ul className="space-y-1 pl-1">
+                          {m.openQuestions.map((q, i) => (
+                            <li key={i} className="flex items-start gap-1.5 text-foreground/80">
+                              <span className="text-amber-400 flex-shrink-0">•</span>{q}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {m.actionItems?.length > 0 && (
+                      <div>
+                        <p className="font-semibold text-foreground/70 mb-1">📋 Action Items</p>
+                        <ul className="space-y-1 pl-1">
+                          {m.actionItems.map(item => (
+                            <li key={item.id} className="flex items-start gap-2 text-foreground/80">
+                              <span className={`flex-shrink-0 ${item.convertedToTaskId ? 'text-green-400' : 'text-muted-foreground/60'}`}>
+                                {item.convertedToTaskId ? '✓' : '•'}
+                              </span>
+                              <span className="flex-1 min-w-0">{item.text}</span>
+                              {item.owner && <span className="text-muted-foreground/50 flex-shrink-0">{item.owner}</span>}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {m.rawNotes && (
+                      <div>
+                        <p className="font-semibold text-foreground/70 mb-1">📝 Raw Notes</p>
+                        <p className="text-foreground/70 leading-relaxed whitespace-pre-wrap">{m.rawNotes}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Meeting modal */}
+      {showModal && (
+        <MeetingEntryModal
+          entry={editEntry}
+          defaultCustomerId={customer.id}
+          customers={customers}
+          onSave={(data) => { onSave(data); setShowModal(false); setEditEntry(null); }}
+          onConvertActionItem={onConvertActionItem}
+          onClose={() => { setShowModal(false); setEditEntry(null); }}
+        />
+      )}
+
+      {/* Delete confirm */}
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Delete Meeting"
+          message={`Delete this meeting entry? This cannot be undone.`}
+          onConfirm={() => { onDelete(deleteTarget.id); setDeleteTarget(null); }}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+    </div>
+  );
+}
+
 // ── LogHoursModal ─────────────────────────────────────────────────────────────
 function LogHoursModal({ okrs, onSubmit, onCancel }) {
   const [hours,           setHours]           = useState('');
@@ -895,8 +1132,9 @@ function LogHoursModal({ okrs, onSubmit, onCancel }) {
 // ── Main CustomerDetailView ───────────────────────────────────────────────────
 export default function CustomerDetailView({ customer, onBack }) {
   const {
-    tasks, milestones, points, addPoint, addTask, okrs,
+    tasks, milestones, points, meetingEntries, customers, addPoint, addTask, okrs,
     addMilestone, updateMilestone, deleteMilestone,
+    addMeetingEntry, updateMeetingEntry, deleteMeetingEntry,
     annotations, updateAnnotation, deleteAnnotation,
   } = useAppStore();
   const [activeTab, setActiveTab] = useState('tasks');
@@ -920,6 +1158,10 @@ export default function CustomerDetailView({ customer, onBack }) {
     () => annotations.filter(a => a.customerId === customer.id),
     [annotations, customer.id]
   );
+  const customerMeetings = useMemo(
+    () => meetingEntries.filter(m => m.customerId === customer.id),
+    [meetingEntries, customer.id]
+  );
   // Quick stats
   const totalPoints = useMemo(
     () => points.filter(p => p.customerId === customer.id).reduce((s, p) => s + p.points, 0),
@@ -935,6 +1177,24 @@ export default function CustomerDetailView({ customer, onBack }) {
   const handleLogHours = (data) => {
     addPoint({ customerId: customer.id, ...data });
     setShowLogHoursModal(false);
+  };
+
+  const handleMeetingSave = (data) => {
+    if (data.id) {
+      updateMeetingEntry(data.id, data);
+    } else {
+      addMeetingEntry({ ...data, customerId: customer.id });
+    }
+  };
+
+  const handleConvertActionItem = (item, customerId) => {
+    const task = addTask({
+      customerId: customerId || customer.id,
+      description: item.text,
+      workType: 'comms',
+      status: 'open',
+    });
+    return task?.id || null;
   };
 
   return (
@@ -1009,6 +1269,7 @@ export default function CustomerDetailView({ customer, onBack }) {
       <div className="flex gap-1 border-b border-border">
         {[
           { id: 'tasks',    label: 'Task Log',  icon: ClipboardList },
+          { id: 'meetings', label: 'Meetings',  icon: MessageSquare },
           { id: 'timeline', label: 'Timeline',  icon: Calendar      },
         ].map(({ id, label, icon: Icon }) => (
           <button
@@ -1033,6 +1294,17 @@ export default function CustomerDetailView({ customer, onBack }) {
           addTask={addTask}
           customerId={customer.id}
           okrs={okrs}
+        />
+      )}
+
+      {activeTab === 'meetings' && (
+        <MeetingsTab
+          meetings={customerMeetings}
+          customers={customers}
+          customer={customer}
+          onSave={handleMeetingSave}
+          onDelete={(id) => deleteMeetingEntry(id)}
+          onConvertActionItem={handleConvertActionItem}
         />
       )}
 
