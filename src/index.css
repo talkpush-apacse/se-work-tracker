@@ -79,8 +79,8 @@
     --accent-foreground: 50 30% 92%;
     --destructive:   0 55% 55%;
     --destructive-foreground: 50 30% 92%;
-    --border:        240 3% 35%;
-    --input:         240 3% 35%;
+    --border:        240 5% 40%;
+    --input:         240 5% 40%;
     --ring:          50 30% 92%;
 
     /* Sidebar dark */

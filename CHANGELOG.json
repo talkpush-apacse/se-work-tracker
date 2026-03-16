@@ -1,6 +1,23 @@
 {
   "versions": [
     {
+      "version": "2.17.0",
+      "codename": "Cadence Crisp",
+      "date": "2026-03-16",
+      "summary": "P3 UX audit sprint — typography scale, color unification, nav density, dot legend, border contrast, and design system green consolidation",
+      "changes": [
+        { "type": "feat", "description": "Page subtitle downsized to text-xs for clearer 3-tier type hierarchy" },
+        { "type": "feat", "description": "Stat chips unified: Tasks Done and Customers now use brand-lavender (matches Hours)" },
+        { "type": "feat", "description": "Week picker card vertical padding reduced for a more compact layout" },
+        { "type": "feat", "description": "Week in Review status dot legend added below cards" },
+        { "type": "feat", "description": "Connect buttons in Emails and Meetings cards upgraded from text links to outlined micro-buttons" },
+        { "type": "feat", "description": "Active nav items now render font-semibold for stronger visual distinction" },
+        { "type": "feat", "description": "Nav item height tightened: py-2 to py-1.5 for a denser sidebar" },
+        { "type": "feat", "description": "QuickStart FAB color unified from emerald to brand-sage-darker" },
+        { "type": "feat", "description": "Dark mode card borders bumped from 35% to 40% lightness for better visibility" }
+      ]
+    },
+    {
       "version": "2.16.0",
       "codename": "Buffer Rising",
       "date": "2026-03-16",

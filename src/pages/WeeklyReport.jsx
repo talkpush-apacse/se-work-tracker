@@ -672,7 +672,7 @@ export default function WeeklyReport({ onNavigate }) {
       {/* Page header */}
       <div ref={pageHeaderRef}>
         <h1 className="text-2xl font-bold text-foreground">Weekly Report</h1>
-        <p className="text-sm text-muted-foreground/80 mt-0.5">
+        <p className="text-xs text-muted-foreground mt-1">
           Summarize your week and generate a professional status email.
         </p>
       </div>
@@ -723,7 +723,7 @@ export default function WeeklyReport({ onNavigate }) {
       <WeeklyUpdateLog weekStart={weekStart} weekEnd={weekEnd} />
 
       {/* ── A: Week Picker ── */}
-      <div className="rounded-2xl border border-border bg-card px-5 py-4 flex items-center justify-between gap-4">
+      <div className="rounded-2xl border border-border bg-card px-5 py-2.5 flex items-center justify-between gap-4">
         <button
           onClick={() => setWeekOffset(o => o - 1)}
           className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-foreground bg-secondary/40 hover:bg-secondary transition-colors"
@@ -757,7 +757,7 @@ export default function WeeklyReport({ onNavigate }) {
             value={weekTasksList.length}
             isExpanded={expandedTile === 'tasks'}
             onToggle={() => setExpandedTile(expandedTile === 'tasks' ? null : 'tasks')}
-            valueColor="text-brand-sage"
+            valueColor="text-brand-lavender"
             target="/ 5 tasks goal"
           />
           <ExpandableTile
@@ -765,7 +765,7 @@ export default function WeeklyReport({ onNavigate }) {
             value={activeCustomers}
             isExpanded={expandedTile === 'customers'}
             onToggle={() => setExpandedTile(expandedTile === 'customers' ? null : 'customers')}
-            valueColor="text-brand-pink"
+            valueColor="text-brand-lavender"
             target="/ 3 clients goal"
           />
         </div>
@@ -899,11 +899,11 @@ export default function WeeklyReport({ onNavigate }) {
                   )}
                 </div>
                 {!gmailToken ? (
-                  <div className="space-y-1">
+                  <div className="space-y-1.5">
                     <p className="text-xs text-muted-foreground">Gmail not connected</p>
                     <button
                       onClick={() => onNavigate('integrations')}
-                      className="text-xs text-brand-lavender hover:underline"
+                      className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg border border-brand-lavender/40 text-brand-lavender hover:bg-brand-lavender/10 transition-colors"
                     >
                       Connect →
                     </button>
@@ -942,11 +942,11 @@ export default function WeeklyReport({ onNavigate }) {
                   )}
                 </div>
                 {!googleToken ? (
-                  <div className="space-y-1">
+                  <div className="space-y-1.5">
                     <p className="text-xs text-muted-foreground">Google Calendar not connected</p>
                     <button
                       onClick={() => onNavigate('integrations')}
-                      className="text-xs text-brand-lavender hover:underline"
+                      className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg border border-brand-lavender/40 text-brand-lavender hover:bg-brand-lavender/10 transition-colors"
                     >
                       Connect →
                     </button>
@@ -975,6 +975,21 @@ export default function WeeklyReport({ onNavigate }) {
               </div>
 
             </div>}
+
+            {/* Status dot legend */}
+            {!allReviewEmpty && (
+              <div className="flex items-center gap-4 mt-2 px-0.5">
+                <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground/70">
+                  <span className="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0 bg-[#4ade80]" /> Has data
+                </span>
+                <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground/70">
+                  <span className="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0 bg-[#f59e0b]" /> Connected, empty
+                </span>
+                <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground/70">
+                  <span className="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0 bg-[#6b7280]" /> Not connected
+                </span>
+              </div>
+            )}
           </div>
         )}
       </div>

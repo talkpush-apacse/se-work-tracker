@@ -80,10 +80,10 @@ function SortableDesktopNavItem({ tab, activeTab, onTabChange, shortcutKey }) {
       <button
         onClick={() => onTabChange(id)}
         title={tab.tooltip ? `${tab.tooltip}  ⌘${shortcutKey}` : label}
-        className={`flex-1 flex items-center justify-center lg:justify-start gap-3 px-2 lg:px-3 py-2 rounded-xl text-sm font-medium font-nav transition-all ${
+        className={`flex-1 flex items-center justify-center lg:justify-start gap-3 px-2 lg:px-3 py-1.5 rounded-xl text-sm font-nav transition-all ${
           activeTab === id
-            ? 'bg-sidebar-accent text-white shadow-sm'
-            : 'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/60'
+            ? 'bg-sidebar-accent text-white shadow-sm font-semibold'
+            : 'font-medium text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/60'
         }`}
       >
         <Icon
