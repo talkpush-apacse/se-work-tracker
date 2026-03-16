@@ -165,6 +165,8 @@ export default function WeeklyUpdateLog({ weekStart, weekEnd } = {}) {
         </div>
 
         {/* Row 2: Type pills */}
+        <div role="group" aria-labelledby="log-type-label">
+        <p id="log-type-label" className="text-[10px] font-medium text-muted-foreground mb-1.5">Log Type</p>
         <div className="flex gap-1.5 flex-wrap">
           {WEEKLY_UPDATE_LOG_TYPES.map(type => (
             <button
@@ -181,6 +183,7 @@ export default function WeeklyUpdateLog({ weekStart, weekEnd } = {}) {
               {WEEKLY_UPDATE_LOG_LABELS[type]}
             </button>
           ))}
+        </div>
         </div>
 
         {/* Row 3: Text + actions */}
@@ -210,7 +213,7 @@ export default function WeeklyUpdateLog({ weekStart, weekEnd } = {}) {
       </form>
 
       {/* Filters */}
-      <div className="flex gap-2 mb-3 flex-wrap">
+      <div className="border-t border-border/50 mb-3 -mx-0 pt-3 flex gap-2 flex-wrap">
         <select
           value={filterLogType}
           onChange={e => setFilterLogType(e.target.value)}

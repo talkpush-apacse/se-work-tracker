@@ -338,7 +338,9 @@ export default function WeeklyReport({ onNavigate }) {
   const [expandedEmailId,    setExpandedEmailId]    = useState(null);
   const [reportTypeFilter,   setReportTypeFilter]   = useState('all'); // 'all' | one of REPORT_TYPES
 
-  const emailOutputRef = useRef(null);
+  const emailOutputRef  = useRef(null);
+  const pageHeaderRef   = useRef(null);
+  const [isHeaderSticky, setIsHeaderSticky] = useState(false);
 
   // ── Derived values ──
   const { weekStart, weekEnd } = useMemo(() => getWeekRangeForOffset(weekOffset), [weekOffset]);
@@ -398,6 +400,9 @@ export default function WeeklyReport({ onNavigate }) {
     REPORT_TYPES.forEach(t => { groups[t] = weekLogs.filter(l => l.type === t); });
     return groups;
   }, [weekLogs]);
+
+  // True when ALL three Week in Review sub-cards are simultaneously empty/disconnected
+  const allReviewEmpty = weekTasksList.length === 0 && !gmailToken && !googleToken;
 
   // Milestones whose targetDate falls in the selected week
   const weekMilestones = useMemo(
@@ -463,6 +468,18 @@ export default function WeeklyReport({ onNavigate }) {
     const weekKey = format(weekStart, 'yyyy-MM-dd');
     localStorage.setItem(`gpt-email-selections-${weekKey}`, JSON.stringify(emailSelections));
   }, [emailSelections, weekStart, gmailEmails]);
+
+  // Sticky header — show when the page H1 scrolls out of view
+  useEffect(() => {
+    const el = pageHeaderRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => setIsHeaderSticky(!entry.isIntersecting),
+      { threshold: 0, rootMargin: '-1px 0px 0px 0px' }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
 
   // Compute included email count
   const includedEmailCount = useMemo(
@@ -653,12 +670,26 @@ export default function WeeklyReport({ onNavigate }) {
   return (
     <div className="space-y-5 max-w-3xl">
       {/* Page header */}
-      <div>
+      <div ref={pageHeaderRef}>
         <h1 className="text-2xl font-bold text-foreground">Weekly Report</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
+        <p className="text-sm text-muted-foreground/80 mt-0.5">
           Summarize your week and generate a professional status email.
         </p>
       </div>
+
+      {/* ── Sticky header — appears when page title scrolls out of view (#10) ── */}
+      {isHeaderSticky && (
+        <div className="sticky top-0 z-20 -mx-4 sm:-mx-6 px-4 sm:px-6 bg-background/95 backdrop-blur-sm border-b border-border flex items-center justify-between py-2.5">
+          <span className="text-sm font-semibold text-foreground">{weekLabel}</span>
+          <button
+            onClick={() => document.getElementById('section-update-log')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-brand-lavender font-semibold hover:opacity-90 transition-all"
+            style={{ color: 'hsl(var(--sidebar-background))' }}
+          >
+            + Add Log
+          </button>
+        </div>
+      )}
 
       {/* ── Integration onboarding banner — only when any integration is missing ── */}
       {(!googleToken || !gmailToken) && (
@@ -688,6 +719,9 @@ export default function WeeklyReport({ onNavigate }) {
         </div>
       )}
 
+      {/* ── Add Log (moved to top — primary daily action) ── */}
+      <WeeklyUpdateLog weekStart={weekStart} weekEnd={weekEnd} />
+
       {/* ── A: Week Picker ── */}
       <div className="rounded-2xl border border-border bg-card px-5 py-4 flex items-center justify-between gap-4">
         <button
@@ -716,14 +750,15 @@ export default function WeeklyReport({ onNavigate }) {
       {/* ── B: Stats chips — Tasks Done & Customers are expandable ── */}
       <div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <StatChip label="Points"    value={Number(totalPts).toFixed(1)} valueColor="text-brand-amber" />
-          <StatChip label="Hours"     value={`${totalHrs}h`} valueColor="text-brand-lavender" />
+          <StatChip label="Points"    value={Number(totalPts).toFixed(1)} valueColor="text-brand-amber"   target="/ 5 pts goal" />
+          <StatChip label="Hours"     value={`${totalHrs}h`}             valueColor="text-brand-lavender" target="/ 8h goal" />
           <ExpandableTile
             label="Tasks Done"
             value={weekTasksList.length}
             isExpanded={expandedTile === 'tasks'}
             onToggle={() => setExpandedTile(expandedTile === 'tasks' ? null : 'tasks')}
             valueColor="text-brand-sage"
+            target="/ 5 tasks goal"
           />
           <ExpandableTile
             label="Customers"
@@ -731,6 +766,7 @@ export default function WeeklyReport({ onNavigate }) {
             isExpanded={expandedTile === 'customers'}
             onToggle={() => setExpandedTile(expandedTile === 'customers' ? null : 'customers')}
             valueColor="text-brand-pink"
+            target="/ 3 clients goal"
           />
         </div>
 
@@ -798,7 +834,20 @@ export default function WeeklyReport({ onNavigate }) {
 
         {reviewOpen && (
           <div className="border-t border-border px-5 pb-5 pt-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {/* Unified empty state — shown only when ALL three cards are empty/disconnected */}
+            {allReviewEmpty && (
+              <div className="rounded-xl border border-dashed border-border/60 bg-secondary/20 px-5 py-6 text-center">
+                <p className="text-sm font-medium text-foreground mb-1">Nothing logged yet this week</p>
+                <p className="text-xs text-muted-foreground">
+                  Add your first log entry above, or{' '}
+                  <button onClick={() => onNavigate('integrations')} className="text-brand-lavender hover:underline">
+                    connect your integrations
+                  </button>
+                  {' '}to pull in calendar & email activity.
+                </p>
+              </div>
+            )}
+            {!allReviewEmpty && <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
 
               {/* Card A — Tasks Done */}
               <div className="rounded-xl border border-border bg-secondary/20 p-3">
@@ -925,7 +974,7 @@ export default function WeeklyReport({ onNavigate }) {
                 )}
               </div>
 
-            </div>
+            </div>}
           </div>
         )}
       </div>
@@ -1186,15 +1235,67 @@ export default function WeeklyReport({ onNavigate }) {
         </div>
       )}
 
-      {/* ── Read / Write separator ── */}
-      <div className="flex items-center gap-3">
-        <div className="flex-1 h-px bg-border" />
-        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide whitespace-nowrap">Add Log Entries</span>
-        <div className="flex-1 h-px bg-border" />
-      </div>
+      {/* ── F: History ── */}
+      <div className="rounded-2xl border border-border bg-card overflow-hidden">
+        <button
+          onClick={() => setHistoryOpen(o => !o)}
+          className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-secondary/30 transition-colors"
+        >
+          <span className="text-sm font-semibold text-foreground">
+            Saved Reports {weeklyReports.length > 0 && <span className="text-muted-foreground font-normal">({weeklyReports.length})</span>}
+          </span>
+          {historyOpen ? <ChevronUp size={16} className="text-muted-foreground" /> : <ChevronDown size={16} className="text-muted-foreground" />}
+        </button>
 
-      {/* ── B4: Weekly Update Log (add entries before generating) ── */}
-      <WeeklyUpdateLog weekStart={weekStart} weekEnd={weekEnd} />
+        {historyOpen && (
+          <div className="border-t border-border">
+            {sortedHistory.length === 0 ? (
+              <div className="px-5 py-8 text-center text-sm text-muted-foreground">
+                No saved reports yet. Generate and save your first weekly email above.
+              </div>
+            ) : (
+              <div className="divide-y divide-border">
+                {sortedHistory.map(r => {
+                  const rStart  = parseISO(r.weekStart);
+                  const rEnd    = parseISO(r.weekEnd);
+                  const label   = formatWeekLabel(rStart, rEnd);
+                  const savedAt = format(parseISO(r.createdAt), 'MMM d, h:mm a');
+                  const preview = (r.emailText || '').replace(/\s+/g, ' ').trim().slice(0, 120);
+                  return (
+                    <div key={r.id} className="px-5 py-4 space-y-1.5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">{label}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Saved {savedAt} · {r.provider} · {r.model}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <button
+                            onClick={() => setEmailText(r.emailText)}
+                            className="text-xs text-brand-lavender hover:text-brand-lavender/80 transition-colors"
+                          >
+                            Load
+                          </button>
+                          <button
+                            onClick={() => setDeleteTarget(r.id)}
+                            className="text-xs text-muted-foreground hover:text-destructive transition-colors"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </div>
+                      {preview && (
+                        <p className="text-xs text-muted-foreground/70 line-clamp-2">{preview}…</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* ── C: Generate ── */}
       <div className="rounded-2xl border border-border bg-card px-5 py-4 space-y-3">
@@ -1307,68 +1408,6 @@ export default function WeeklyReport({ onNavigate }) {
         )}
       </div>
 
-      {/* ── F: History ── */}
-      <div className="rounded-2xl border border-border bg-card overflow-hidden">
-        <button
-          onClick={() => setHistoryOpen(o => !o)}
-          className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-secondary/30 transition-colors"
-        >
-          <span className="text-sm font-semibold text-foreground">
-            Saved Reports {weeklyReports.length > 0 && <span className="text-muted-foreground font-normal">({weeklyReports.length})</span>}
-          </span>
-          {historyOpen ? <ChevronUp size={16} className="text-muted-foreground" /> : <ChevronDown size={16} className="text-muted-foreground" />}
-        </button>
-
-        {historyOpen && (
-          <div className="border-t border-border">
-            {sortedHistory.length === 0 ? (
-              <div className="px-5 py-8 text-center text-sm text-muted-foreground">
-                No saved reports yet. Generate and save your first weekly email above.
-              </div>
-            ) : (
-              <div className="divide-y divide-border">
-                {sortedHistory.map(r => {
-                  const rStart  = parseISO(r.weekStart);
-                  const rEnd    = parseISO(r.weekEnd);
-                  const label   = formatWeekLabel(rStart, rEnd);
-                  const savedAt = format(parseISO(r.createdAt), 'MMM d, h:mm a');
-                  const preview = (r.emailText || '').replace(/\s+/g, ' ').trim().slice(0, 120);
-                  return (
-                    <div key={r.id} className="px-5 py-4 space-y-1.5">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-foreground truncate">{label}</p>
-                          <p className="text-xs text-muted-foreground">
-                            Saved {savedAt} · {r.provider} · {r.model}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <button
-                            onClick={() => setEmailText(r.emailText)}
-                            className="text-xs text-brand-lavender hover:text-brand-lavender/80 transition-colors"
-                          >
-                            Load
-                          </button>
-                          <button
-                            onClick={() => setDeleteTarget(r.id)}
-                            className="text-xs text-muted-foreground hover:text-destructive transition-colors"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-                      </div>
-                      {preview && (
-                        <p className="text-xs text-muted-foreground/70 line-clamp-2">{preview}…</p>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
       {/* Delete confirmation */}
       {deleteTarget && (
         <ConfirmDialog
@@ -1384,17 +1423,18 @@ export default function WeeklyReport({ onNavigate }) {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function StatChip({ label, value, valueColor = 'text-foreground' }) {
+function StatChip({ label, value, valueColor = 'text-foreground', target }) {
   return (
     <div className="rounded-xl border border-border bg-card px-4 py-3 text-center">
       <p className={`text-lg font-bold ${valueColor}`}>{value}</p>
       <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
+      {target && <p className="text-[10px] text-muted-foreground/50 mt-0.5">{target}</p>}
     </div>
   );
 }
 
 /** Stat tile with a chevron indicator — expanded content is rendered separately below the grid */
-function ExpandableTile({ label, value, isExpanded, onToggle, valueColor = 'text-foreground' }) {
+function ExpandableTile({ label, value, isExpanded, onToggle, valueColor = 'text-foreground', target }) {
   return (
     <div
       className={`rounded-xl border bg-card transition-colors cursor-pointer ${
@@ -1407,6 +1447,7 @@ function ExpandableTile({ label, value, isExpanded, onToggle, valueColor = 'text
           {label}
           {isExpanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
         </p>
+        {target && <p className="text-[10px] text-muted-foreground/50 mt-0.5">{target}</p>}
       </button>
     </div>
   );

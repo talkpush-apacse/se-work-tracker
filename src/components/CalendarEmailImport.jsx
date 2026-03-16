@@ -348,7 +348,7 @@ export default function CalendarEmailImport({ customers, addWeeklyUpdateLog, aiS
             setTimeout(handleFetch, 100);
           }
         }}
-        className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl bg-card border border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:border-brand-lavender/30 transition-all"
+        className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl bg-secondary/40 border border-dashed border-brand-lavender/30 text-xs font-medium text-muted-foreground hover:text-foreground hover:border-brand-lavender/60 hover:bg-secondary/60 transition-all"
       >
         <Download size={13} className="text-brand-lavender" />
         <span>Import from Calendar & Email</span>

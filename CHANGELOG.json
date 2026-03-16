@@ -1,6 +1,37 @@
 {
   "versions": [
     {
+      "version": "2.12.0",
+      "codename": "Xenial Crisp",
+      "date": "2026-03-16",
+      "summary": "P2 UX audit sprint — Weekly Report and nav polish: stat targets, section reordering, sticky header, unified empty state, nav grouping, and import toggle differentiation",
+      "changes": [
+        { "type": "feat", "description": "Saved Reports section moved above Generate for faster access to past emails" },
+        { "type": "feat", "description": "Stat chips now display daily targets (/ 5 pts goal, / 8h goal, etc.)" },
+        { "type": "feat", "description": "Weekly Report sticky mini-header with week label and quick Add Log button" },
+        { "type": "feat", "description": "Unified first-time empty state replaces three separate empty panels" },
+        { "type": "feat", "description": "Sidebar nav items grouped under Work, Insights, Connect section labels" },
+        { "type": "feat", "description": "Weekly Update Log form now has Log Type label and accessibility role" },
+        { "type": "feat", "description": "Visual separator between update log form and filter bar" },
+        { "type": "feat", "description": "Import from Calendar & Email toggle uses dashed border to distinguish from primary form" }
+      ]
+    },
+    {
+      "version": "2.11.0",
+      "codename": "Workflow Deep",
+      "date": "2026-03-16",
+      "summary": "Auto-index activities into Knowledge — Triage, Weekly Report, and meeting entries now silently feed the Memory tab",
+      "changes": [
+        { "type": "feat", "description": "Tasks marked Done are auto-indexed as searchable annotations in Knowledge" },
+        { "type": "feat", "description": "Saved AI drafts (Triage workspace) auto-indexed into Knowledge on save" },
+        { "type": "feat", "description": "New meeting entries auto-indexed with raw notes as searchable text" },
+        { "type": "feat", "description": "Weekly update log entries auto-indexed into Knowledge on add" },
+        { "type": "feat", "description": "Saved weekly reports auto-indexed (first 500 chars) into Knowledge on save" },
+        { "type": "feat", "description": "Source badge on auto-indexed Knowledge entries: AI Draft, Meeting, Task, Update, Weekly Report" },
+        { "type": "feat", "description": "Dedup guard — re-saving the same source never creates duplicate Knowledge entries" }
+      ]
+    },
+    {
       "version": "2.10.1",
       "codename": "Velocity Power",
       "date": "2026-03-16",
