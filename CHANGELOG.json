@@ -1,6 +1,18 @@
 {
   "versions": [
     {
+      "version": "2.18.0",
+      "codename": "Deep Work Fluid",
+      "date": "2026-03-16",
+      "summary": "P4 UX audit sprint — micro-interactions: collapse animation, skeleton loader, press feedback, and expressive type pills",
+      "changes": [
+        { "type": "feat", "description": "Week in Review collapses with AnimatePresence height+opacity animation" },
+        { "type": "feat", "description": "ExpandableTile tiles have active:scale-[0.97] press feedback" },
+        { "type": "feat", "description": "Calendar/Email import shows 3 animate-pulse skeleton rows while fetching" },
+        { "type": "feat", "description": "Log type pills: active state bumped to 40% fill + scale-105 + shadow-sm" }
+      ]
+    },
+    {
       "version": "2.17.0",
       "codename": "Cadence Crisp",
       "date": "2026-03-16",

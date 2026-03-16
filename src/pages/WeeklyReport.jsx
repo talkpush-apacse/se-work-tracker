@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   ChevronLeft, ChevronRight, Copy, Check, Save, Trash2,
   Loader2, ChevronDown, ChevronUp, Mail, RefreshCw, RotateCcw, AlertTriangle, LogIn,
@@ -832,7 +833,16 @@ export default function WeeklyReport({ onNavigate }) {
           }
         </button>
 
+        <AnimatePresence initial={false}>
         {reviewOpen && (
+          <motion.div
+            key="review-body"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: 'easeInOut' }}
+            className="overflow-hidden"
+          >
           <div className="border-t border-border px-5 pb-5 pt-4">
             {/* Unified empty state — shown only when ALL three cards are empty/disconnected */}
             {allReviewEmpty && (
@@ -991,7 +1001,9 @@ export default function WeeklyReport({ onNavigate }) {
               </div>
             )}
           </div>
+          </motion.div>
         )}
+        </AnimatePresence>
       </div>
 
       {/* ── Email Activity — Interactive Viewer with Include/Exclude ── */}
@@ -1456,7 +1468,7 @@ function ExpandableTile({ label, value, isExpanded, onToggle, valueColor = 'text
         isExpanded ? 'border-brand-lavender/40' : 'border-border'
       }`}
     >
-      <button onClick={onToggle} className="w-full px-4 py-3 text-center hover:bg-secondary/30 transition-colors rounded-xl">
+      <button onClick={onToggle} className="w-full px-4 py-3 text-center hover:bg-secondary/30 active:scale-[0.97] transition-all rounded-xl">
         <p className={`text-lg font-bold ${valueColor}`}>{value}</p>
         <p className="text-xs text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
           {label}

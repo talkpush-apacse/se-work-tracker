@@ -173,11 +173,13 @@ export default function WeeklyUpdateLog({ weekStart, weekEnd } = {}) {
               key={type}
               type="button"
               onClick={() => setLogForm(p => ({ ...p, type }))}
-              className="px-3 py-1 rounded-full text-[11px] font-semibold border transition-all"
+              className={`px-3 py-1 rounded-full text-[11px] font-semibold border transition-all ${
+                logForm.type === type ? 'scale-105 shadow-sm' : 'hover:scale-105'
+              }`}
               style={logForm.type === type ? {
-                backgroundColor: WEEKLY_UPDATE_LOG_COLORS[type] + '25',
+                backgroundColor: WEEKLY_UPDATE_LOG_COLORS[type] + '40',
                 color: WEEKLY_UPDATE_LOG_COLORS[type],
-                borderColor: WEEKLY_UPDATE_LOG_COLORS[type] + '60',
+                borderColor: WEEKLY_UPDATE_LOG_COLORS[type] + '80',
               } : { borderColor: 'var(--border)', color: 'var(--muted-foreground)', backgroundColor: 'transparent' }}
             >
               {WEEKLY_UPDATE_LOG_LABELS[type]}

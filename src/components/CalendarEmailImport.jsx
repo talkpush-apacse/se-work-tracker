@@ -473,11 +473,18 @@ export default function CalendarEmailImport({ customers, addWeeklyUpdateLog, aiS
                 </div>
               )}
 
-              {/* Loading */}
+              {/* Loading — skeleton rows */}
               {isFetching && (
-                <div className="flex items-center justify-center gap-2 py-6 text-muted-foreground text-xs">
-                  <Loader2 size={14} className="animate-spin" />
-                  <span>Fetching calendar events and {emailSource === 'starred' ? 'starred' : emailSource === 'sent' ? 'sent' : 'starred & sent'} emails…</span>
+                <div className="space-y-2 py-2">
+                  {[0, 1, 2].map(i => (
+                    <div key={i} className="animate-pulse flex items-start gap-3 p-3 rounded-xl border border-border bg-secondary/10">
+                      <div className="h-4 w-14 bg-secondary rounded-full flex-shrink-0 mt-0.5" />
+                      <div className="flex-1 space-y-2 min-w-0">
+                        <div className="h-3 bg-secondary rounded w-3/4" />
+                        <div className="h-2.5 bg-secondary rounded w-1/2" />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
 
