@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import ImageExtension from '@tiptap/extension-image';
@@ -34,19 +34,28 @@ function readAsDataUrl(file) {
 
 function ToolbarButton({ onClick, active, title, children, className }) {
   return (
-    <button
-      type="button"
-      onMouseDown={e => { e.preventDefault(); onClick(); }}
-      title={title}
-      data-active={active ? 'true' : undefined}
-      className={cn(
-        'p-1.5 rounded transition-colors text-muted-foreground hover:text-foreground hover:bg-secondary',
-        active && 'text-brand-lavender bg-brand-lavender/10',
-        className,
+    <div className="relative group/tip">
+      <button
+        type="button"
+        onMouseDown={e => { e.preventDefault(); onClick(); }}
+        data-active={active ? 'true' : undefined}
+        className={cn(
+          'p-1.5 rounded transition-colors text-muted-foreground hover:text-foreground hover:bg-secondary',
+          active && 'text-brand-lavender bg-brand-lavender/10',
+          className,
+        )}
+      >
+        {children}
+      </button>
+      {title && (
+        <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 flex flex-col items-center opacity-0 group-hover/tip:opacity-100 transition-opacity delay-200 z-50">
+          <span className="whitespace-nowrap rounded-md bg-foreground/90 px-2 py-1 text-[11px] text-background font-medium shadow-lg">
+            {title}
+          </span>
+          <span className="w-1.5 h-1.5 rotate-45 bg-foreground/90 -mt-[3px] flex-shrink-0" />
+        </div>
       )}
-    >
-      {children}
-    </button>
+    </div>
   );
 }
 
@@ -56,6 +65,7 @@ function Divider() {
 
 export default function RichTextEditor({ value, onChange, placeholder, minHeight = '200px' }) {
   const fileInputRef = useRef(null);
+  const [showMoreTools, setShowMoreTools] = useState(false);
 
   const editor = useEditor({
     extensions: [
@@ -149,6 +159,7 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
     <div className="flex flex-col bg-secondary/60 border border-border/50 rounded-xl focus-within:border-border overflow-hidden transition-colors">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-0.5 px-2 py-1.5 border-b border-border/40 bg-secondary/40">
+        {/* Core tools — always visible */}
         <ToolbarButton
           onClick={() => editor.chain().focus().toggleBold().run()}
           active={editor.isActive('bold')}
@@ -174,23 +185,6 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
         <Divider />
 
         <ToolbarButton
-          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-          active={editor.isActive('heading', { level: 2 })}
-          title="Heading 2"
-        >
-          <Heading2 size={13} />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-          active={editor.isActive('heading', { level: 3 })}
-          title="Heading 3"
-        >
-          <Heading3 size={13} />
-        </ToolbarButton>
-
-        <Divider />
-
-        <ToolbarButton
           onClick={() => editor.chain().focus().toggleBulletList().run()}
           active={editor.isActive('bulletList')}
           title="Bullet List"
@@ -198,36 +192,78 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
           <List size={13} />
         </ToolbarButton>
         <ToolbarButton
-          onClick={() => editor.chain().focus().toggleOrderedList().run()}
-          active={editor.isActive('orderedList')}
-          title="Ordered List"
-        >
-          <ListOrdered size={13} />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleBlockquote().run()}
-          active={editor.isActive('blockquote')}
-          title="Blockquote"
-        >
-          <Quote size={13} />
-        </ToolbarButton>
-
-        <Divider />
-
-        <ToolbarButton
           onClick={handleLinkClick}
           active={editor.isActive('link')}
           title="Link"
         >
           <LinkIcon size={13} />
         </ToolbarButton>
-        <ToolbarButton
-          onClick={() => fileInputRef.current?.click()}
-          active={false}
-          title="Insert image"
+
+        {/* Overflow toggle */}
+        <button
+          type="button"
+          onMouseDown={e => { e.preventDefault(); setShowMoreTools(v => !v); }}
+          title="More formatting"
+          className={cn(
+            'p-1.5 rounded transition-colors text-xs font-bold leading-none text-muted-foreground hover:text-foreground hover:bg-secondary',
+            showMoreTools && 'text-brand-lavender bg-brand-lavender/10',
+          )}
         >
-          <ImageIcon size={13} />
-        </ToolbarButton>
+          •••
+        </button>
+
+        {/* Extended tools — shown when overflow is open */}
+        {showMoreTools && (
+          <>
+            <Divider />
+            <ToolbarButton
+              onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+              active={editor.isActive('heading', { level: 2 })}
+              title="Heading 2"
+            >
+              <Heading2 size={13} />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+              active={editor.isActive('heading', { level: 3 })}
+              title="Heading 3"
+            >
+              <Heading3 size={13} />
+            </ToolbarButton>
+            <Divider />
+            <ToolbarButton
+              onClick={() => editor.chain().focus().toggleOrderedList().run()}
+              active={editor.isActive('orderedList')}
+              title="Ordered List"
+            >
+              <ListOrdered size={13} />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().toggleBlockquote().run()}
+              active={editor.isActive('blockquote')}
+              title="Blockquote"
+            >
+              <Quote size={13} />
+            </ToolbarButton>
+            <Divider />
+            <ToolbarButton
+              onClick={() => fileInputRef.current?.click()}
+              active={false}
+              title="Insert image"
+            >
+              <ImageIcon size={13} />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().setHorizontalRule().run()}
+              active={false}
+              title="Horizontal rule"
+            >
+              <Minus size={13} />
+            </ToolbarButton>
+          </>
+        )}
+
+        {/* Hidden file input — always mounted so the ref is stable */}
         <input
           ref={fileInputRef}
           type="file"
@@ -235,16 +271,6 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
           className="hidden"
           onChange={handleImageFile}
         />
-
-        <Divider />
-
-        <ToolbarButton
-          onClick={() => editor.chain().focus().setHorizontalRule().run()}
-          active={false}
-          title="Horizontal rule"
-        >
-          <Minus size={13} />
-        </ToolbarButton>
       </div>
 
       {/* Editor content */}

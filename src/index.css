@@ -74,7 +74,7 @@
     --secondary:     240 5% 18%;
     --secondary-foreground: 50 30% 92%;
     --muted:         240 5% 18%;
-    --muted-foreground: 240 5% 58%;
+    --muted-foreground: 240 5% 65%;
     --accent:        298 50% 65%;
     --accent-foreground: 50 30% 92%;
     --destructive:   0 55% 55%;
@@ -88,7 +88,7 @@
     --sidebar-foreground:        0 0% 95%;
     --sidebar-accent:            240 5% 17%;
     --sidebar-accent-foreground: 0 0% 95%;
-    --sidebar-border:            240 5% 17%;
+    --sidebar-border:            240 5% 23%;
 
     /* Brand palette — dark adjusted (hue preserved, lightness adjusted) */
     --brand-sage:          139 25% 62%;

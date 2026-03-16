@@ -1,8 +1,8 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  Brain, Search, Sparkles, X, Loader2, ChevronDown, Plus, AlertCircle, PencilLine, Trash2,
-  CheckSquare, Square, CheckCheck,
+  Brain, Search, Sparkles, StickyNote, X, Loader2, ChevronDown, Plus, AlertCircle, PencilLine, Trash2,
+  CheckSquare, Square, CheckCheck, Database,
 } from 'lucide-react';
 import {
   format, parseISO, formatDistanceToNow, differenceInDays,
@@ -10,9 +10,19 @@ import {
 } from 'date-fns';
 import { useAppStore } from '../context/StoreContext';
 import { buildMemoryIndex, getEntryColors } from '../utils/memoryIndex';
-import { aiMemorySearch } from '../utils/memorySearch';
+import { chunkMemoryEntries } from '../utils/chunker';
+import { ragSearch } from '../utils/ragSearch';
 import { ANNOTATION_TAGS, ANNOTATION_TAG_LABELS } from '../constants';
 import MemoryDetailDrawer from '../components/MemoryDetailDrawer';
+
+// ── Source badge config for auto-indexed annotations ──────────────────────────
+const SOURCE_BADGE_CONFIG = {
+  'ai-output':     { label: 'AI Draft',      cls: 'bg-purple-500/15 text-purple-400 border-purple-500/20' },
+  'meeting':       { label: 'Meeting',        cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20' },
+  'task':          { label: 'Task',           cls: 'bg-green-500/15 text-green-400 border-green-500/20' },
+  'weekly-update': { label: 'Update',         cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
+  'weekly-report': { label: 'Weekly Report',  cls: 'bg-violet-500/15 text-violet-400 border-violet-500/20' },
+};
 
 // ── Type filter options ────────────────────────────────────────────────────────
 const TYPE_FILTER_OPTIONS = [
@@ -22,7 +32,8 @@ const TYPE_FILTER_OPTIONS = [
   { value: 'lowlight',    label: 'Lowlight',   weeklyLogType: true },
   { value: 'learning',    label: 'Learning',   weeklyLogType: true },
   { value: 'shoutout',    label: 'Shoutout',   weeklyLogType: true },
-  { value: 'aiOutput',    label: 'AI Draft' },
+  { value: 'artifact',    label: 'Artifact' },
+  { value: 'task-note',   label: 'Task Note' },
   { value: 'milestone',   label: 'Milestone' },
   { value: 'activityLog', label: 'Activity' },
   { value: 'annotation',  label: 'Note' },
@@ -119,6 +130,22 @@ function SkeletonCard() {
   );
 }
 
+// ── RAG Answer card skeleton ──────────────────────────────────────────────────
+function AnswerSkeleton() {
+  return (
+    <div className="rounded-2xl border border-accent/30 bg-accent/10 px-4 py-4 animate-pulse space-y-2">
+      <div className="flex items-center gap-2 mb-3">
+        <Brain size={14} className="text-accent-foreground/40" />
+        <div className="h-3 w-20 bg-accent/30 rounded" />
+      </div>
+      <div className="h-3 w-full bg-accent/20 rounded" />
+      <div className="h-3 w-5/6 bg-accent/20 rounded" />
+      <div className="h-3 w-4/6 bg-accent/20 rounded" />
+      <p className="text-[11px] text-muted-foreground/50 pt-1">Searching memory…</p>
+    </div>
+  );
+}
+
 // ── Type multi-select dropdown ────────────────────────────────────────────────
 function TypeDropdown({ selectedTypes, onToggle, onClear }) {
   const [open, setOpen] = useState(false);
@@ -187,9 +214,6 @@ function TypeDropdown({ selectedTypes, onToggle, onClear }) {
 
 // ── Customer dropdown ─────────────────────────────────────────────────────────
 function CustomerDropdown({ customers, value, onChange }) {
-  const selected = customers.find(c => c.id === value);
-  const label = selected ? selected.name : 'Customer';
-
   return (
     <div className="relative">
       <select
@@ -212,7 +236,6 @@ function CustomerDropdown({ customers, value, onChange }) {
 
 // ── Date range dropdown ───────────────────────────────────────────────────────
 function DateRangeDropdown({ value, onChange }) {
-  const selected = DATE_RANGE_OPTIONS.find(o => o.value === value);
   return (
     <div className="relative">
       <select
@@ -314,7 +337,7 @@ function AddNoteModal({ customers, initialData, onSave, onClose }) {
 }
 
 // ── Memory card ───────────────────────────────────────────────────────────────
-function MemoryCard({ entry, highlightRegex, aiActive, aiReason, onClick, isSelected, isSelectMode, onSelect, entryIndex }) {
+function MemoryCard({ entry, highlightRegex, similarityPct, onClick, isSelected, isSelectMode, onSelect, entryIndex }) {
   const colors = getEntryColors(entry);
   const dateStr = formatEntryDate(entry.date);
 
@@ -359,7 +382,12 @@ function MemoryCard({ entry, highlightRegex, aiActive, aiReason, onClick, isSele
       <div className="flex items-start gap-3">
         {/* Icon + type badge */}
         <div className="flex flex-col items-center gap-1 flex-shrink-0 mt-0.5">
-          <span className="text-base leading-none">{entry.icon}</span>
+          {entry.entityType === 'artifact'
+            ? <Sparkles size={16} className="text-violet-400" />
+            : entry.entityType === 'task-note'
+              ? <StickyNote size={16} className="text-amber-400" />
+              : <span className="text-base leading-none">{entry.icon}</span>
+          }
           <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md border ${colors.bg} ${colors.text} ${colors.border} whitespace-nowrap`}>
             {entry.label}
           </span>
@@ -367,7 +395,7 @@ function MemoryCard({ entry, highlightRegex, aiActive, aiReason, onClick, isSele
 
         {/* Content */}
         <div className="min-w-0 flex-1">
-          {/* Meta: customer + date */}
+          {/* Meta: customer + date + similarity */}
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             {entry.customerName && (
               <span className="flex items-center gap-1 text-[11px] font-medium text-foreground">
@@ -388,19 +416,24 @@ function MemoryCard({ entry, highlightRegex, aiActive, aiReason, onClick, isSele
                 {entry.subtext}
               </span>
             )}
+            {/* Source badge — only on auto-generated annotations */}
+            {entry.entityType === 'annotation' && entry.sourceRef?.autoGenerated && SOURCE_BADGE_CONFIG[entry.sourceRef.source] && (
+              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full border ${SOURCE_BADGE_CONFIG[entry.sourceRef.source].cls}`}>
+                {SOURCE_BADGE_CONFIG[entry.sourceRef.source].label}
+              </span>
+            )}
+            {/* Similarity badge for RAG source results */}
+            {similarityPct != null && (
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-brand-lavender/15 text-brand-lavender border border-brand-lavender/20">
+                {similarityPct}% match
+              </span>
+            )}
           </div>
 
           {/* Text — 2-line clamp */}
           <p className="text-xs text-foreground/90 leading-relaxed line-clamp-2">
             {highlightRegex ? highlightText(entry.text, highlightRegex) : entry.text}
           </p>
-
-          {/* AI reason */}
-          {aiActive && aiReason && (
-            <p className="text-[10px] text-muted-foreground/70 mt-1 italic line-clamp-1">
-              {aiReason}
-            </p>
-          )}
         </div>
       </div>
     </motion.div>
@@ -435,7 +468,6 @@ function useWindowVirtualizer(totalItems, enabled) {
       setSlice({ start, end });
     };
 
-    // Give DOM time to settle on first render
     const raf = requestAnimationFrame(update);
     window.addEventListener('scroll', update, { passive: true });
     window.addEventListener('resize', update, { passive: true });
@@ -451,11 +483,17 @@ function useWindowVirtualizer(totalItems, enabled) {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-// Maps entityType → store delete function name
 const DELETABLE_TYPES = new Set(['annotation', 'task', 'meeting', 'milestone', 'activityLog', 'weeklyLog']);
 
 function getEntryKey(entry) {
   return `${entry.entityType}-${entry.id}`;
+}
+
+// Build a lookup map from entity id → MemoryEntry for RAG chunk → entry resolution
+function buildIdMap(entries) {
+  const map = new Map();
+  for (const e of entries) map.set(e.id, e);
+  return map;
 }
 
 export default function Knowledge({ onNavigate }) {
@@ -467,28 +505,32 @@ export default function Knowledge({ onNavigate }) {
   } = store;
 
   // ── State ──
-  const [query, setQuery]                 = useState('');
+  const [query, setQuery]                   = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
-  const [selectedTypes, setSelectedTypes] = useState(new Set());
+  const [selectedTypes, setSelectedTypes]   = useState(new Set());
   const [selectedCustomer, setSelectedCustomer] = useState('');
-  const [dateRange, setDateRange]         = useState('all');
+  const [dateRange, setDateRange]           = useState('all');
 
-  // AI search
-  const [aiActive, setAiActive]         = useState(false);
-  const [aiSearching, setAiSearching]   = useState(false);
-  const [aiError, setAiError]           = useState(null);
-  const [aiReasons, setAiReasons]       = useState({});
-  const [aiRankedEntries, setAiRankedEntries] = useState(null);
+  // RAG search
+  const [ragMode, setRagMode]               = useState(false); // true when RAG results are shown
+  const [ragSearching, setRagSearching]     = useState(false);
+  const [ragAnswer, setRagAnswer]           = useState(null);
+  const [ragChunks, setRagChunks]           = useState([]);   // raw chunks from API
+  const [ragError, setRagError]             = useState(null);
+
+  // Rebuild memory index (backfill)
+  const [rebuilding, setRebuilding]         = useState(false);
+  const [rebuildStatus, setRebuildStatus]   = useState(null); // null | 'done' | 'error'
 
   // UI
-  const [selectedEntry, setSelectedEntry] = useState(null);
-  const [showAddNote, setShowAddNote]     = useState(false);
+  const [selectedEntry, setSelectedEntry]   = useState(null);
+  const [showAddNote, setShowAddNote]       = useState(false);
   const [editingAnnotation, setEditingAnnotation] = useState(null);
 
   // Bulk select
-  const [selectedIds, setSelectedIds]     = useState(new Set());
+  const [selectedIds, setSelectedIds]       = useState(new Set());
   const [showBulkConfirm, setShowBulkConfirm] = useState(false);
-  const lastSelectedIndexRef              = useRef(null);
+  const lastSelectedIndexRef                = useRef(null);
 
   const debounceRef = useRef(null);
   const searchRef   = useRef(null);
@@ -500,13 +542,13 @@ export default function Knowledge({ onNavigate }) {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [query]);
 
-  // Reset AI results when query or filters change
+  // Reset RAG results when query or filters change
   useEffect(() => {
-    if (aiActive) {
-      setAiActive(false);
-      setAiRankedEntries(null);
-      setAiReasons({});
-      setAiError(null);
+    if (ragMode) {
+      setRagMode(false);
+      setRagAnswer(null);
+      setRagChunks([]);
+      setRagError(null);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedQuery, selectedTypes, selectedCustomer, dateRange]);
@@ -517,6 +559,8 @@ export default function Knowledge({ onNavigate }) {
     store.aiOutputs, store.milestones, store.points,
     store.annotations, store.customers,
   ]);
+
+  const entryById = useMemo(() => buildIdMap(memoryIndex), [memoryIndex]);
 
   // ── Apply filters (keyword + type + customer + date) ──
   const filteredEntries = useMemo(() => {
@@ -532,19 +576,29 @@ export default function Knowledge({ onNavigate }) {
     });
   }, [memoryIndex, debouncedQuery, selectedTypes, selectedCustomer, dateRange]);
 
-  // ── Display entries: AI-ranked or keyword-filtered ──
-  const displayEntries = aiActive && aiRankedEntries
-    ? aiRankedEntries.filter(e => filteredEntries.some(f => f.id === e.id))
-    : filteredEntries;
+  // ── Resolve RAG chunks → MemoryEntry objects for display ──
+  // Chunks from the vector store reference entity_id, which maps to MemoryEntry.id
+  const ragSourceEntries = useMemo(() => {
+    if (!ragChunks.length) return [];
+    const seen = new Set();
+    return ragChunks
+      .map(chunk => {
+        const entry = entryById.get(chunk.entity_id);
+        if (!entry || seen.has(entry.id)) return null;
+        seen.add(entry.id);
+        return { entry, similarity: chunk.similarity };
+      })
+      .filter(Boolean);
+  }, [ragChunks, entryById]);
 
-  // Memoize to a stable array reference — prevents every MemoryCard from getting
-  // a new prop reference on unrelated re-renders (e.g. selectedEntry changes)
+  // ── Display entries: RAG sources or keyword-filtered ──
+  const displayEntries = ragMode ? ragSourceEntries.map(s => s.entry) : filteredEntries;
+
   const queryWords = useMemo(
     () => debouncedQuery.trim().toLowerCase().split(/\s+/).filter(Boolean),
     [debouncedQuery]
   );
 
-  // Compile the highlight regex once per query instead of once per card render
   const highlightRegex = useMemo(() => {
     if (!queryWords.length) return null;
     const escaped = queryWords.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
@@ -558,36 +612,74 @@ export default function Knowledge({ onNavigate }) {
   const paddingTop = shouldVirtualize ? slice.start * ITEM_HEIGHT : 0;
   const paddingBottom = shouldVirtualize ? Math.max(0, (displayEntries.length - slice.end) * ITEM_HEIGHT) : 0;
 
-  // ── AI search ──
-  const handleAiSearch = useCallback(async () => {
+  // ── RAG search ──
+  const handleRagSearch = useCallback(async () => {
     if (!query.trim()) return;
-    if (aiActive) {
-      // Toggle off
-      setAiActive(false);
-      setAiRankedEntries(null);
-      setAiReasons({});
+
+    if (ragMode) {
+      // Toggle off — back to browse
+      setRagMode(false);
+      setRagAnswer(null);
+      setRagChunks([]);
+      setRagError(null);
       return;
     }
 
-    setAiSearching(true);
-    setAiError(null);
+    setRagSearching(true);
+    setRagError(null);
 
-    try {
-      const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
-      const { rankedEntries, reasons } = await aiMemorySearch(
-        query,
-        filteredEntries,
-        apiKey
-      );
-      setAiRankedEntries(rankedEntries);
-      setAiReasons(reasons);
-      setAiActive(true);
-    } catch (err) {
-      setAiError(err.message);
-    } finally {
-      setAiSearching(false);
+    const apiSecret = import.meta.env.VITE_API_SECRET;
+    const anthropicApiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
+
+    // Build filters from current UI selections
+    const filters = {};
+    if (selectedCustomer) filters.customer_id = selectedCustomer;
+    if (selectedTypes.size > 0) {
+      // Map weeklyLog sub-types back to 'weeklyLog' entity type for the backend filter
+      const entityTypes = [...selectedTypes].map(t => {
+        const opt = TYPE_FILTER_OPTIONS.find(o => o.value === t);
+        return opt?.weeklyLogType ? 'weeklyLog' : t;
+      });
+      filters.entity_types = [...new Set(entityTypes)];
     }
-  }, [query, aiActive, filteredEntries]);
+
+    const result = await ragSearch(query, filters, apiSecret, anthropicApiKey);
+
+    setRagSearching(false);
+
+    if (result.error) {
+      setRagError(result.error);
+      return;
+    }
+
+    setRagAnswer(result.answer);
+    setRagChunks(result.chunks);
+    setRagMode(true);
+  }, [query, ragMode, selectedCustomer, selectedTypes]);
+
+  // ── Rebuild Memory Index (backfill) ──
+  const handleRebuild = useCallback(async () => {
+    setRebuilding(true);
+    setRebuildStatus(null);
+    try {
+      const entries = buildMemoryIndex(store);
+      const chunks = chunkMemoryEntries(entries);
+      const res = await fetch('/api/embeddings?op=upsert', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_API_SECRET}`,
+        },
+        body: JSON.stringify({ chunks }),
+      });
+      if (!res.ok) throw new Error('Upsert failed');
+      setRebuildStatus(`done:${chunks.length}`);
+    } catch {
+      setRebuildStatus('error');
+    } finally {
+      setRebuilding(false);
+    }
+  }, [store]);
 
   // ── Filter helpers ──
   const toggleType = (type) => {
@@ -604,6 +696,13 @@ export default function Knowledge({ onNavigate }) {
     setSelectedTypes(new Set());
     setSelectedCustomer('');
     setDateRange('all');
+  };
+
+  const clearRag = () => {
+    setRagMode(false);
+    setRagAnswer(null);
+    setRagChunks([]);
+    setRagError(null);
   };
 
   // ── Bulk select ──
@@ -683,16 +782,24 @@ export default function Knowledge({ onNavigate }) {
     setSelectedEntry(null);
   };
 
-  // ── Navigation helper ──
   const handleNavigateToTriage = () => {
     onNavigate?.('triage');
   };
+
+  // Resolve rebuild status label
+  const rebuildLabel = (() => {
+    if (rebuilding) return null; // handled by button state
+    if (!rebuildStatus) return null;
+    if (rebuildStatus === 'error') return 'Index failed';
+    const n = rebuildStatus.replace('done:', '');
+    return `Done — ${n} chunks indexed`;
+  })();
 
   // ── Render ──
   return (
     <div className="space-y-4">
       {/* Page header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
             <Brain size={20} className="text-brand-lavender" />
@@ -700,13 +807,38 @@ export default function Knowledge({ onNavigate }) {
           </div>
           <p className="text-xs text-muted-foreground mt-0.5 ml-7">Everything you've logged, searchable.</p>
         </div>
-        <button
-          onClick={() => { setEditingAnnotation(null); setShowAddNote(true); }}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-brand-lavender/15 text-brand-lavender text-xs font-semibold hover:bg-brand-lavender/25 transition-all border border-brand-lavender/20"
-        >
-          <Plus size={13} />
-          Add Note
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Rebuild Memory Index button */}
+          <div className="flex flex-col items-end gap-0.5">
+            <button
+              onClick={handleRebuild}
+              disabled={rebuilding}
+              title="Re-embed all entries into the vector store"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-secondary/80 text-muted-foreground text-xs font-medium hover:text-foreground hover:bg-secondary transition-all border border-border disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {rebuilding
+                ? <Loader2 size={12} className="animate-spin" />
+                : <Database size={12} />
+              }
+              {rebuilding
+                ? `Indexing ${chunkMemoryEntries(buildMemoryIndex(store)).length} entries…`
+                : 'Rebuild Index'
+              }
+            </button>
+            {rebuildLabel && (
+              <span className={`text-[10px] ${rebuildStatus === 'error' ? 'text-red-400' : 'text-muted-foreground'}`}>
+                {rebuildLabel}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={() => { setEditingAnnotation(null); setShowAddNote(true); }}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-brand-lavender/15 text-brand-lavender text-xs font-semibold hover:bg-brand-lavender/25 transition-all border border-brand-lavender/20"
+          >
+            <Plus size={13} />
+            Add Note
+          </button>
+        </div>
       </div>
 
       {/* ── Search bar ── */}
@@ -717,33 +849,34 @@ export default function Knowledge({ onNavigate }) {
           type="text"
           value={query}
           onChange={e => setQuery(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && query.trim()) handleRagSearch(); }}
           placeholder="Search tasks, meetings, learnings, decisions…"
           className="w-full h-12 bg-card border border-border rounded-2xl pl-11 pr-28 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40 transition-all"
         />
         <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
           {query && (
             <button
-              onClick={() => { setQuery(''); setDebouncedQuery(''); }}
+              onClick={() => { setQuery(''); setDebouncedQuery(''); clearRag(); }}
               className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
             >
               <X size={14} />
             </button>
           )}
           <button
-            onClick={handleAiSearch}
-            disabled={!query.trim() || aiSearching}
-            title={aiActive ? 'Reset AI results' : 'AI semantic search'}
+            onClick={handleRagSearch}
+            disabled={!query.trim() || ragSearching}
+            title={ragMode ? 'Clear AI results' : 'AI semantic search (RAG)'}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
-              aiActive
+              ragMode
                 ? 'bg-brand-lavender text-white hover:bg-brand-lavender/80'
                 : 'bg-brand-lavender/15 text-brand-lavender hover:bg-brand-lavender/25'
             }`}
           >
-            {aiSearching
+            {ragSearching
               ? <Loader2 size={13} className="animate-spin" />
               : <Sparkles size={13} />
             }
-            {aiActive ? 'AI on' : 'AI'}
+            {ragMode ? 'AI on' : 'AI'}
           </button>
         </div>
       </div>
@@ -755,6 +888,28 @@ export default function Knowledge({ onNavigate }) {
           onToggle={toggleType}
           onClear={() => setSelectedTypes(new Set())}
         />
+        {/* Notes & Artifacts quick-toggle chip */}
+        {(() => {
+          const bothActive = selectedTypes.has('artifact') && selectedTypes.has('task-note');
+          return (
+            <button
+              onClick={() => setSelectedTypes(prev => {
+                const next = new Set(prev);
+                if (bothActive) { next.delete('artifact'); next.delete('task-note'); }
+                else { next.add('artifact'); next.add('task-note'); }
+                return next;
+              })}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all ${
+                bothActive
+                  ? 'bg-brand-lavender/15 text-brand-lavender border-brand-lavender/30'
+                  : 'bg-secondary border-border text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <StickyNote size={11} />
+              Notes & Artifacts
+            </button>
+          );
+        })()}
         <CustomerDropdown
           customers={customers}
           value={selectedCustomer}
@@ -771,31 +926,60 @@ export default function Knowledge({ onNavigate }) {
         )}
       </div>
 
-      {/* ── AI error ── */}
-      {aiError && (
+      {/* ── RAG error ── */}
+      {ragError && (
         <div className="rounded-2xl border border-red-500/30 bg-red-500/5 px-4 py-3 flex items-start gap-2">
           <AlertCircle size={14} className="text-red-400 mt-0.5 flex-shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-xs font-medium text-red-400">AI search failed</p>
-            <p className="text-[11px] text-red-400/70 mt-0.5">{aiError}</p>
+            <p className="text-[11px] text-red-400/70 mt-0.5">{ragError}</p>
           </div>
-          <button onClick={() => setAiError(null)} className="text-red-400/60 hover:text-red-400">
+          <button onClick={() => setRagError(null)} className="text-red-400/60 hover:text-red-400">
             <X size={13} />
           </button>
+        </div>
+      )}
+
+      {/* ── RAG answer card (searching skeleton or result) ── */}
+      {ragSearching && <AnswerSkeleton />}
+
+      {ragMode && ragAnswer && (
+        <div className="rounded-2xl border border-accent/30 bg-accent/10 px-4 py-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <Brain size={14} className="text-brand-lavender" />
+              <span className="text-xs font-semibold text-foreground">AI Answer</span>
+            </div>
+            <button
+              onClick={clearRag}
+              className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Clear <X size={11} />
+            </button>
+          </div>
+          <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-line">
+            {ragAnswer}
+          </p>
         </div>
       )}
 
       {/* ── Stats bar ── */}
       <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
         <div className="flex items-center gap-2">
-          <span>
-            Showing <span className="font-medium text-foreground">{displayEntries.length}</span> of{' '}
-            <span className="font-medium text-foreground">{memoryIndex.length}</span> entries
-          </span>
-          {aiActive && (
+          {ragMode ? (
+            <span>
+              Sources: <span className="font-medium text-foreground">{ragSourceEntries.length}</span> entries
+            </span>
+          ) : (
+            <span>
+              Showing <span className="font-medium text-foreground">{displayEntries.length}</span> of{' '}
+              <span className="font-medium text-foreground">{memoryIndex.length}</span> entries
+            </span>
+          )}
+          {ragMode && (
             <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-lavender/15 text-brand-lavender text-[10px] font-semibold border border-brand-lavender/20">
               <Sparkles size={9} />
-              AI ranked
+              RAG
             </span>
           )}
         </div>
@@ -815,16 +999,23 @@ export default function Knowledge({ onNavigate }) {
         )}
       </div>
 
+      {/* ── RAG sources label ── */}
+      {ragMode && ragSourceEntries.length > 0 && (
+        <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+          Sources ({ragSourceEntries.length})
+        </p>
+      )}
+
       {/* ── Results list ── */}
-      {aiSearching ? (
-        <div className="space-y-2">
-          {Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} />)}
-        </div>
-      ) : displayEntries.length === 0 ? (
+      {ragSearching ? null : displayEntries.length === 0 ? (
         <div className="bg-card border border-border rounded-2xl px-6 py-12 text-center">
           <Search size={28} className="text-muted-foreground/30 mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground font-medium">No entries match your search.</p>
-          <p className="text-xs text-muted-foreground/60 mt-1">Try different keywords or adjust your filters.</p>
+          <p className="text-sm text-muted-foreground font-medium">
+            {ragMode ? 'No matching sources found.' : 'No entries match your search.'}
+          </p>
+          <p className="text-xs text-muted-foreground/60 mt-1">
+            {ragMode ? 'Try a different question or clear filters.' : 'Try different keywords or adjust your filters.'}
+          </p>
           {hasActiveFilters && (
             <button
               onClick={clearFilters}
@@ -836,25 +1027,21 @@ export default function Knowledge({ onNavigate }) {
         </div>
       ) : (
         <div ref={containerRef}>
-          {/* Top spacer for virtualization */}
           {paddingTop > 0 && <div style={{ height: paddingTop }} />}
 
-          {/*
-            AnimatePresence is only used when NOT virtualizing. When virtualizing,
-            items leaving visibleEntries (due to scroll) would each trigger an exit
-            animation, creating invisible animated elements at the viewport edge.
-          */}
           {shouldVirtualize ? (
             <div className="space-y-2">
               {visibleEntries.map((entry, i) => {
                 const absoluteIndex = slice.start + i;
+                const simPct = ragMode
+                  ? ragSourceEntries.find(s => s.entry.id === entry.id)?.similarity
+                  : null;
                 return (
                   <MemoryCard
                     key={`${entry.entityType}-${entry.id}`}
                     entry={entry}
                     highlightRegex={highlightRegex}
-                    aiActive={aiActive}
-                    aiReason={aiReasons[entry.id]}
+                    similarityPct={simPct != null ? Math.round(simPct * 100) : null}
                     onClick={setSelectedEntry}
                     isSelected={selectedIds.has(getEntryKey(entry))}
                     isSelectMode={isSelectMode}
@@ -867,25 +1054,28 @@ export default function Knowledge({ onNavigate }) {
           ) : (
             <AnimatePresence mode="popLayout" initial={false}>
               <div className="space-y-2">
-                {visibleEntries.map((entry, i) => (
-                  <MemoryCard
-                    key={`${entry.entityType}-${entry.id}`}
-                    entry={entry}
-                    highlightRegex={highlightRegex}
-                    aiActive={aiActive}
-                    aiReason={aiReasons[entry.id]}
-                    onClick={setSelectedEntry}
-                    isSelected={selectedIds.has(getEntryKey(entry))}
-                    isSelectMode={isSelectMode}
-                    onSelect={handleSelectEntry}
-                    entryIndex={i}
-                  />
-                ))}
+                {visibleEntries.map((entry, i) => {
+                  const simPct = ragMode
+                    ? ragSourceEntries.find(s => s.entry.id === entry.id)?.similarity
+                    : null;
+                  return (
+                    <MemoryCard
+                      key={`${entry.entityType}-${entry.id}`}
+                      entry={entry}
+                      highlightRegex={highlightRegex}
+                      similarityPct={simPct != null ? Math.round(simPct * 100) : null}
+                      onClick={setSelectedEntry}
+                      isSelected={selectedIds.has(getEntryKey(entry))}
+                      isSelectMode={isSelectMode}
+                      onSelect={handleSelectEntry}
+                      entryIndex={i}
+                    />
+                  );
+                })}
               </div>
             </AnimatePresence>
           )}
 
-          {/* Bottom spacer for virtualization */}
           {paddingBottom > 0 && <div style={{ height: paddingBottom }} />}
         </div>
       )}

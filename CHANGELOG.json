@@ -1,6 +1,73 @@
 {
   "versions": [
     {
+      "version": "2.16.0",
+      "codename": "Buffer Rising",
+      "date": "2026-03-16",
+      "summary": "Auto-index key events into Knowledge and filter to done-only tasks",
+      "changes": [
+        { "type": "feat", "description": "AI outputs, meetings, done tasks, weekly updates, and reports auto-create annotations in Knowledge" },
+        { "type": "feat", "description": "Source badges (AI Draft, Meeting, Task, Update, Weekly Report) shown on auto-generated entries" },
+        { "type": "feat", "description": "Dedup guard prevents duplicate annotations when the same source event fires twice" },
+        { "type": "fix", "description": "Knowledge memory index now only includes completed (done) tasks — open/blocked tasks excluded" }
+      ]
+    },
+    {
+      "version": "2.15.0",
+      "codename": "Anchor Deep",
+      "date": "2026-03-16",
+      "summary": "Extended Knowledge search corpus with AI artifacts and task notes",
+      "changes": [
+        { "type": "feat", "description": "AI outputs now indexed as 'artifact' type with full outputText and parent task as subtitle" },
+        { "type": "feat", "description": "Completed tasks with notes indexed as 'task-note' entries in Knowledge search" },
+        { "type": "feat", "description": "Sparkles icon for artifacts, StickyNote icon for task notes in search results" },
+        { "type": "feat", "description": "Notes & Artifacts quick-toggle chip in Knowledge filter row" },
+        { "type": "feat", "description": "RAG system prompt extracted to constants.js and updated to describe all entry types" }
+      ]
+    },
+    {
+      "version": "2.14.0",
+      "codename": "Zone Crisp",
+      "date": "2026-03-16",
+      "summary": "Full UX audit pass — 23 accessibility, contrast, spacing, and polish fixes across the app",
+      "changes": [
+        { "type": "fix", "description": "Raised contrast on UTILITIES label, muted-foreground token, and inactive nav text to WCAG AA" },
+        { "type": "feat", "description": "Custom checkbox component replaces native browser checkbox on dark theme" },
+        { "type": "fix", "description": "Generate button disabled hint added when context notes are empty" },
+        { "type": "feat", "description": "Breadcrumb trail replaces flat header in TaskDetailView" },
+        { "type": "fix", "description": "Active nav item now shows brand-lavender left-border accent and white text" },
+        { "type": "fix", "description": "Output Type active pill now uses filled brand-lavender style" },
+        { "type": "fix", "description": "AI task metadata panel simplified to compact chip row — removed duplicate card" },
+        { "type": "fix", "description": "Recipient label added above dropdown in AI Assist panel" },
+        { "type": "fix", "description": "Nav items tightened from py-2.5 to py-2; spacing normalized to 8px grid" },
+        { "type": "fix", "description": "TODAY section gains border-b hairline separator from UTILITIES" },
+        { "type": "fix", "description": "Synced indicator recoloured from sage-green to sky-blue" },
+        { "type": "feat", "description": "RichTextEditor toolbar collapsed to 5 core tools + ••• overflow toggle" },
+        { "type": "fix", "description": "Version number raised to text-[11px] at 40% opacity for legibility" },
+        { "type": "fix", "description": "Sidebar right border token boosted from 17% to 23% lightness" },
+        { "type": "fix", "description": "Timer row: time in bright emerald bold, task name at lower opacity" },
+        { "type": "feat", "description": "Nav items grouped into WORK / INSIGHTS / CONNECT sections with labels" },
+        { "type": "feat", "description": "Nav tooltips show description + keyboard shortcut hint (⌘1–9)" },
+        { "type": "feat", "description": "⌘1–9 keyboard shortcuts to jump between nav items by visual position" },
+        { "type": "fix", "description": "Styled CSS tooltips on toolbar buttons replace native browser title attribute" },
+        { "type": "fix", "description": "Ticket/Link label icon changed from ExternalLink to Link2 — removes false affordance" }
+      ]
+    },
+    {
+      "version": "2.13.0",
+      "codename": "Yield Core",
+      "date": "2026-03-16",
+      "summary": "RAG upgrade — pgvector embeddings replace compressed-index AI search in Knowledge",
+      "changes": [
+        { "type": "feat", "description": "Vector store via pgvector + OpenAI text-embedding-3-small for semantic memory search" },
+        { "type": "feat", "description": "RAG search: retrieve top 15 chunks, synthesize answer with Claude" },
+        { "type": "feat", "description": "AI Answer card in Knowledge with Clear button and Sources list with similarity % badges" },
+        { "type": "feat", "description": "Rebuild Memory Index button in Knowledge header for one-time and on-demand backfill" },
+        { "type": "feat", "description": "Silent background embedding sync — debounced 5s after any store change" },
+        { "type": "feat", "description": "New api/embeddings.js serverless endpoint handling upsert and search ops" }
+      ]
+    },
+    {
       "version": "2.12.0",
       "codename": "Xenial Crisp",
       "date": "2026-03-16",

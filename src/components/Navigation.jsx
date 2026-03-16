@@ -1,5 +1,5 @@
 import { LayoutDashboard, Target, Users, Menu, X, Download, Upload, ListTodo, Cloud, CloudOff, Loader2, Plug, Mail, Brain, Clock, GripVertical, Heart } from 'lucide-react';
-import { useState, useRef, useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback, Fragment } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAppStore } from '../context/StoreContext';
 import { useTimerContext, useTimerDisplay } from '../context/TimerContext';
@@ -10,15 +10,15 @@ import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } 
 import { CSS } from '@dnd-kit/utilities';
 
 const DEFAULT_TABS = [
-  { id: 'triage',       label: 'Triage',         icon: ListTodo },
-  { id: 'customers',    label: 'Customers',      icon: Users },
-  { id: 'okrs',         label: 'OKRs',           icon: Target },
-  { id: 'dashboard',    label: 'Dashboard',      icon: LayoutDashboard },
-  { id: 'weekly',       label: 'Weekly Report',  icon: Mail },
-  { id: 'timebudget',   label: 'Time Budget',   icon: Clock },
-  { id: 'pulse',        label: 'Pulse',          icon: Heart },
-  { id: 'knowledge',    label: 'Knowledge',      icon: Brain },
-  { id: 'integrations', label: 'Integrations',   icon: Plug },
+  { id: 'dashboard',    label: 'Dashboard',      icon: LayoutDashboard, group: null,        tooltip: 'Dashboard — overview of your work' },
+  { id: 'triage',       label: 'Triage',         icon: ListTodo,        group: null,        tooltip: 'Triage — manage & prioritize tasks' },
+  { id: 'timebudget',   label: 'Time Budget',    icon: Clock,           group: 'Work',      tooltip: 'Time Budget — plan weekly time allocation' },
+  { id: 'okrs',         label: 'OKRs',           icon: Target,          group: 'Work',      tooltip: 'OKRs — quarterly objectives & key results' },
+  { id: 'customers',    label: 'Customers',      icon: Users,           group: 'Work',      tooltip: 'Customers — manage client accounts' },
+  { id: 'weekly',       label: 'Weekly Report',  icon: Mail,            group: 'Insights',  tooltip: 'Weekly Report — generate weekly status email' },
+  { id: 'pulse',        label: 'Pulse',          icon: Heart,           group: 'Insights',  tooltip: 'Pulse — log daily stress & wellness levels' },
+  { id: 'knowledge',    label: 'Knowledge',      icon: Brain,           group: 'Insights',  tooltip: 'Knowledge — search & manage work notes' },
+  { id: 'integrations', label: 'Integrations',   icon: Plug,            group: 'Connect',   tooltip: 'Integrations — connect Google Calendar & Gmail' },
 ];
 
 const STORAGE_KEY = 'gpt-sidebar-order';
@@ -49,7 +49,7 @@ function saveTabOrder(tabs) {
 }
 
 // ── Sortable nav item for desktop sidebar ──
-function SortableDesktopNavItem({ tab, activeTab, onTabChange }) {
+function SortableDesktopNavItem({ tab, activeTab, onTabChange, shortcutKey }) {
   const { id, label, icon: Icon } = tab;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const style = {
@@ -79,8 +79,8 @@ function SortableDesktopNavItem({ tab, activeTab, onTabChange }) {
       </button>
       <button
         onClick={() => onTabChange(id)}
-        title={label}
-        className={`flex-1 flex items-center justify-center lg:justify-start gap-3 px-2 lg:px-3 py-2.5 rounded-xl text-sm font-medium font-nav transition-all ${
+        title={tab.tooltip ? `${tab.tooltip}  ⌘${shortcutKey}` : label}
+        className={`flex-1 flex items-center justify-center lg:justify-start gap-3 px-2 lg:px-3 py-2 rounded-xl text-sm font-medium font-nav transition-all ${
           activeTab === id
             ? 'bg-sidebar-accent text-white shadow-sm'
             : 'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/60'
@@ -159,6 +159,21 @@ export default function Navigation({ activeTab, onTabChange }) {
     });
   }, []);
 
+  // ⌘1–9 keyboard shortcuts — navigate to the Nth tab in current visual order
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key >= '1' && e.key <= '9') {
+        const idx = parseInt(e.key, 10) - 1;
+        if (idx < orderedTabs.length) {
+          e.preventDefault();
+          onTabChange(orderedTabs[idx].id);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [orderedTabs, onTabChange]);
+
   // Today at a glance — memoized so it only recalculates when `points` changes,
   // not on every tab switch or timer tick that re-renders Navigation.
   const now = new Date();
@@ -209,24 +224,35 @@ export default function Navigation({ activeTab, onTabChange }) {
         <nav className="flex-1 p-2 lg:p-3 space-y-1">
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={orderedTabs.map(t => t.id)} strategy={verticalListSortingStrategy}>
-              {orderedTabs.map(tab => (
-                <SortableDesktopNavItem
-                  key={tab.id}
-                  tab={tab}
-                  activeTab={activeTab}
-                  onTabChange={onTabChange}
-                />
-              ))}
+              {orderedTabs.map((tab, idx) => {
+                const prevGroup = idx > 0 ? orderedTabs[idx - 1].group : null;
+                const showGroupLabel = tab.group && tab.group !== prevGroup;
+                return (
+                  <Fragment key={tab.id}>
+                    {showGroupLabel && (
+                      <p className="hidden lg:block text-[10px] font-semibold text-sidebar-foreground/40 uppercase tracking-wider px-3 pt-3 pb-0.5 font-nav select-none">
+                        {tab.group}
+                      </p>
+                    )}
+                    <SortableDesktopNavItem
+                      tab={tab}
+                      activeTab={activeTab}
+                      onTabChange={onTabChange}
+                      shortcutKey={idx + 1}
+                    />
+                  </Fragment>
+                );
+              })}
             </SortableContext>
           </DndContext>
         </nav>
 
         {/* Today at a glance — only visible on expanded sidebar (lg) */}
-        <div className="hidden lg:block px-3 py-3 border-t border-sidebar-border bg-sidebar-accent/20">
+        <div className="hidden lg:block px-3 py-3 border-t border-b border-sidebar-border bg-sidebar-accent/20">
           <p className="text-[10px] font-semibold text-sidebar-foreground/50 uppercase tracking-wider mb-2 font-nav">Today</p>
           <p className="text-sm font-medium text-sidebar-foreground mb-0.5">{format(now, 'EEEE, MMM d')}</p>
           <p
-            className="text-xs text-sidebar-foreground/50"
+            className="text-xs text-sidebar-foreground/50 mb-0"
             title="Points represent logged work units. 1 pt ≈ 60 minutes of tracked time."
           >
             <span className="text-sidebar-foreground font-bold">{todayPoints}</span> pts logged
@@ -234,9 +260,9 @@ export default function Navigation({ activeTab, onTabChange }) {
           {isRunning ? (
             <div className="mt-2 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-brand-sage animate-pulse flex-shrink-0" />
-              <span className="text-[10px] text-brand-sage font-mono tabular-nums">{fmtTimer(elapsedSeconds)}</span>
+              <span className="text-[10px] text-emerald-300 font-mono tabular-nums font-semibold">{fmtTimer(elapsedSeconds)}</span>
               {timerTaskDesc && (
-                <span className="text-[10px] text-sidebar-foreground/40 truncate">{timerTaskDesc}</span>
+                <span className="text-[10px] text-sidebar-foreground/30 truncate">{timerTaskDesc}</span>
               )}
             </div>
           ) : (
@@ -247,22 +273,22 @@ export default function Navigation({ activeTab, onTabChange }) {
         <div className="p-2 lg:p-3 border-t border-sidebar-border space-y-1">
           {/* Utilities label — lg only */}
           <p className="hidden lg:block text-[10px] font-semibold text-sidebar-foreground/50 uppercase tracking-wider px-3 pt-1 pb-0.5 font-nav">Utilities</p>
-          {/* Sync status indicator */}
-          <div className="flex items-center justify-center lg:justify-start gap-2 px-2 lg:px-3 py-1.5 text-xs">
+          {/* Sync status — compact pill, not a nav item */}
+          <div className="flex items-center justify-center lg:justify-start gap-1.5 px-3 py-0.5">
             {syncStatus === 'loading' && (
-              <><Loader2 size={12} className="animate-spin text-brand-lavender flex-shrink-0" /><span className="hidden lg:block text-brand-lavender">Loading...</span></>
+              <><Loader2 size={10} className="animate-spin text-brand-lavender/60 flex-shrink-0" /><span className="hidden lg:block text-[11px] text-sidebar-foreground/40">Loading…</span></>
             )}
             {syncStatus === 'saving' && (
-              <><Loader2 size={12} className="animate-spin text-brand-amber flex-shrink-0" /><span className="hidden lg:block text-brand-amber">Saving...</span></>
+              <><Loader2 size={10} className="animate-spin text-brand-amber/60 flex-shrink-0" /><span className="hidden lg:block text-[11px] text-sidebar-foreground/40">Saving…</span></>
             )}
             {syncStatus === 'synced' && (
-              <><Cloud size={12} className="text-brand-sage flex-shrink-0" /><span className="hidden lg:block text-brand-sage">Synced</span></>
+              <><span className="w-1.5 h-1.5 rounded-full bg-brand-sage/70 flex-shrink-0" /><span className="hidden lg:block text-[11px] text-sidebar-foreground/40">Synced</span></>
             )}
             {syncStatus === 'offline' && (
-              <><CloudOff size={12} className="text-sidebar-foreground/40 flex-shrink-0" /><span className="hidden lg:block text-sidebar-foreground/40">Offline</span></>
+              <><span className="w-1.5 h-1.5 rounded-full bg-sidebar-foreground/30 flex-shrink-0" /><span className="hidden lg:block text-[11px] text-sidebar-foreground/40">Offline</span></>
             )}
             {syncStatus === 'error' && (
-              <><CloudOff size={12} className="text-destructive flex-shrink-0" /><span className="hidden lg:block text-destructive">Sync error</span></>
+              <><span className="w-1.5 h-1.5 rounded-full bg-destructive/70 flex-shrink-0" /><span className="hidden lg:block text-[11px] text-destructive/70">Sync error</span></>
             )}
           </div>
           <button
@@ -282,7 +308,7 @@ export default function Navigation({ activeTab, onTabChange }) {
             <span className="hidden lg:block">Import Data</span>
           </button>
           <input ref={fileRef} type="file" accept=".json" onChange={handleImport} className="hidden" />
-          <p className="text-[10px] text-sidebar-foreground/25 text-center lg:text-left lg:px-3 py-1">
+          <p className="text-[11px] text-sidebar-foreground/40 text-center lg:text-left lg:px-3 py-1">
             v{__APP_VERSION__}
           </p>
         </div>
@@ -300,7 +326,7 @@ export default function Navigation({ activeTab, onTabChange }) {
         <div className="flex items-center gap-2">
           {syncStatus === 'loading' && <Loader2 size={12} className="animate-spin text-brand-lavender" />}
           {syncStatus === 'saving' && <Loader2 size={12} className="animate-spin text-brand-amber" />}
-          {syncStatus === 'synced' && <Cloud size={12} className="text-brand-sage" />}
+          {syncStatus === 'synced' && <Cloud size={12} className="text-sky-400" />}
           {syncStatus === 'offline' && <CloudOff size={12} className="text-sidebar-foreground/40" />}
           {syncStatus === 'error' && <CloudOff size={12} className="text-destructive" />}
           <button
@@ -359,7 +385,7 @@ export default function Navigation({ activeTab, onTabChange }) {
                 </button>
               </div>
               <input ref={fileRef} type="file" accept=".json" onChange={handleImport} className="hidden" />
-              <p className="text-[10px] text-sidebar-foreground/25 text-center pt-1">
+              <p className="text-[11px] text-sidebar-foreground/40 text-center pt-1">
                 v{__APP_VERSION__}
               </p>
             </motion.div>

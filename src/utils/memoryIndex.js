@@ -5,7 +5,7 @@
  * MemoryEntry shape:
  * {
  *   id: string,
- *   entityType: string,   // 'task' | 'meeting' | 'weeklyLog' | 'aiOutput' | 'milestone' | 'activityLog' | 'annotation'
+ *   entityType: string,   // 'task' | 'meeting' | 'weeklyLog' | 'artifact' | 'task-note' | 'milestone' | 'activityLog' | 'annotation'
  *   label: string,        // human-readable type label
  *   icon: string,         // emoji
  *   date: string,         // ISO date string
@@ -19,6 +19,7 @@
  */
 
 import { WORK_TYPE_LABELS, WEEKLY_UPDATE_LOG_LABELS } from '../constants';
+import { stripHtml } from '../lib/utils';
 
 const WEEKLY_LOG_ICONS = {
   highlight:            '⭐',
@@ -65,8 +66,9 @@ export function buildMemoryIndex(store) {
 
   const entries = [];
 
-  // ── Tasks ──────────────────────────────────────────────────────────
+  // ── Tasks (done only) ──────────────────────────────────────────────
   for (const t of tasks) {
+    if (t.status !== 'done') continue;
     const date = safeDate(t.closedAt) || safeDate(t.createdAt);
     if (!date) continue;
     const customer = t.customerId ? customerMap.get(t.customerId) : null;
@@ -127,7 +129,7 @@ export function buildMemoryIndex(store) {
     });
   }
 
-  // ── AI Outputs ─────────────────────────────────────────────────────
+  // ── AI Artifacts (outputs) ─────────────────────────────────────────
   for (const o of aiOutputs) {
     const date = safeDate(o.createdAt);
     if (!date) continue;
@@ -136,15 +138,15 @@ export function buildMemoryIndex(store) {
     const customer = parentTask?.customerId ? customerMap.get(parentTask.customerId) : null;
     entries.push({
       id: o.id,
-      entityType: 'aiOutput',
-      label: 'AI Draft',
-      icon: '🤖',
+      entityType: 'artifact',
+      label: 'Artifact',
+      icon: '✨',
       date,
       customerId: parentTask?.customerId || null,
       customerName: customer?.name || null,
       customerColor: customer?.color || null,
-      text: (o.outputText || '').slice(0, 300),
-      subtext: o.outputType || o.type || null,
+      text: stripHtml(o.outputText || ''),
+      subtext: parentTask?.description || null,
       sourceRef: o,
     });
   }
@@ -193,6 +195,28 @@ export function buildMemoryIndex(store) {
     });
   }
 
+  // ── Task Notes (completed tasks with non-empty notes) ─────────────
+  for (const t of tasks) {
+    if (t.status !== 'done') continue;
+    if (!t.notes?.trim()) continue;
+    const date = safeDate(t.closedAt) || safeDate(t.createdAt);
+    if (!date) continue;
+    const customer = t.customerId ? customerMap.get(t.customerId) : null;
+    entries.push({
+      id: `${t.id}-note`,
+      entityType: 'task-note',
+      label: 'Task Note',
+      icon: '🗒️',
+      date,
+      customerId: t.customerId || null,
+      customerName: customer?.name || null,
+      customerColor: customer?.color || null,
+      text: stripHtml(t.notes),
+      subtext: t.description || null,
+      sourceRef: t,
+    });
+  }
+
   // ── Annotations ────────────────────────────────────────────────────
   for (const a of annotations) {
     const date = safeDate(a.createdAt) || dateFromDateStr(a.date);
@@ -227,6 +251,8 @@ export const ENTITY_TYPE_COLORS = {
   lowlight:    { bg: 'bg-red-500/15',     text: 'text-red-400',     border: 'border-red-500/20',     hex: '#ef4444' },
   learning:    { bg: 'bg-green-500/15',   text: 'text-green-400',   border: 'border-green-500/20',   hex: '#22c55e' },
   aiOutput:    { bg: 'bg-cyan-500/15',    text: 'text-cyan-400',    border: 'border-cyan-500/20',    hex: '#06b6d4' },
+  artifact:    { bg: 'bg-violet-500/15',  text: 'text-violet-400',  border: 'border-violet-500/20',  hex: '#8b5cf6' },
+  'task-note': { bg: 'bg-amber-500/15',   text: 'text-amber-400',   border: 'border-amber-500/20',   hex: '#f59e0b' },
   milestone:   { bg: 'bg-orange-500/15',  text: 'text-orange-400',  border: 'border-orange-500/20',  hex: '#f97316' },
   activityLog: { bg: 'bg-slate-500/15',   text: 'text-slate-400',   border: 'border-slate-500/20',   hex: '#64748b' },
   annotation:  { bg: 'bg-gray-500/15',    text: 'text-gray-400',    border: 'border-gray-500/20',    hex: '#9ca3af' },

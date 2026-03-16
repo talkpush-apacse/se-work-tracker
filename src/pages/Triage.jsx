@@ -4,7 +4,7 @@ import {
   ChevronDown, Plus, Mic, MicOff, Copy, Save, Check,
   Loader2, Sparkles, ChevronLeft, ChevronRight,
   Calendar, User, Tag, AlertCircle, Archive, ArchiveX, Trash2,
-  Settings, RotateCcw, Pencil, GripVertical, ExternalLink, ArrowLeft,
+  Settings, RotateCcw, Pencil, GripVertical, ExternalLink, Link2, ArrowLeft,
   Timer, Square, Pin, CheckSquare, Paperclip, Clock,
   Table2, X, RefreshCw,
 } from 'lucide-react';
@@ -84,6 +84,35 @@ Meeting context: ${task}
 Write in four sections — Context, Key Decisions, Action Items (with owners if known), and Next Steps.
 Be concise and scannable. Bullet points within sections are fine.`,
 };
+
+// ─── Custom checkbox — avoids native browser rendering inconsistency on dark theme ──
+// Hidden native input (accessible, keyboard-operable) + custom-styled visual span.
+function CustomCheckbox({ checked, onChange, ariaLabel }) {
+  return (
+    <label className="relative flex-shrink-0 cursor-pointer block w-4 h-4">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={onChange}
+        aria-label={ariaLabel}
+        className="sr-only peer"
+      />
+      <span className={`flex w-4 h-4 rounded border-2 transition-all items-center justify-center
+        peer-focus-visible:ring-2 peer-focus-visible:ring-green-400/60
+        ${checked
+          ? 'bg-green-500 border-green-500'
+          : 'bg-secondary border-border hover:border-green-400/50'
+        }`}
+      >
+        {checked && (
+          <svg width="9" height="7" viewBox="0 0 9 7" fill="none" aria-hidden="true">
+            <path d="M1 3.5L3.5 6L8 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        )}
+      </span>
+    </label>
+  );
+}
 
 // ─── Inline customer creation form ──────────────────────────────────────────
 // Used by QuickAddTaskForm to allow creating a new customer without leaving
@@ -623,30 +652,27 @@ const AIWorkspace = memo(function AIWorkspace({ task, customer }) {
 
   return (
     <div className="space-y-4">
-      {/* Task header */}
-      <div className="bg-card border border-border rounded-2xl p-4">
-        <div className="flex items-start gap-3 flex-wrap mb-2">
-          {customer && (
-            <span
-              className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0"
-              style={{ backgroundColor: (customer.color || '#6366f1') + '22', color: customer.color || '#6366f1' }}
-            >
-              {customer.name}
-            </span>
-          )}
-          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border flex items-center gap-1 ${typeColors.bg} ${typeColors.text} ${typeColors.border} flex-shrink-0`}>
-            {task.isEvergreen && <RefreshCw size={9} />}
-            {WORK_TYPE_LABELS[task.workType] || 'Comms'}
+      {/* Task context — compact chip row (description visible in left panel) */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {customer && (
+          <span
+            className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0"
+            style={{ backgroundColor: (customer.color || '#6366f1') + '22', color: customer.color || '#6366f1' }}
+          >
+            {customer.name}
           </span>
-          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${statusColors.bg} ${statusColors.text} ${statusColors.border} flex-shrink-0`}>
-            {TASK_STATUS_LABELS[task.status]}
-          </span>
-        </div>
-        <p className="text-sm font-semibold text-foreground leading-snug">{task.description}</p>
+        )}
+        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border flex items-center gap-1 ${typeColors.bg} ${typeColors.text} ${typeColors.border} flex-shrink-0`}>
+          {task.isEvergreen && <RefreshCw size={9} />}
+          {WORK_TYPE_LABELS[task.workType] || 'Comms'}
+        </span>
+        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${statusColors.bg} ${statusColors.text} ${statusColors.border} flex-shrink-0`}>
+          {TASK_STATUS_LABELS[task.status]}
+        </span>
         {recipientText && (
-          <p className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-            <User size={11} /> {recipientText}
-          </p>
+          <span className="flex items-center gap-1 text-[10px] text-muted-foreground flex-shrink-0">
+            <User size={9} /> {recipientText}
+          </span>
         )}
       </div>
 
@@ -660,7 +686,7 @@ const AIWorkspace = memo(function AIWorkspace({ task, customer }) {
               onClick={() => setOutputType(type)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
                 outputType === type
-                  ? 'bg-brand-lavender border-indigo-500 text-foreground'
+                  ? 'bg-brand-lavender border-brand-lavender text-white font-semibold shadow-sm'
                   : 'bg-secondary border-border text-muted-foreground hover:text-foreground hover:border-border'
               }`}
             >
@@ -670,23 +696,26 @@ const AIWorkspace = memo(function AIWorkspace({ task, customer }) {
         </div>
         {/* Recipient selector — visible for output types that use it */}
         {['message-draft', 'meeting-summary'].includes(outputType) && (
-          <div className="mt-2.5 flex items-center gap-2">
-            <User size={11} className="text-muted-foreground flex-shrink-0" />
-            <select
-              value={recipientOverride}
-              onChange={e => setRecipientOverride(e.target.value)}
-              className="flex-1 bg-secondary/60 border border-border/60 rounded-lg px-2.5 py-1.5 text-xs text-foreground/80 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
-            >
-              <option value="">— No recipient —</option>
-              {TASK_RECIPIENTS.map(r => (
-                <option key={r.value} value={r.value}>{r.label}</option>
-              ))}
-            </select>
-            {recipientText && (
-              <span className="text-[10px] text-brand-lavender/70 whitespace-nowrap">
-                tailored for <span className="font-semibold">{recipientText}</span>
-              </span>
-            )}
+          <div className="mt-2.5">
+            <p className="text-xs font-medium text-muted-foreground mb-2">Recipient</p>
+            <div className="flex items-center gap-2">
+              <User size={11} className="text-muted-foreground flex-shrink-0" />
+              <select
+                value={recipientOverride}
+                onChange={e => setRecipientOverride(e.target.value)}
+                className="flex-1 bg-secondary/60 border border-border/60 rounded-lg px-2.5 py-1.5 text-xs text-foreground/80 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+              >
+                <option value="">— No recipient —</option>
+                {TASK_RECIPIENTS.map(r => (
+                  <option key={r.value} value={r.value}>{r.label}</option>
+                ))}
+              </select>
+              {recipientText && (
+                <span className="text-[10px] text-brand-lavender/70 whitespace-nowrap">
+                  tailored for <span className="font-semibold">{recipientText}</span>
+                </span>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -886,10 +915,18 @@ const AIWorkspace = memo(function AIWorkspace({ task, customer }) {
         </div>
       )}
 
+      {/* Inline hint when context field is empty */}
+      {!userInput.trim() && !isGenerating && (
+        <p className="text-[11px] text-muted-foreground/60 text-center -mt-1">
+          Add context notes above to enable generation
+        </p>
+      )}
+
       {/* Generate button */}
       <button
         onClick={handleGenerate}
         disabled={isGenerating || !userInput.trim()}
+        title={!userInput.trim() && !isGenerating ? 'Add context notes to generate' : undefined}
         className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-brand-lavender hover:bg-brand-lavender/80 disabled:opacity-40 disabled:cursor-not-allowed text-foreground font-bold text-sm transition-all shadow-lg shadow-indigo-600/30"
       >
         {isGenerating
@@ -1304,11 +1341,10 @@ function QuickAddTaskForm({ customers, onSubmit, onCancel }) {
 
       {/* Evergreen toggle */}
       <label className="flex items-center gap-2 cursor-pointer">
-        <input
-          type="checkbox"
+        <CustomCheckbox
           checked={form.isEvergreen}
           onChange={e => setForm(p => ({ ...p, isEvergreen: e.target.checked }))}
-          className="w-3.5 h-3.5 rounded border-border bg-secondary text-green-500 focus:ring-ring/40 focus:ring-1 accent-green-500"
+          ariaLabel="Evergreen (resets weekly)"
         />
         <span className="text-xs text-muted-foreground flex items-center gap-1">
           <RefreshCw size={10} className="text-green-400" /> Evergreen (resets weekly)
@@ -1552,17 +1588,31 @@ function TaskDetailView({ task, customer, onBack }) {
 
   return (
     <div>
-      {/* Header bar */}
-      <div className="flex items-center gap-3 mb-6">
+      {/* Breadcrumb header */}
+      <div className="flex items-center gap-1.5 mb-6 text-xs flex-wrap">
         <button
           onClick={onBack}
-          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          className="text-muted-foreground hover:text-foreground transition-colors"
         >
-          <ArrowLeft size={16} /> Back to Queue
+          Triage
         </button>
+        <span className="text-muted-foreground/30">›</span>
+        <button
+          onClick={onBack}
+          className="text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Task Queue
+        </button>
+        <span className="text-muted-foreground/30">›</span>
+        <span
+          className="text-foreground/80 font-medium truncate max-w-[40ch]"
+          title={task.description}
+        >
+          {task.description.length > 40 ? `${task.description.slice(0, 40)}…` : task.description}
+        </span>
         {customer && (
           <span
-            className="text-xs font-semibold px-2 py-0.5 rounded-full"
+            className="ml-1 text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
             style={{ backgroundColor: (customer.color || '#6366f1') + '22', color: customer.color || '#6366f1' }}
           >
             {customer.name}
@@ -1590,7 +1640,7 @@ function TaskDetailView({ task, customer, onBack }) {
           </div>
 
           {/* Status + Type */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-1 block">Status</label>
               <select
@@ -1619,11 +1669,10 @@ function TaskDetailView({ task, customer, onBack }) {
 
           {/* Evergreen toggle */}
           <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
+            <CustomCheckbox
               checked={!!task.isEvergreen}
               onChange={e => updateTask(task.id, { isEvergreen: e.target.checked || undefined })}
-              className="w-3.5 h-3.5 rounded border-border bg-secondary text-green-500 focus:ring-ring/40 focus:ring-1 accent-green-500"
+              ariaLabel="Evergreen (resets weekly)"
             />
             <span className="text-xs text-muted-foreground flex items-center gap-1">
               <RefreshCw size={10} className="text-green-400" /> Evergreen (resets weekly)
@@ -1633,7 +1682,7 @@ function TaskDetailView({ task, customer, onBack }) {
           {/* Ticket URL */}
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1">
-              <ExternalLink size={11} /> Ticket / Link
+              <Link2 size={11} /> Ticket / Link
             </label>
             <div className="flex gap-2">
               <input
