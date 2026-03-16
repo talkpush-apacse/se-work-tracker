@@ -60,12 +60,18 @@ function SortableDesktopNavItem({ tab, activeTab, onTabChange }) {
   };
 
   return (
-    <div ref={setNodeRef} style={style} className="flex items-center group">
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center group border-l-[3px] transition-colors rounded-l-sm ${
+        activeTab === id ? 'border-l-brand-lavender' : 'border-l-transparent'
+      }`}
+    >
       {/* Drag handle — only visible on lg (expanded sidebar) */}
       <button
         {...attributes}
         {...listeners}
-        className="hidden lg:flex items-center justify-center w-5 h-5 flex-shrink-0 cursor-grab active:cursor-grabbing text-sidebar-foreground/20 hover:text-sidebar-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity"
+        className="hidden lg:flex items-center justify-center w-5 h-5 flex-shrink-0 cursor-grab active:cursor-grabbing text-sidebar-foreground/40 hover:text-sidebar-foreground/70 opacity-40 group-hover:opacity-100 transition-opacity"
         tabIndex={-1}
         aria-label={`Reorder ${label}`}
       >
@@ -76,7 +82,7 @@ function SortableDesktopNavItem({ tab, activeTab, onTabChange }) {
         title={label}
         className={`flex-1 flex items-center justify-center lg:justify-start gap-3 px-2 lg:px-3 py-2.5 rounded-xl text-sm font-medium font-nav transition-all ${
           activeTab === id
-            ? 'bg-sidebar-accent text-sidebar-foreground shadow-sm'
+            ? 'bg-sidebar-accent text-white shadow-sm'
             : 'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/60'
         }`}
       >
@@ -219,7 +225,10 @@ export default function Navigation({ activeTab, onTabChange }) {
         <div className="hidden lg:block px-3 py-3 border-t border-sidebar-border bg-sidebar-accent/20">
           <p className="text-[10px] font-semibold text-sidebar-foreground/50 uppercase tracking-wider mb-2 font-nav">Today</p>
           <p className="text-sm font-medium text-sidebar-foreground mb-0.5">{format(now, 'EEEE, MMM d')}</p>
-          <p className="text-xs text-sidebar-foreground/50">
+          <p
+            className="text-xs text-sidebar-foreground/50"
+            title="Points represent logged work units. 1 pt ≈ 60 minutes of tracked time."
+          >
             <span className="text-sidebar-foreground font-bold">{todayPoints}</span> pts logged
           </p>
           {isRunning ? (
@@ -237,7 +246,7 @@ export default function Navigation({ activeTab, onTabChange }) {
 
         <div className="p-2 lg:p-3 border-t border-sidebar-border space-y-1">
           {/* Utilities label — lg only */}
-          <p className="hidden lg:block text-[10px] font-semibold text-sidebar-foreground/30 uppercase tracking-wider px-3 pt-1 pb-0.5 font-nav">Utilities</p>
+          <p className="hidden lg:block text-[10px] font-semibold text-sidebar-foreground/50 uppercase tracking-wider px-3 pt-1 pb-0.5 font-nav">Utilities</p>
           {/* Sync status indicator */}
           <div className="flex items-center justify-center lg:justify-start gap-2 px-2 lg:px-3 py-1.5 text-xs">
             {syncStatus === 'loading' && (

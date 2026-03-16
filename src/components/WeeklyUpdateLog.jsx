@@ -202,7 +202,7 @@ export default function WeeklyUpdateLog({ weekStart, weekEnd } = {}) {
           <button
             type="submit"
             disabled={!logForm.text.trim()}
-            className="flex-1 px-4 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-medium disabled:opacity-40 hover:bg-primary/90 transition-all"
+            className="flex-1 px-4 py-1.5 rounded-xl bg-brand-lavender text-[hsl(var(--sidebar-background))] text-xs font-semibold disabled:opacity-40 hover:opacity-90 transition-all"
           >
             {logEditId ? 'Save Changes' : 'Add Log'}
           </button>

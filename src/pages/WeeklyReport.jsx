@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
   ChevronLeft, ChevronRight, Copy, Check, Save, Trash2,
-  Loader2, ChevronDown, ChevronUp, Mail, RefreshCw, RotateCcw, AlertTriangle,
+  Loader2, ChevronDown, ChevronUp, Mail, RefreshCw, RotateCcw, AlertTriangle, LogIn,
 } from 'lucide-react';
 import { format, addWeeks, parseISO } from 'date-fns';
 import { useAppStore } from '../context/StoreContext';
@@ -1425,16 +1425,16 @@ function IntegrationButton({ label, connected, onNavigate: navigate, onError }) 
   return connected ? (
     <button
       onClick={handleClick}
-      className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-brand-sage/10 text-brand-sage border border-brand-sage/20 hover:bg-brand-sage/20 transition-colors"
+      className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-brand-sage/10 text-brand-sage-darker border border-brand-sage/20 hover:bg-brand-sage/20 transition-colors"
     >
       <Check size={11} /> {label} connected
     </button>
   ) : (
     <button
       onClick={handleClick}
-      className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border border-amber-400/50 text-amber-500 hover:bg-amber-400/10 transition-colors"
+      className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border border-brand-lavender/40 text-brand-lavender hover:bg-brand-lavender/10 transition-colors"
     >
-      <AlertTriangle size={11} /> Connect {label}
+      <LogIn size={11} /> Connect {label}
     </button>
   );
 }

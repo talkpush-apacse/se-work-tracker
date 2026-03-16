@@ -1,6 +1,19 @@
 {
   "versions": [
     {
+      "version": "2.10.1",
+      "codename": "Velocity Power",
+      "date": "2026-03-16",
+      "summary": "P1 accessibility fixes — button contrast, integration button colors, FAB label, drag handle visibility",
+      "changes": [
+        { "type": "fix", "description": "Add Log button now uses brand-lavender with high-contrast dark text (WCAG AA)" },
+        { "type": "fix", "description": "Connect integration buttons replaced amber/warning color with brand-lavender" },
+        { "type": "fix", "description": "Gmail connected pill now uses brand-sage-darker for WCAG AA contrast compliance" },
+        { "type": "fix", "description": "FAB Start button now has aria-label for screen reader accessibility" },
+        { "type": "fix", "description": "Sidebar drag handle now dimly visible (opacity-40) by default, not hidden" }
+      ]
+    },
+    {
       "version": "2.10.0",
       "codename": "Velocity Power",
       "date": "2026-03-16",
