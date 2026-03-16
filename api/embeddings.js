@@ -133,7 +133,7 @@ async function handleSearch(req, res) {
       LIMIT $2
     `;
 
-    const chunks = await sql(queryStr, params);
+    const chunks = await sql.query(queryStr, params);
 
     return res.status(200).json({ chunks });
   } catch (err) {
