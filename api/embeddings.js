@@ -17,6 +17,10 @@ export default async function handler(req, res) {
   return res.status(400).json({ error: 'Invalid op. Use ?op=upsert or ?op=search' });
 }
 
+// How many chunks to upsert per SQL round-trip.
+// Keeps individual queries fast and well under Neon's HTTP payload limits.
+const UPSERT_BATCH_SIZE = 25;
+
 async function handleUpsert(req, res) {
   const { chunks } = req.body;
   if (!Array.isArray(chunks) || chunks.length === 0) {
@@ -43,29 +47,45 @@ async function handleUpsert(req, res) {
 
   const { data } = await embedRes.json();
 
-  // Upsert each chunk into memory_chunks
-  for (let i = 0; i < chunks.length; i++) {
-    const c = chunks[i];
-    const vectorStr = `[${data[i].embedding.join(',')}]`;
+  // Upsert in batches instead of one query per chunk.
+  // Previously: N sequential SQL round-trips (slow, risks Vercel timeout at scale).
+  // Now: ceil(N / UPSERT_BATCH_SIZE) round-trips using a bulk VALUES insert.
+  try {
+    for (let batchStart = 0; batchStart < chunks.length; batchStart += UPSERT_BATCH_SIZE) {
+      const batch = chunks.slice(batchStart, batchStart + UPSERT_BATCH_SIZE);
 
-    await sql`
-      INSERT INTO memory_chunks (id, entity_type, entity_id, customer_id, date, text, embedding, metadata)
-      VALUES (
-        ${c.id},
-        ${c.entity_type},
-        ${c.entity_id},
-        ${c.customer_id ?? null},
-        ${c.date ?? null},
-        ${c.text},
-        ${vectorStr}::vector,
-        ${JSON.stringify(c.metadata ?? {})}
-      )
-      ON CONFLICT (id) DO UPDATE SET
-        text = EXCLUDED.text,
-        embedding = EXCLUDED.embedding,
-        metadata = EXCLUDED.metadata,
-        created_at = now()
-    `;
+      // Build parameterized VALUES list: ($1,$2,...,$8), ($9,$10,...,$16), ...
+      const params = [];
+      const valueClauses = batch.map((c, i) => {
+        const base = i * 8;
+        params.push(
+          c.id,
+          c.entity_type,
+          c.entity_id,
+          c.customer_id ?? null,
+          c.date ?? null,
+          c.text,
+          `[${data[batchStart + i].embedding.join(',')}]`,
+          JSON.stringify(c.metadata ?? {}),
+        );
+        return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}::vector, $${base + 8}::jsonb)`;
+      });
+
+      const queryStr = `
+        INSERT INTO memory_chunks (id, entity_type, entity_id, customer_id, date, text, embedding, metadata)
+        VALUES ${valueClauses.join(', ')}
+        ON CONFLICT (id) DO UPDATE SET
+          text       = EXCLUDED.text,
+          embedding  = EXCLUDED.embedding,
+          metadata   = EXCLUDED.metadata,
+          created_at = now()
+      `;
+
+      await sql.query(queryStr, params);
+    }
+  } catch (err) {
+    console.error('[embeddings/upsert] SQL error:', err);
+    return res.status(500).json({ error: 'Failed to persist chunks to vector store' });
   }
 
   return res.status(200).json({ upserted: chunks.length });

@@ -1,6 +1,19 @@
 {
   "versions": [
     {
+      "version": "2.18.1",
+      "codename": "Deep Work Fluid",
+      "date": "2026-03-17",
+      "summary": "Security + stability fixes from code review — API key hardening, React anti-pattern fix, and SQL batch upsert",
+      "changes": [
+        { "type": "fix", "description": "Moved Anthropic API key server-side — no longer exposed in browser bundle" },
+        { "type": "fix", "description": "Fixed nested setState anti-pattern in deleteCustomer cascade delete" },
+        { "type": "fix", "description": "Replaced N+1 SQL writes with batched upsert in embeddings route" },
+        { "type": "fix", "description": "Added try/catch around embeddings upsert SQL loop" },
+        { "type": "fix", "description": "Added DATABASE_URL guard to _db.js for clearer misconfiguration errors" }
+      ]
+    },
+    {
       "version": "2.18.0",
       "codename": "Deep Work Fluid",
       "date": "2026-03-16",

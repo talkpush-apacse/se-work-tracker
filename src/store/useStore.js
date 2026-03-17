@@ -525,19 +525,22 @@ export function useStore() {
   }, []);
   // Cascade delete: points, meeting entries, tasks (+ their AI outputs), milestones, annotations, weekly reports + logs
   const deleteCustomer = useCallback((id) => {
+    // Snapshot task IDs that belong to this customer BEFORE mutating tasks state.
+    // setAiOutputs must NOT be called inside the setTasks updater — that is a
+    // nested-setState anti-pattern that fires twice in React Strict Mode / concurrent
+    // mode, causing the second call to run against stale state.
+    const taskIdsToDelete = new Set(tasks.filter(t => t.customerId === id).map(t => t.id));
+
     setCustomers(prev => prev.filter(c => c.id !== id));
     setPoints(prev => prev.filter(pt => pt.customerId !== id));
     setMeetingEntries(prev => prev.filter(m => m.customerId !== id));
-    setTasks(prev => {
-      const toDelete = new Set(prev.filter(t => t.customerId === id).map(t => t.id));
-      setAiOutputs(ao => ao.filter(o => !toDelete.has(o.taskId)));
-      return prev.filter(t => t.customerId !== id);
-    });
+    setTasks(prev => prev.filter(t => t.customerId !== id));
+    setAiOutputs(prev => prev.filter(o => !taskIdsToDelete.has(o.taskId)));
     setMilestones(prev => prev.filter(m => m.customerId !== id));
     setAnnotations(prev => prev.filter(a => a.customerId !== id));
     setWeeklyReports(prev => prev.filter(r => r.customerId !== id));
     setWeeklyUpdateLogs(prev => prev.filter(l => l.customerId !== id));
-  }, []);
+  }, [tasks]);
   const reorderCustomers = useCallback((orderedIds) => {
     setCustomers(prev => orderedIds.map(id => prev.find(c => c.id === id)).filter(Boolean));
   }, []);

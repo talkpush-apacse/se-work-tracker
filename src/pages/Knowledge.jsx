@@ -655,7 +655,6 @@ export default function Knowledge({ onNavigate }) {
     setRagError(null);
 
     const apiSecret = import.meta.env.VITE_API_SECRET;
-    const anthropicApiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
 
     // Build filters from current UI selections
     const filters = {};
@@ -669,7 +668,8 @@ export default function Knowledge({ onNavigate }) {
       filters.entity_types = [...new Set(entityTypes)];
     }
 
-    const result = await ragSearch(query, filters, apiSecret, anthropicApiKey);
+    // Pass the user's preferred Claude model — synthesis now happens server-side
+    const result = await ragSearch(query, filters, apiSecret, aiSettings?.claudeModel);
 
     setRagSearching(false);
 

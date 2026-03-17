@@ -1,17 +1,18 @@
 /**
  * memorySearch.js
  * AI-powered semantic search over the memory index.
+ * @deprecated — use ragSearch.js (pgvector RAG) instead. Retained as fallback.
+ * Uses callClaude() — API key stays server-side via /api/claude proxy.
  */
+
+import { callClaude } from '../lib/api';
 
 /**
  * @param {string} query
  * @param {MemoryEntry[]} entries  Full (already-filtered) memory index
- * @param {string} anthropicApiKey
  * @returns {Promise<{ rankedEntries: MemoryEntry[], reasons: Record<string, string> }>}
  */
-export async function aiMemorySearch(query, entries, anthropicApiKey) {
-  if (!anthropicApiKey) throw new Error('VITE_ANTHROPIC_API_KEY is not set.');
-
+export async function aiMemorySearch(query, entries) {
   // Build a compact index
   const index = entries.map(e => ({
     id: e.id,
@@ -28,7 +29,7 @@ export async function aiMemorySearch(query, entries, anthropicApiKey) {
 
   if (fullJson.length <= 80000) {
     // Single request
-    allResults = await runBatch(query, index, anthropicApiKey);
+    allResults = await runBatch(query, index);
   } else {
     // Chunk into batches of ~60k chars each
     const batches = [];
@@ -47,9 +48,7 @@ export async function aiMemorySearch(query, entries, anthropicApiKey) {
     }
     if (current.length > 0) batches.push(current);
 
-    const batchResults = await Promise.all(
-      batches.map(batch => runBatch(query, batch, anthropicApiKey))
-    );
+    const batchResults = await Promise.all(batches.map(batch => runBatch(query, batch)));
 
     // Merge and deduplicate — keep highest score per id
     const scoreMap = new Map();
@@ -76,9 +75,9 @@ export async function aiMemorySearch(query, entries, anthropicApiKey) {
   }
 
   // Re-order entries: scored first (in score order), then unscored in original order
-  const scoreById = new Map(allResults.map(r => [r.id, r.score]));
-  const scored = allResults
-    .map(r => entries.find(e => e.id === r.id))
+  const allResultIds = allResults.map(r => r.id);
+  const scored = allResultIds
+    .map(id => entries.find(e => e.id === id))
     .filter(Boolean);
   const unscored = entries.filter(e => !scoredIds.has(e.id));
 
@@ -88,33 +87,15 @@ export async function aiMemorySearch(query, entries, anthropicApiKey) {
   };
 }
 
-async function runBatch(query, indexBatch, apiKey) {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 2000,
-      system: 'You are a semantic search engine for a personal work log. Return ONLY a valid JSON array. No markdown, no explanation, no preamble.',
-      messages: [{
-        role: 'user',
-        content: `Query: "${query}"\n\nEntries:\n${JSON.stringify(indexBatch)}\n\nReturn: [{id, score, reason}] where score is 0.0–1.0. Omit entries scoring below 0.25. Sort descending by score.`,
-      }],
-    }),
+async function runBatch(query, indexBatch) {
+  const text = await callClaude({
+    max_tokens: 2000,
+    system: 'You are a semantic search engine for a personal work log. Return ONLY a valid JSON array. No markdown, no explanation, no preamble.',
+    messages: [{
+      role: 'user',
+      content: `Query: "${query}"\n\nEntries:\n${JSON.stringify(indexBatch)}\n\nReturn: [{id, score, reason}] where score is 0.0–1.0. Omit entries scoring below 0.25. Sort descending by score.`,
+    }],
   });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error?.message || `Claude API error ${res.status}`);
-  }
-
-  const data = await res.json();
-  const text = data.content?.[0]?.text || '[]';
 
   try {
     const parsed = JSON.parse(text);

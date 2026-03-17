@@ -4,6 +4,11 @@
  */
 import { neon } from '@neondatabase/serverless';
 
+// Guard: fail fast with a clear message rather than a cryptic neon error at query time
+if (!process.env.DATABASE_URL) {
+  throw new Error('[_db] DATABASE_URL is not set. Add it to your Vercel environment variables.');
+}
+
 export const sql = neon(process.env.DATABASE_URL);
 
 /**

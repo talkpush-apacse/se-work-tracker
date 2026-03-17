@@ -794,11 +794,9 @@ function MeetingsTab({ meetings, customers, customer, onSave, onDelete, onConver
   );
 
   const handleInlineSummarize = async (meeting) => {
-    const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
-    if (!apiKey) return;
     setSummarizingId(meeting.id);
     try {
-      const result = await generateMeetingSummary(meeting, apiKey);
+      const result = await generateMeetingSummary(meeting);
       if (result) onSave({ ...meeting, ...result });
     } catch { /* ignore */ }
     finally { setSummarizingId(null); }

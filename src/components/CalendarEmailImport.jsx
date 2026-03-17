@@ -11,6 +11,7 @@ import {
 import { format, parseISO, startOfWeek, endOfWeek } from 'date-fns';
 import { useGoogleAuth } from '../context/GoogleAuthContext';
 import { fetchCalendarEvents, fetchGmailMessages } from '../lib/googleApi';
+import { callClaude } from '../lib/api';
 import { WEEKLY_UPDATE_LOG_TYPES, WEEKLY_UPDATE_LOG_LABELS, WEEKLY_UPDATE_LOG_COLORS } from '../constants';
 
 // Log types available for tagging (exclude 'neutral' — not useful for promoted items)
@@ -194,30 +195,12 @@ export default function CalendarEmailImport({ customers, addWeeklyUpdateLog, aiS
       const provider = aiSettings?.providers?.knowledge || aiSettings?.providers?.weeklyEmail || 'claude';
 
       if (provider === 'claude') {
-        const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
-        if (!apiKey) throw new Error('VITE_ANTHROPIC_API_KEY is not set');
-
-        const res = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type':            'application/json',
-            'x-api-key':               apiKey,
-            'anthropic-version':       '2023-06-01',
-            'anthropic-dangerous-direct-browser-access': 'true',
-          },
-          body: JSON.stringify({
-            model:      aiSettings?.claudeModel || 'claude-sonnet-4-6',
-            max_tokens: 2000,
-            system:     SUMMARY_SYSTEM_PROMPT,
-            messages:   [{ role: 'user', content: userContent }],
-          }),
+        output = await callClaude({
+          model:      aiSettings?.claudeModel,
+          system:     SUMMARY_SYSTEM_PROMPT,
+          messages:   [{ role: 'user', content: userContent }],
+          max_tokens: 2000,
         });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error?.message || `Claude API error ${res.status}`);
-        }
-        const data = await res.json();
-        output = data.content?.[0]?.text || '';
       } else {
         const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
         if (!apiKey) throw new Error('VITE_OPENAI_API_KEY is not set');

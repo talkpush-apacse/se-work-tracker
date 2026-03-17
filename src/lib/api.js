@@ -110,6 +110,29 @@ export async function uploadFile(file, onProgress) {
 }
 
 /**
+ * Call the server-side Claude proxy.
+ * Replaces all direct `fetch('https://api.anthropic.com/v1/messages')` calls
+ * so ANTHROPIC_API_KEY is never bundled into the browser build.
+ *
+ * @param {{ model?: string, system?: string, messages: object[], max_tokens?: number }} params
+ * @returns {Promise<string>} The text from Claude's first response block
+ * @throws {Error} On API or network failure — caller is responsible for try/catch
+ */
+export async function callClaude({ model, system, messages, max_tokens }) {
+  const res = await fetch('/api/claude', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ model, system, messages, max_tokens }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Claude API error (${res.status})`);
+  }
+  const data = await res.json();
+  return data.text ?? '';
+}
+
+/**
  * Delete a file from Vercel Blob.
  * @param {string} blobUrl - The full Blob URL to delete
  * @returns {boolean} true on success

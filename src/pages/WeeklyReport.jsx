@@ -15,6 +15,7 @@ import {
 import { Button } from '../components/ui/button';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { fetchCalendarEvents, fetchWeeklyEmailsWithBodies } from '../lib/googleApi';
+import { callClaude } from '../lib/api';
 import WeeklyUpdateLog from '../components/WeeklyUpdateLog';
 
 // ─── Module-level constants ──────────────────────────────────────────────────
@@ -496,8 +497,7 @@ export default function WeeklyReport({ onNavigate }) {
 
   // "Summarize Selected" handler — manual trigger, not auto
   const handleSummarizeEmails = useCallback(async () => {
-    const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
-    if (!apiKey || !gmailEmails) return;
+    if (!gmailEmails) return;
 
     const included = gmailEmails.filter(e => emailSelections[e.id]);
     if (included.length === 0) return;
@@ -513,24 +513,13 @@ export default function WeeklyReport({ onNavigate }) {
     }).join('\n\n');
 
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type':            'application/json',
-          'x-api-key':               apiKey,
-          'anthropic-version':       '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
-        body: JSON.stringify({
-          model:      aiSettings.claudeModel || 'claude-sonnet-4-6',
-          max_tokens: 800,
-          system:     WEEKLY_EMAIL_SUMMARY_PROMPT,
-          messages:   [{ role: 'user', content: `Here are ${included.length} emails from this week:\n\n${emailData}` }],
-        }),
+      const summary = await callClaude({
+        model:      aiSettings.claudeModel,
+        system:     WEEKLY_EMAIL_SUMMARY_PROMPT,
+        messages:   [{ role: 'user', content: `Here are ${included.length} emails from this week:\n\n${emailData}` }],
+        max_tokens: 800,
       });
-      if (!res.ok) throw new Error(`Claude API ${res.status}`);
-      const data = await res.json();
-      setEmailSummary(data.content?.[0]?.text || '');
+      setEmailSummary(summary);
     } catch (err) {
       setEmailSummaryError(err.message);
     } finally {
@@ -555,30 +544,12 @@ export default function WeeklyReport({ onNavigate }) {
       let output = '';
 
       if (provider === 'claude') {
-        const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
-        if (!apiKey) throw new Error('VITE_ANTHROPIC_API_KEY is not set');
-
-        const res = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type':            'application/json',
-            'x-api-key':               apiKey,
-            'anthropic-version':       '2023-06-01',
-            'anthropic-dangerous-direct-browser-access': 'true',
-          },
-          body: JSON.stringify({
-            model:      aiSettings.claudeModel || 'claude-sonnet-4-6',
-            max_tokens: 1500,
-            system:     systemPrompt,
-            messages:   [{ role: 'user', content: context }],
-          }),
+        output = await callClaude({
+          model:      aiSettings.claudeModel,
+          system:     systemPrompt,
+          messages:   [{ role: 'user', content: context }],
+          max_tokens: 1500,
         });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error?.message || `Claude API error ${res.status}`);
-        }
-        const data = await res.json();
-        output = data.content?.[0]?.text || '';
       } else {
         const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
         if (!apiKey) throw new Error('VITE_OPENAI_API_KEY is not set');

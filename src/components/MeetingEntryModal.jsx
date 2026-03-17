@@ -213,11 +213,7 @@ export default function MeetingEntryModal({
     setAiGenerating(true);
     setAiError(null);
     try {
-      const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
-      const result = await generateMeetingSummary(
-        { ...form, id: entry?.id },
-        apiKey
-      );
+      const result = await generateMeetingSummary({ ...form, id: entry?.id });
       if (result) {
         // Preserve convertedToTaskId on existing action items when re-generating
         if (aiData?.actionItems?.length) {

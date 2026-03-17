@@ -3,6 +3,7 @@ import { Mic, MicOff, Loader2, Check, Sparkles } from 'lucide-react';
 import Modal from './Modal';
 import { useAppStore } from '../context/StoreContext';
 import { Button } from './ui/button';
+import { callClaude } from '../lib/api';
 
 // System prompt for standalone AI Assist (email refiner — plain text output)
 const STANDALONE_SYSTEM_PROMPT = `You are an email refiner for a Solutions Engineer at a hiring tech SaaS company. Emails go to enterprise BPO/retail clients — busy managers, directors, VPs who skim.
@@ -161,32 +162,12 @@ export default function AIAssistModal({ onClose }) {
 
     try {
       if (currentProvider === 'claude') {
-        const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
-        if (!apiKey) throw new Error('VITE_ANTHROPIC_API_KEY is not set.');
-
-        const res = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01',
-            'anthropic-dangerous-direct-browser-access': 'true',
-          },
-          body: JSON.stringify({
-            model: aiSettings.claudeModel || 'claude-sonnet-4-6',
-            max_tokens: 1024,
-            system: STANDALONE_SYSTEM_PROMPT,
-            messages: [{ role: 'user', content: userInput.trim() }],
-          }),
+        const text = await callClaude({
+          model:      aiSettings.claudeModel,
+          system:     STANDALONE_SYSTEM_PROMPT,
+          messages:   [{ role: 'user', content: userInput.trim() }],
+          max_tokens: 1024,
         });
-
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData?.error?.message || `Anthropic error ${res.status}`);
-        }
-
-        const data = await res.json();
-        const text = data.content?.[0]?.text || '';
         setGeneratedText(text);
         setEditedText(text);
         // Auto-fill task description from first line (up to 120 chars)

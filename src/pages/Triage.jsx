@@ -14,6 +14,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { parseISO } from 'date-fns';
 import { useAppStore } from '../context/StoreContext';
 import { useTimerContext, useTimerDisplay } from '../context/TimerContext';
+import { callClaude } from '../lib/api';
 import { getWeekRangeForOffset, formatWeekLabel, isInRange } from '../utils/dateHelpers';
 import ConfirmDialog from '../components/ConfirmDialog';
 import FileAttachments from '../components/FileAttachments';
@@ -561,35 +562,13 @@ const AIWorkspace = memo(function AIWorkspace({ task, customer }) {
 
     try {
       if (currentProvider === 'claude') {
-        // ── Anthropic Claude ─────────────────────────────────────────────
-        const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
-        if (!apiKey) {
-          throw new Error('VITE_ANTHROPIC_API_KEY is not set. Add it to your .env file and restart the dev server.');
-        }
-
-        const res = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01',
-            'anthropic-dangerous-direct-browser-access': 'true',
-          },
-          body: JSON.stringify({
-            model: aiSettings.claudeModel || 'claude-sonnet-4-6',
-            max_tokens: 1024,
-            system: systemPrompt,
-            messages: [{ role: 'user', content: userInput.trim() }],
-          }),
+        // ── Anthropic Claude (via server-side proxy) ──────────────────────
+        const text = await callClaude({
+          model:      aiSettings.claudeModel,
+          system:     systemPrompt,
+          messages:   [{ role: 'user', content: userInput.trim() }],
+          max_tokens: 1024,
         });
-
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData?.error?.message || `Anthropic error ${res.status}`);
-        }
-
-        const data = await res.json();
-        const text = data.content?.[0]?.text || '';
         setCurrentOutput({ outputType, inputText: userInput.trim(), outputText: text, provider: 'claude' });
         setEditedText(text);
       } else {

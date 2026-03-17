@@ -10,6 +10,7 @@ import {
 import Modal from './Modal';
 import { Button } from './ui/button';
 import { useAppStore } from '../context/StoreContext';
+import { callClaude } from '../lib/api';
 
 // ── System prompt (as specified) ─────────────────────────────────────────────
 const VOICE_COMMS_PROMPT = `You are a professional communications assistant for a Solutions Engineer at a B2B SaaS company called Talkpush.
@@ -161,32 +162,12 @@ export default function VoiceCommsModal({ onClose }) {
       : VOICE_COMMS_PROMPT;
 
     try {
-      const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
-      if (!apiKey) throw new Error('VITE_ANTHROPIC_API_KEY is not configured.');
-
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
-        body: JSON.stringify({
-          model: aiSettings?.claudeModel || 'claude-sonnet-4-6',
-          max_tokens: 800,
-          system: systemPrompt,
-          messages: [{ role: 'user', content: text }],
-        }),
-      });
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData?.error?.message || `API error ${res.status}`);
-      }
-
-      const data = await res.json();
-      const draftText = data.content?.[0]?.text?.trim() || '';
+      const draftText = (await callClaude({
+        model:      aiSettings?.claudeModel,
+        system:     systemPrompt,
+        messages:   [{ role: 'user', content: text }],
+        max_tokens: 800,
+      })).trim();
       if (!draftText) throw new Error('No draft received from Claude.');
 
       editor?.commands.setContent(textToHtml(draftText));
