@@ -785,7 +785,7 @@ export default function WeeklyReport({ onNavigate }) {
 
       {/* ── Navigation error banner ── */}
       {navError && (
-        <div className="flex items-center gap-2 text-sm text-amber-600 bg-amber-400/10 border border-amber-400/30 rounded-xl px-4 py-2.5">
+        <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5">
           <AlertTriangle size={14} /> {navError}
         </div>
       )}
@@ -835,7 +835,7 @@ export default function WeeklyReport({ onNavigate }) {
                 <div className="flex items-center gap-2 mb-2">
                   <span
                     className="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0"
-                    style={{ backgroundColor: weekTasksList.length > 0 ? '#4ade80' : '#6b7280' }}
+                    style={{ backgroundColor: weekTasksList.length > 0 ? '#2BAF54' : '#9C8E7E' }}
                   />
                   <p className="text-xs font-semibold text-foreground">Tasks Done</p>
                   <span className="text-xs text-muted-foreground ml-auto">{weekTasksList.length}</span>
@@ -866,12 +866,12 @@ export default function WeeklyReport({ onNavigate }) {
                     className="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0"
                     style={{
                       backgroundColor: !gmailToken
-                        ? '#6b7280'
+                        ? '#9C8E7E'
                         : (isFetchingData || gmailEmails === null)
-                          ? '#6b7280'
+                          ? '#9C8E7E'
                           : gmailEmails.length > 0
-                            ? '#4ade80'
-                            : '#f59e0b',
+                            ? '#2BAF54'
+                            : '#C47F0A',
                     }}
                   />
                   <p className="text-xs font-semibold text-foreground">Emails Sent</p>
@@ -909,12 +909,12 @@ export default function WeeklyReport({ onNavigate }) {
                     className="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0"
                     style={{
                       backgroundColor: !googleToken
-                        ? '#6b7280'
+                        ? '#9C8E7E'
                         : (isFetchingData || calendarEvents === null)
-                          ? '#6b7280'
+                          ? '#9C8E7E'
                           : calendarEvents.length > 0
-                            ? '#4ade80'
-                            : '#f59e0b',
+                            ? '#2BAF54'
+                            : '#C47F0A',
                     }}
                   />
                   <p className="text-xs font-semibold text-foreground">Meetings</p>
@@ -961,13 +961,13 @@ export default function WeeklyReport({ onNavigate }) {
             {!allReviewEmpty && (
               <div className="flex items-center gap-4 mt-2 px-0.5">
                 <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground/70">
-                  <span className="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0 bg-[#4ade80]" /> Has data
+                  <span className="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0 bg-[#2BAF54]" /> Has data
                 </span>
                 <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground/70">
-                  <span className="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0 bg-[#f59e0b]" /> Connected, empty
+                  <span className="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0 bg-[#C47F0A]" /> Connected, empty
                 </span>
                 <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground/70">
-                  <span className="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0 bg-[#6b7280]" /> Not connected
+                  <span className="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0 bg-[#9C8E7E]" /> Not connected
                 </span>
               </div>
             )}
@@ -1073,15 +1073,15 @@ export default function WeeklyReport({ onNavigate }) {
                     {/* Direction badge */}
                     <span className={`flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded ${
                       e.direction === 'sent'
-                        ? 'bg-blue-500/15 text-blue-400'
-                        : 'bg-emerald-500/15 text-emerald-400'
+                        ? 'bg-blue-50 text-blue-700'
+                        : 'bg-emerald-50 text-emerald-700'
                     }`}>
                       {e.direction === 'sent' ? 'Sent' : 'Recv'}
                     </span>
 
                     {/* Noise badge */}
                     {e.isNoise && (
-                      <span className="flex-shrink-0 text-[9px] font-semibold px-1 py-0.5 rounded bg-amber-500/15 text-amber-400">
+                      <span className="flex-shrink-0 text-[9px] font-semibold px-1 py-0.5 rounded bg-amber-50 text-amber-700">
                         Auto
                       </span>
                     )}
@@ -1216,8 +1216,8 @@ export default function WeeklyReport({ onNavigate }) {
                   <span
                     className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md flex-shrink-0 mt-0.5"
                     style={{
-                      backgroundColor: (MILESTONE_STATUS_COLORS[m.status] || '#6b7280') + '20',
-                      color: MILESTONE_STATUS_COLORS[m.status] || '#6b7280',
+                      backgroundColor: (MILESTONE_STATUS_COLORS[m.status] || '#9C8E7E') + '20',
+                      color: MILESTONE_STATUS_COLORS[m.status] || '#9C8E7E',
                     }}
                   >
                     {MILESTONE_STATUS_LABELS[m.status] || m.status}
@@ -1424,7 +1424,7 @@ export default function WeeklyReport({ onNavigate }) {
 function StatChip({ label, value, valueColor = 'text-foreground', target }) {
   return (
     <div className="rounded-xl border border-border bg-card px-4 py-3 text-center">
-      <p className={`text-lg font-bold ${valueColor}`}>{value}</p>
+      <p className={`text-lg font-mono font-bold ${valueColor}`}>{value}</p>
       <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
       {target && <p className="text-[10px] text-muted-foreground/50 mt-0.5">{target}</p>}
     </div>
@@ -1439,8 +1439,8 @@ function ExpandableTile({ label, value, isExpanded, onToggle, valueColor = 'text
         isExpanded ? 'border-brand-lavender/40' : 'border-border'
       }`}
     >
-      <button onClick={onToggle} className="w-full px-4 py-3 text-center hover:bg-secondary/30 active:scale-[0.97] transition-all rounded-xl">
-        <p className={`text-lg font-bold ${valueColor}`}>{value}</p>
+      <button onClick={onToggle} className="w-full px-4 py-3 text-center hover:bg-card-hover active:scale-[0.97] transition-all rounded-xl">
+        <p className={`text-lg font-mono font-bold ${valueColor}`}>{value}</p>
         <p className="text-xs text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
           {label}
           {isExpanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />}

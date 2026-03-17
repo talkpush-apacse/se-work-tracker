@@ -242,12 +242,12 @@ export default function VoiceCommsModal({ onClose }) {
         {step === 'recording' && (
           <div className="flex flex-col items-center gap-5 py-4">
             <div className="relative flex items-center justify-center w-24 h-24 rounded-full">
-              <div className="absolute inset-0 rounded-full bg-red-500/15 animate-ping" />
-              <div className="absolute inset-2 rounded-full bg-red-500/10 border border-red-500/20" />
-              <Mic size={36} className="text-red-400 relative z-10" />
+              <div className="absolute inset-0 rounded-full bg-red-50 animate-ping" />
+              <div className="absolute inset-2 rounded-full bg-red-50 border border-red-200" />
+              <Mic size={36} className="text-red-700 relative z-10" />
             </div>
             <div className="text-center space-y-1">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-red-400">Recording</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-red-700">Recording</p>
               <p className="text-3xl font-mono tabular-nums text-foreground">{formatDuration(duration)}</p>
             </div>
             <Button onClick={stopRecording} variant="destructive" className="gap-2 min-w-[140px]">
@@ -301,7 +301,7 @@ export default function VoiceCommsModal({ onClose }) {
         {/* ── Drafting ── */}
         {step === 'drafting' && (
           <div className="flex flex-col items-center gap-3 py-12">
-            <Loader2 size={28} className="animate-spin text-teal-500" />
+            <Loader2 size={28} className="animate-spin text-brand-lavender" />
             <p className="text-sm text-muted-foreground">Drafting your message…</p>
           </div>
         )}
@@ -315,7 +315,7 @@ export default function VoiceCommsModal({ onClose }) {
                 <label className="text-xs font-medium text-muted-foreground">
                   Draft
                   {selectedCustomer && (
-                    <span className="ml-2 text-teal-500 font-normal">· {selectedCustomer.name}</span>
+                    <span className="ml-2 text-brand-lavender font-normal">· {selectedCustomer.name}</span>
                   )}
                   <span className="ml-1.5 text-muted-foreground/50">(editable)</span>
                 </label>
@@ -375,7 +375,7 @@ export default function VoiceCommsModal({ onClose }) {
 
             {/* Actions */}
             {saved ? (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
+              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">
                 <Check size={13} />
                 Saved to Knowledge!
               </div>
@@ -392,7 +392,7 @@ export default function VoiceCommsModal({ onClose }) {
                 <Button
                   size="sm"
                   onClick={handleSave}
-                  className="flex-1 gap-1.5 bg-teal-600 hover:bg-teal-500 text-white"
+                  className="flex-1 gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground"
                 >
                   <Save size={13} />
                   Save to Knowledge

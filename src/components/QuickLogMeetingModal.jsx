@@ -216,7 +216,7 @@ ${rawNotes}`;
     return (
       <Modal title="Log Meeting" onClose={onClose} size="lg">
         <div className="flex items-center justify-center py-12">
-          <div className="flex items-center gap-2 text-emerald-400 text-sm font-medium">
+          <div className="flex items-center gap-2 text-emerald-700 text-sm font-medium">
             <CheckSquare size={16} />
             {toast}
           </div>
@@ -235,11 +235,11 @@ ${rawNotes}`;
             onChange={e => { setTitle(e.target.value); setTitleError(''); }}
             placeholder="Meeting title *"
             className={`w-full bg-secondary border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40 ${
-              titleError ? 'border-red-500' : 'border-border'
+              titleError ? 'border-red-200' : 'border-border'
             }`}
           />
           {titleError && (
-            <p className="text-red-400 text-[11px] mt-1">{titleError}</p>
+            <p className="text-red-700 text-[11px] mt-1">{titleError}</p>
           )}
         </div>
 
@@ -336,7 +336,7 @@ ${rawNotes}`;
         <button
           onClick={handleSummarize}
           disabled={!rawNotes.trim() || isGenerating}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-brand-lavender/20 text-brand-lavender border border-indigo-500/30 hover:bg-brand-lavender/30"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-brand-lavender/20 text-brand-lavender border border-brand-lavender/20 hover:bg-brand-lavender/30"
         >
           {isGenerating ? (
             <Loader2 size={13} className="animate-spin" />
@@ -347,7 +347,7 @@ ${rawNotes}`;
         </button>
 
         {aiError && (
-          <p className="text-red-400 text-xs">{aiError}</p>
+          <p className="text-red-700 text-xs">{aiError}</p>
         )}
 
         {/* AI Results */}
@@ -386,7 +386,7 @@ ${rawNotes}`;
                 <ul className="space-y-1 pl-1">
                   {aiDecisions.map((d, i) => (
                     <li key={i} className="flex items-start gap-1.5 text-xs text-foreground/80">
-                      <span className="flex-shrink-0 mt-0.5 text-emerald-400">•</span>
+                      <span className="flex-shrink-0 mt-0.5 text-emerald-700">•</span>
                       {d}
                     </li>
                   ))}

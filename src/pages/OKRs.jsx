@@ -197,7 +197,7 @@ function OkrForm({ initial = {}, onSubmit, onCancel }) {
       </div>
 
       <div className="flex gap-3 pt-1">
-        <button type="button" onClick={onCancel} className="flex-1 py-2.5 rounded-xl bg-muted hover:bg-gray-600 text-sm font-medium transition-colors">Cancel</button>
+        <button type="button" onClick={onCancel} className="flex-1 py-2.5 rounded-xl bg-muted hover:bg-card-hover text-sm font-medium transition-colors">Cancel</button>
         <button type="submit" className="flex-1 py-2.5 rounded-xl bg-brand-lavender hover:bg-brand-lavender/80 text-sm font-bold text-foreground transition-colors">{initial.id ? 'Save Changes' : 'Create OKR'}</button>
       </div>
     </form>
@@ -253,13 +253,13 @@ function KrProgress({ keyResults }) {
 
   return (
     <div className="flex items-center gap-2 mt-2">
-      <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
+      <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
         <div
-          className={`h-full rounded-full transition-all ${avg >= 100 ? 'bg-emerald-500' : avg >= 50 ? 'bg-indigo-500' : 'bg-gray-600'}`}
+          className={`h-full rounded-full transition-all ${avg >= 100 ? 'bg-emerald-500' : avg >= 50 ? 'bg-primary' : 'bg-muted-foreground/40'}`}
           style={{ width: `${avg}%` }}
         />
       </div>
-      <span className="text-[10px] font-semibold text-muted-foreground">{avg}%</span>
+      <span className="text-[10px] font-mono font-semibold text-muted-foreground">{avg}%</span>
     </div>
   );
 }
@@ -281,13 +281,13 @@ function PointsProgress({ totalPoints, targetPoints, onSetTarget }) {
 
   return (
     <div className="flex items-center gap-2 mt-1.5">
-      <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
+      <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
         <div
-          className={`h-full rounded-full transition-all ${pct >= 100 ? 'bg-emerald-500' : pct >= 50 ? 'bg-teal-500' : 'bg-gray-600'}`}
+          className={`h-full rounded-full transition-all ${pct >= 100 ? 'bg-emerald-500' : pct >= 50 ? 'bg-primary' : 'bg-muted-foreground/40'}`}
           style={{ width: `${pct}%` }}
         />
       </div>
-      <span className="text-[10px] font-semibold text-muted-foreground">{Number(totalPoints).toFixed(1)}/{Number(targetPoints).toFixed(1)} pts ({pct}%)</span>
+      <span className="text-[10px] font-mono font-semibold text-muted-foreground">{Number(totalPoints).toFixed(1)}/{Number(targetPoints).toFixed(1)} pts ({pct}%)</span>
     </div>
   );
 }
@@ -414,13 +414,13 @@ export default function OKRs() {
 
                             <div className="flex items-center gap-4 mt-2 flex-wrap">
                               <span className="text-xs text-muted-foreground">{linkedTasks.length} task{linkedTasks.length !== 1 ? 's' : ''}</span>
-                              <span className="text-xs font-semibold text-brand-lavender">{Number(totalPoints).toFixed(1)} pts</span>
-                              <span className="text-xs text-muted-foreground">{totalHours.toFixed(1)}h</span>
+                              <span className="text-xs font-mono font-semibold text-brand-lavender">{Number(totalPoints).toFixed(1)} pts</span>
+                              <span className="text-xs font-mono text-muted-foreground">{totalHours.toFixed(1)}h</span>
                               {timeLogHours > 0 && (
-                                <span className="text-xs font-semibold text-teal-400">{timeLogHours}h invested</span>
+                                <span className="text-xs font-semibold text-teal-700">{timeLogHours}h invested</span>
                               )}
                               {taskPts > 0 && (
-                                <span className="text-xs font-semibold text-teal-400">⚡{Number(taskPts).toFixed(1)} task pts</span>
+                                <span className="text-xs font-semibold text-teal-700">⚡{Number(taskPts).toFixed(1)} task pts</span>
                               )}
                               {keyResults.length > 0 && (
                                 <span className="text-xs text-muted-foreground">{keyResults.length} KR{keyResults.length !== 1 ? 's' : ''}</span>
@@ -491,9 +491,9 @@ export default function OKRs() {
                                       <span
                                         className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold flex-shrink-0"
                                         style={{
-                                          backgroundColor: (cust.color || '#10b981') + '22',
-                                          color: cust.color || '#10b981',
-                                          border: `1px solid ${cust.color || '#10b981'}40`,
+                                          backgroundColor: (cust.color || '#2BAF54') + '22',
+                                          color: cust.color || '#2BAF54',
+                                          border: `1px solid ${cust.color || '#2BAF54'}40`,
                                         }}
                                       >
                                         {cust.name}

@@ -71,7 +71,7 @@ function SortableDesktopNavItem({ tab, activeTab, onTabChange, shortcutKey }) {
       <button
         {...attributes}
         {...listeners}
-        className="hidden lg:flex items-center justify-center w-5 h-5 flex-shrink-0 cursor-grab active:cursor-grabbing text-sidebar-foreground/40 hover:text-sidebar-foreground/70 opacity-40 group-hover:opacity-100 transition-opacity"
+        className="hidden lg:flex items-center justify-center w-5 h-5 flex-shrink-0 cursor-grab active:cursor-grabbing text-sidebar-muted/60 hover:text-sidebar-foreground/70 opacity-40 group-hover:opacity-100 transition-opacity"
         tabIndex={-1}
         aria-label={`Reorder ${label}`}
       >
@@ -82,8 +82,8 @@ function SortableDesktopNavItem({ tab, activeTab, onTabChange, shortcutKey }) {
         title={tab.tooltip ? `${tab.tooltip}  ⌘${shortcutKey}` : label}
         className={`flex-1 flex items-center justify-center lg:justify-start gap-3 px-2 lg:px-3 py-1.5 rounded-xl text-sm font-nav transition-all ${
           activeTab === id
-            ? 'bg-sidebar-accent text-white shadow-sm font-semibold'
-            : 'font-medium text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/60'
+            ? 'bg-sidebar-accent text-foreground shadow-sm font-semibold'
+            : 'font-medium text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-accent/60'
         }`}
       >
         <Icon
@@ -112,7 +112,7 @@ function SortableMobileNavItem({ tab, activeTab, onTabChange, onClose }) {
       <button
         {...attributes}
         {...listeners}
-        className="flex items-center justify-center w-6 h-6 flex-shrink-0 cursor-grab active:cursor-grabbing text-sidebar-foreground/25 hover:text-sidebar-foreground/50"
+        className="flex items-center justify-center w-6 h-6 flex-shrink-0 cursor-grab active:cursor-grabbing text-sidebar-muted/50 hover:text-sidebar-foreground/50"
         tabIndex={-1}
         aria-label={`Reorder ${label}`}
       >
@@ -122,8 +122,8 @@ function SortableMobileNavItem({ tab, activeTab, onTabChange, onClose }) {
         onClick={() => { onTabChange(id); onClose(); }}
         className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium font-nav transition-all ${
           activeTab === id
-            ? 'bg-sidebar-accent text-sidebar-foreground'
-            : 'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/60'
+            ? 'bg-sidebar-accent text-foreground'
+            : 'text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-accent/60'
         }`}
       >
         <Icon size={16} className={activeTab === id ? 'text-brand-lavender' : ''} />
@@ -211,12 +211,12 @@ export default function Navigation({ activeTab, onTabChange }) {
           title="Go to Dashboard"
         >
           <div className="flex items-center gap-2 justify-center lg:justify-start">
-            <div className="w-8 h-8 flex-shrink-0 rounded-lg bg-brand-lavender flex items-center justify-center text-foreground font-bold text-sm font-nav">
+            <div className="w-8 h-8 flex-shrink-0 rounded-lg bg-brand-lavender flex items-center justify-center text-white font-bold text-sm font-nav">
               SE
             </div>
             <div className="hidden lg:block">
               <p className="text-sm font-bold text-sidebar-foreground leading-tight font-nav">Work Tracker</p>
-              <p className="text-[10px] text-sidebar-foreground/50 leading-tight">Solutions Engineer</p>
+              <p className="text-[10px] text-sidebar-muted leading-tight">Solutions Engineer</p>
             </div>
           </div>
         </button>
@@ -230,7 +230,7 @@ export default function Navigation({ activeTab, onTabChange }) {
                 return (
                   <Fragment key={tab.id}>
                     {showGroupLabel && (
-                      <p className="hidden lg:block text-[10px] font-semibold text-sidebar-foreground/40 uppercase tracking-wider px-3 pt-3 pb-0.5 font-nav select-none">
+                      <p className="hidden lg:block text-[10px] font-semibold text-sidebar-muted/80 uppercase tracking-wider px-3 pt-3 pb-0.5 font-nav select-none">
                         {tab.group}
                       </p>
                     )}
@@ -249,10 +249,10 @@ export default function Navigation({ activeTab, onTabChange }) {
 
         {/* Today at a glance — only visible on expanded sidebar (lg) */}
         <div className="hidden lg:block px-3 py-3 border-t border-b border-sidebar-border bg-sidebar-accent/20">
-          <p className="text-[10px] font-semibold text-sidebar-foreground/50 uppercase tracking-wider mb-2 font-nav">Today</p>
+          <p className="text-[10px] font-semibold text-sidebar-muted uppercase tracking-wider mb-2 font-nav">Today</p>
           <p className="text-sm font-medium text-sidebar-foreground mb-0.5">{format(now, 'EEEE, MMM d')}</p>
           <p
-            className="text-xs text-sidebar-foreground/50 mb-0"
+            className="text-xs text-sidebar-muted mb-0"
             title="Points represent logged work units. 1 pt ≈ 60 minutes of tracked time."
           >
             <span className="text-sidebar-foreground font-bold">{todayPoints}</span> pts logged
@@ -260,32 +260,32 @@ export default function Navigation({ activeTab, onTabChange }) {
           {isRunning ? (
             <div className="mt-2 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-brand-sage animate-pulse flex-shrink-0" />
-              <span className="text-[10px] text-emerald-300 font-mono tabular-nums font-semibold">{fmtTimer(elapsedSeconds)}</span>
+              <span className="text-[10px] text-status-success font-mono tabular-nums font-semibold">{fmtTimer(elapsedSeconds)}</span>
               {timerTaskDesc && (
-                <span className="text-[10px] text-sidebar-foreground/30 truncate">{timerTaskDesc}</span>
+                <span className="text-[10px] text-sidebar-muted/70 truncate">{timerTaskDesc}</span>
               )}
             </div>
           ) : (
-            <p className="mt-2 text-[10px] text-sidebar-foreground/30">No timer running</p>
+            <p className="mt-2 text-[10px] text-sidebar-muted/70">No timer running</p>
           )}
         </div>
 
         <div className="p-2 lg:p-3 border-t border-sidebar-border space-y-1">
           {/* Utilities label — lg only */}
-          <p className="hidden lg:block text-[10px] font-semibold text-sidebar-foreground/50 uppercase tracking-wider px-3 pt-1 pb-0.5 font-nav">Utilities</p>
+          <p className="hidden lg:block text-[10px] font-semibold text-sidebar-muted uppercase tracking-wider px-3 pt-1 pb-0.5 font-nav">Utilities</p>
           {/* Sync status — compact pill, not a nav item */}
           <div className="flex items-center justify-center lg:justify-start gap-1.5 px-3 py-0.5">
             {syncStatus === 'loading' && (
-              <><Loader2 size={10} className="animate-spin text-brand-lavender/60 flex-shrink-0" /><span className="hidden lg:block text-[11px] text-sidebar-foreground/40">Loading…</span></>
+              <><Loader2 size={10} className="animate-spin text-brand-lavender/60 flex-shrink-0" /><span className="hidden lg:block text-[11px] text-sidebar-muted/80">Loading…</span></>
             )}
             {syncStatus === 'saving' && (
-              <><Loader2 size={10} className="animate-spin text-brand-amber/60 flex-shrink-0" /><span className="hidden lg:block text-[11px] text-sidebar-foreground/40">Saving…</span></>
+              <><Loader2 size={10} className="animate-spin text-brand-amber/60 flex-shrink-0" /><span className="hidden lg:block text-[11px] text-sidebar-muted/80">Saving…</span></>
             )}
             {syncStatus === 'synced' && (
-              <><span className="w-1.5 h-1.5 rounded-full bg-brand-sage/70 flex-shrink-0" /><span className="hidden lg:block text-[11px] text-sidebar-foreground/40">Synced</span></>
+              <><span className="w-1.5 h-1.5 rounded-full bg-brand-sage/70 flex-shrink-0" /><span className="hidden lg:block text-[11px] text-sidebar-muted/80">Synced</span></>
             )}
             {syncStatus === 'offline' && (
-              <><span className="w-1.5 h-1.5 rounded-full bg-sidebar-foreground/30 flex-shrink-0" /><span className="hidden lg:block text-[11px] text-sidebar-foreground/40">Offline</span></>
+              <><span className="w-1.5 h-1.5 rounded-full bg-sidebar-muted/50 flex-shrink-0" /><span className="hidden lg:block text-[11px] text-sidebar-muted/80">Offline</span></>
             )}
             {syncStatus === 'error' && (
               <><span className="w-1.5 h-1.5 rounded-full bg-destructive/70 flex-shrink-0" /><span className="hidden lg:block text-[11px] text-destructive/70">Sync error</span></>
@@ -294,7 +294,7 @@ export default function Navigation({ activeTab, onTabChange }) {
           <button
             onClick={exportData}
             title="Export Data"
-            className="w-full flex items-center justify-center lg:justify-start gap-3 px-2 lg:px-3 py-2 rounded-xl text-xs font-medium font-nav text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 transition-all"
+            className="w-full flex items-center justify-center lg:justify-start gap-3 px-2 lg:px-3 py-2 rounded-xl text-xs font-medium font-nav text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-accent/60 transition-all"
           >
             <Download size={14} className="flex-shrink-0" />
             <span className="hidden lg:block">Export Data</span>
@@ -302,13 +302,13 @@ export default function Navigation({ activeTab, onTabChange }) {
           <button
             onClick={() => fileRef.current?.click()}
             title="Import Data"
-            className="w-full flex items-center justify-center lg:justify-start gap-3 px-2 lg:px-3 py-2 rounded-xl text-xs font-medium font-nav text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 transition-all"
+            className="w-full flex items-center justify-center lg:justify-start gap-3 px-2 lg:px-3 py-2 rounded-xl text-xs font-medium font-nav text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-accent/60 transition-all"
           >
             <Upload size={14} className="flex-shrink-0" />
             <span className="hidden lg:block">Import Data</span>
           </button>
           <input ref={fileRef} type="file" accept=".json" onChange={handleImport} className="hidden" />
-          <p className="text-[11px] text-sidebar-foreground/40 text-center lg:text-left lg:px-3 py-1">
+          <p className="text-[11px] text-sidebar-muted/80 text-center lg:text-left lg:px-3 py-1">
             v{__APP_VERSION__}
           </p>
         </div>
@@ -320,18 +320,18 @@ export default function Navigation({ activeTab, onTabChange }) {
           onClick={() => { onTabChange('dashboard'); setMenuOpen(false); }}
           className="flex items-center gap-2"
         >
-          <div className="w-7 h-7 rounded-lg bg-brand-lavender flex items-center justify-center text-foreground font-bold text-xs font-nav">SE</div>
+          <div className="w-7 h-7 rounded-lg bg-brand-lavender flex items-center justify-center text-white font-bold text-xs font-nav">SE</div>
           <span className="text-sm font-bold text-sidebar-foreground font-nav">Work Tracker</span>
         </button>
         <div className="flex items-center gap-2">
           {syncStatus === 'loading' && <Loader2 size={12} className="animate-spin text-brand-lavender" />}
           {syncStatus === 'saving' && <Loader2 size={12} className="animate-spin text-brand-amber" />}
-          {syncStatus === 'synced' && <Cloud size={12} className="text-sky-400" />}
-          {syncStatus === 'offline' && <CloudOff size={12} className="text-sidebar-foreground/40" />}
+          {syncStatus === 'synced' && <Cloud size={12} className="text-status-success" />}
+          {syncStatus === 'offline' && <CloudOff size={12} className="text-sidebar-muted/80" />}
           {syncStatus === 'error' && <CloudOff size={12} className="text-destructive" />}
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className="text-sidebar-foreground/60 hover:text-sidebar-foreground p-1 transition-colors"
+            className="text-sidebar-muted hover:text-sidebar-foreground p-1 transition-colors"
           >
             {menuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
@@ -342,7 +342,7 @@ export default function Navigation({ activeTab, onTabChange }) {
       <AnimatePresence>
         {menuOpen && (
           <motion.div
-            className="md:hidden fixed inset-0 z-30 bg-black/60"
+            className="md:hidden fixed inset-0 z-30 bg-black/30"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -373,19 +373,19 @@ export default function Navigation({ activeTab, onTabChange }) {
               <div className="flex gap-2 pt-2 border-t border-sidebar-border">
                 <button
                   onClick={() => { exportData(); setMenuOpen(false); }}
-                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-nav text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 transition-all"
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-nav text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-accent/60 transition-all"
                 >
                   <Download size={13} /> Export
                 </button>
                 <button
                   onClick={() => { fileRef.current?.click(); setMenuOpen(false); }}
-                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-nav text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 transition-all"
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-nav text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-accent/60 transition-all"
                 >
                   <Upload size={13} /> Import
                 </button>
               </div>
               <input ref={fileRef} type="file" accept=".json" onChange={handleImport} className="hidden" />
-              <p className="text-[11px] text-sidebar-foreground/40 text-center pt-1">
+              <p className="text-[11px] text-sidebar-muted/80 text-center pt-1">
                 v{__APP_VERSION__}
               </p>
             </motion.div>

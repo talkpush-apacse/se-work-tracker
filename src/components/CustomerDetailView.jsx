@@ -38,10 +38,10 @@ function todayLocalStr() {
 
 // ── Milestone status icon ─────────────────────────────────────────────────────
 function MilestoneStatusIcon({ status, size = 13 }) {
-  if (status === 'completed')   return <CheckCircle2 size={size} className="text-emerald-400" />;
-  if (status === 'cancelled')   return <Ban          size={size} className="text-gray-500"    />;
-  if (status === 'in-progress') return <Circle       size={size} className="text-indigo-400"  />;
-  return                               <Circle       size={size} className="text-amber-400"   />; // pending
+  if (status === 'completed')   return <CheckCircle2 size={size} className="text-status-success" />;
+  if (status === 'cancelled')   return <Ban          size={size} className="text-muted-foreground"    />;
+  if (status === 'in-progress') return <Circle       size={size} className="text-indigo-700"  />;
+  return                               <Circle       size={size} className="text-amber-700"   />; // pending
 }
 
 // ── Milestone form ────────────────────────────────────────────────────────────
@@ -84,7 +84,7 @@ function MilestoneForm({ initial = {}, onSubmit, onCancel }) {
           type="date"
           value={form.targetDate}
           onChange={e => setForm(p => ({ ...p, targetDate: e.target.value }))}
-          className="[color-scheme:dark]"
+          className="[color-scheme:light]"
         />
       </div>
 
@@ -265,7 +265,7 @@ function TasksTab({ tasks, addTask, customerId, okrs }) {
                 {/* Main row */}
                 <div className="px-4 py-3 flex items-start gap-3">
                   {/* Work type badge */}
-                  <span className={`flex-shrink-0 mt-0.5 border rounded-full px-2 py-0.5 text-[10px] font-bold leading-tight ${typeColor.bg || 'bg-gray-500/15'} ${typeColor.text || 'text-gray-400'} ${typeColor.border || 'border-gray-500/20'}`}>
+                  <span className={`flex-shrink-0 mt-0.5 border rounded-full px-2 py-0.5 text-[10px] font-bold leading-tight ${typeColor.bg || 'bg-muted'} ${typeColor.text || 'text-muted-foreground'} ${typeColor.border || 'border-border'}`}>
                     {WORK_TYPE_LABELS[task.workType] || task.workType || 'Comms'}
                   </span>
 
@@ -281,7 +281,7 @@ function TasksTab({ tasks, addTask, customerId, okrs }) {
                   </div>
 
                   {/* Status badge */}
-                  <span className={`flex-shrink-0 border rounded-full px-2 py-0.5 text-[10px] font-bold leading-tight ${statusColor.bg || 'bg-gray-500/15'} ${statusColor.text || 'text-gray-400'} ${statusColor.border || 'border-gray-500/20'}`}>
+                  <span className={`flex-shrink-0 border rounded-full px-2 py-0.5 text-[10px] font-bold leading-tight ${statusColor.bg || 'bg-muted'} ${statusColor.text || 'text-muted-foreground'} ${statusColor.border || 'border-border'}`}>
                     {TASK_STATUS_LABELS[task.status] || task.status}
                   </span>
 
@@ -455,7 +455,7 @@ function TimelineTab({ tasks, milestones, annotations, customer, onAdd, onEdit, 
           </div>
           <button
             onClick={handleAddOpen}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-amber/20 hover:bg-brand-amber/30 text-brand-amber border border-amber-500/30 text-xs font-semibold transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-amber/20 hover:bg-brand-amber/30 text-brand-amber border border-amber-200 text-xs font-semibold transition-all"
           >
             <Flag size={12} />
             Add Milestone
@@ -533,7 +533,7 @@ function TimelineTab({ tasks, milestones, annotations, customer, onAdd, onEdit, 
                       return (
                         <span
                           key={`t-${t.id}-${idx}`}
-                          className={`truncate text-[9px] font-medium px-1 py-0.5 rounded leading-tight ${colors.bg || 'bg-gray-500/15'} ${colors.text || 'text-gray-400'}`}
+                          className={`truncate text-[9px] font-medium px-1 py-0.5 rounded leading-tight ${colors.bg || 'bg-muted'} ${colors.text || 'text-muted-foreground'}`}
                           title={t.description}
                         >
                           ✓ {t.description}
@@ -572,7 +572,7 @@ function TimelineTab({ tasks, milestones, annotations, customer, onAdd, onEdit, 
         {/* Legend */}
         <div className="flex flex-wrap items-center gap-4 mt-3">
           <div className="flex items-center gap-1.5">
-            <span className="w-3 h-2 rounded-sm bg-amber-400/25 border border-amber-500/40" />
+            <span className="w-3 h-2 rounded-sm bg-amber-100 border border-amber-200" />
             <span className="text-[10px] text-muted-foreground">Milestone</span>
           </div>
           <div className="flex items-center gap-1.5">
@@ -839,7 +839,7 @@ function MeetingsTab({ meetings, customers, customer, onSave, onDelete, onConver
               <div key={m.id} className="bg-card border border-border rounded-xl overflow-hidden">
                 {/* Main row */}
                 <div className="px-4 py-3 flex items-start gap-3">
-                  <MessageSquare size={14} className="text-blue-400 flex-shrink-0 mt-0.5" />
+                  <MessageSquare size={14} className="text-blue-700 flex-shrink-0 mt-0.5" />
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-0.5">
@@ -863,17 +863,17 @@ function MeetingsTab({ meetings, customers, customer, onSave, onDelete, onConver
                     {hasAI && (
                       <div className="flex flex-wrap gap-1.5 mt-1.5">
                         {m.decisions?.length > 0 && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                             ✅ {m.decisions.length} decision{m.decisions.length !== 1 ? 's' : ''}
                           </span>
                         )}
                         {m.openQuestions?.length > 0 && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20">
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
                             ❓ {m.openQuestions.length} question{m.openQuestions.length !== 1 ? 's' : ''}
                           </span>
                         )}
                         {m.actionItems?.length > 0 && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/20">
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
                             📋 {m.actionItems.length} action item{m.actionItems.length !== 1 ? 's' : ''}
                           </span>
                         )}
@@ -936,7 +936,7 @@ function MeetingsTab({ meetings, customers, customer, onSave, onDelete, onConver
                         <ul className="space-y-1 pl-1">
                           {m.decisions.map((d, i) => (
                             <li key={i} className="flex items-start gap-1.5 text-foreground/80">
-                              <span className="text-emerald-400 flex-shrink-0">•</span>{d}
+                              <span className="text-status-success flex-shrink-0">•</span>{d}
                             </li>
                           ))}
                         </ul>
@@ -948,7 +948,7 @@ function MeetingsTab({ meetings, customers, customer, onSave, onDelete, onConver
                         <ul className="space-y-1 pl-1">
                           {m.openQuestions.map((q, i) => (
                             <li key={i} className="flex items-start gap-1.5 text-foreground/80">
-                              <span className="text-amber-400 flex-shrink-0">•</span>{q}
+                              <span className="text-amber-700 flex-shrink-0">•</span>{q}
                             </li>
                           ))}
                         </ul>
@@ -960,7 +960,7 @@ function MeetingsTab({ meetings, customers, customer, onSave, onDelete, onConver
                         <ul className="space-y-1 pl-1">
                           {m.actionItems.map(item => (
                             <li key={item.id} className="flex items-start gap-2 text-foreground/80">
-                              <span className={`flex-shrink-0 ${item.convertedToTaskId ? 'text-green-400' : 'text-muted-foreground/60'}`}>
+                              <span className={`flex-shrink-0 ${item.convertedToTaskId ? 'text-emerald-700' : 'text-muted-foreground/60'}`}>
                                 {item.convertedToTaskId ? '✓' : '•'}
                               </span>
                               <span className="flex-1 min-w-0">{item.text}</span>

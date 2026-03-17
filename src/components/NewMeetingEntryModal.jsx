@@ -43,7 +43,7 @@ export default function NewMeetingEntryModal({ customer, onClose }) {
             type="date"
             value={form.meetingDate}
             onChange={(e) => setForm(p => ({ ...p, meetingDate: e.target.value }))}
-            className="[color-scheme:dark]"
+            className="[color-scheme:light]"
           />
           {errors.meetingDate && <p className="mt-1 text-xs text-destructive">{errors.meetingDate}</p>}
         </div>
