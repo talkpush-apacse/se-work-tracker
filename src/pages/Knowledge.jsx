@@ -412,7 +412,11 @@ function MemoryCard({ entry, highlightRegex, similarityPct, onClick, isSelected,
               </span>
             )}
             {entry.subtext && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground border border-border">
+              <span className={`text-[10px] px-1.5 py-0.5 rounded border ${
+                entry.entityType === 'meeting'
+                  ? 'font-bold bg-blue-500/10 text-blue-400 border-blue-500/20'
+                  : 'bg-secondary text-muted-foreground border-border'
+              }`}>
                 {entry.subtext}
               </span>
             )}
@@ -430,10 +434,32 @@ function MemoryCard({ entry, highlightRegex, similarityPct, onClick, isSelected,
             )}
           </div>
 
-          {/* Text — 2-line clamp */}
-          <p className="text-xs text-foreground/90 leading-relaxed line-clamp-2">
-            {highlightRegex ? highlightText(entry.text, highlightRegex) : entry.text}
-          </p>
+          {/* Meeting-specific: show summary + badges instead of raw text */}
+          {entry.entityType === 'meeting' && entry.sourceRef?.aiSummary ? (
+            <>
+              <p className="text-xs text-foreground/90 leading-relaxed line-clamp-2">
+                {highlightRegex ? highlightText(entry.sourceRef.aiSummary, highlightRegex) : entry.sourceRef.aiSummary}
+              </p>
+              {/* Meeting pill badges */}
+              <div className="flex items-center gap-1.5 mt-1">
+                {(entry.sourceRef.actionItems || []).filter(a => typeof a === 'object' ? !a.triaged : true).length > 0 && (
+                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20">
+                    {(entry.sourceRef.actionItems || []).filter(a => typeof a === 'object' ? !a.triaged : true).length} pending actions
+                  </span>
+                )}
+                {(entry.sourceRef.decisions || []).length > 0 && (
+                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+                    {(entry.sourceRef.decisions || []).length} decision{(entry.sourceRef.decisions || []).length > 1 ? 's' : ''}
+                  </span>
+                )}
+              </div>
+            </>
+          ) : (
+            /* Text — 2-line clamp */
+            <p className="text-xs text-foreground/90 leading-relaxed line-clamp-2">
+              {highlightRegex ? highlightText(entry.text, highlightRegex) : entry.text}
+            </p>
+          )}
         </div>
       </div>
     </motion.div>

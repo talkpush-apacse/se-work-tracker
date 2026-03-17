@@ -6,7 +6,7 @@ import {
   Calendar, User, Tag, AlertCircle, Archive, ArchiveX, Trash2,
   Settings, RotateCcw, Pencil, GripVertical, ExternalLink, Link2, ArrowLeft,
   Timer, Square, Pin, CheckSquare, Paperclip, Clock,
-  Table2, X, RefreshCw,
+  Table2, X, RefreshCw, Video,
 } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
@@ -30,6 +30,8 @@ import {
 import Modal from '../components/Modal';
 import AIAssistModal from '../components/AIAssistModal';
 import VoiceCommsModal from '../components/VoiceCommsModal';
+import QuickLogMeetingModal from '../components/QuickLogMeetingModal';
+import MeetingReviewPanel from '../components/MeetingReviewPanel';
 import { stripHtml, htmlToPlainText } from '../lib/utils';
 
 // ─── Helper: resolve recipient label from value key ───────────────────────────
@@ -1833,7 +1835,7 @@ function TaskDetailView({ task, customer, onBack }) {
 // ─── Main Triage page ──────────────────────────────────────────────────────────
 export default function Triage() {
   const {
-    tasks, customers, updateTask, addTask, reorderTasks, addPoint, okrs,
+    tasks, customers, meetingEntries, updateTask, addTask, reorderTasks, addPoint, okrs,
     aiSettings,
   } = useAppStore();
   const { isRunning, taskId: runningTaskId, startTimer, stopTimer } = useTimerContext();
@@ -1845,6 +1847,9 @@ export default function Triage() {
 
   // Voice Comms modal
   const [showVoiceComms, setShowVoiceComms] = useState(false);
+
+  // Meeting modal
+  const [showLogMeeting, setShowLogMeeting] = useState(false);
 
   // Filter state
   const [filterCustomerId, setFilterCustomerId] = useState('');
@@ -1954,6 +1959,12 @@ export default function Triage() {
       return (statusOrder[a.status] ?? 5) - (statusOrder[b.status] ?? 5);
     }),
     [tasks, customerMap, filterCustomerId, filterPriorityClients]
+  );
+
+  // Pending meetings count for badge
+  const pendingMeetingsCount = useMemo(
+    () => (meetingEntries || []).filter(m => m.triageStatus === 'pending').length,
+    [meetingEntries]
   );
 
   const filtersActive = filterCustomerId || filterWorkType || filterStatus || filterPriorityClients;
@@ -2137,6 +2148,12 @@ export default function Triage() {
               Focus Time
             </button>
           )}
+          <button
+            onClick={() => setShowLogMeeting(true)}
+            className="flex items-center gap-[6px] px-3.5 py-[7px] rounded-[6px] text-[13px] font-medium border border-[rgba(255,255,255,0.07)] bg-[#1a1d2e] text-[#8b8fa8] hover:bg-[#1f2235] hover:text-[#e8eaf0] transition-[all_0.15s_ease]"
+          >
+            <Video size={12} /> Log Meeting
+          </button>
           <button
             onClick={() => setAiAssistOpen(true)}
             className="flex items-center gap-[6px] px-3.5 py-[7px] rounded-[6px] text-[13px] font-medium border border-[rgba(255,255,255,0.07)] bg-[#1a1d2e] text-[#8b8fa8] hover:bg-[#1f2235] hover:text-[#e8eaf0] transition-[all_0.15s_ease]"
@@ -2329,6 +2346,22 @@ export default function Triage() {
                 boardTab === 'evergreen' ? 'bg-green-500/20 text-green-400' : 'bg-muted text-muted-foreground'
               }`}>
                 {evergreenTasks.length}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => { setBoardTab('meetings'); setFilterStatus(''); setFilterCustomerId(''); setFilterWorkType(''); setFilterPriorityClients(false); clearSelection(); }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              boardTab === 'meetings' ? 'bg-blue-500/15 text-blue-400 shadow-sm' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Video size={12} />
+            Meetings
+            {pendingMeetingsCount > 0 && (
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                boardTab === 'meetings' ? 'bg-blue-500/20 text-blue-400' : 'bg-amber-500/20 text-amber-400'
+              }`}>
+                {pendingMeetingsCount}
               </span>
             )}
           </button>
@@ -2560,6 +2593,11 @@ export default function Triage() {
             </div>
           )
         )}
+
+        {/* Meetings tab — Meeting Review panel */}
+        {boardTab === 'meetings' && (
+          <MeetingReviewPanel />
+        )}
       </div>
 
     </div>
@@ -2594,6 +2632,11 @@ export default function Triage() {
     {/* AI Assist standalone modal */}
     {aiAssistOpen && (
       <AIAssistModal onClose={() => setAiAssistOpen(false)} />
+    )}
+
+    {/* Quick Log Meeting modal */}
+    {showLogMeeting && (
+      <QuickLogMeetingModal onClose={() => setShowLogMeeting(false)} />
     )}
     </>
   );

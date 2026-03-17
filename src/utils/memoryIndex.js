@@ -114,6 +114,14 @@ export function buildMemoryIndex(store) {
     const date = dateFromDateStr(m.meetingDate) || safeDate(m.createdAt);
     if (!date) continue;
     const customer = m.customerId ? customerMap.get(m.customerId) : null;
+    // Build rich text corpus from all meeting fields for search
+    const textParts = [
+      m.title,
+      m.rawNotes,
+      m.aiSummary,
+      ...((m.actionItems || []).map(a => typeof a === 'string' ? a : a.text)),
+      ...((m.decisions || []) ),
+    ].filter(Boolean);
     entries.push({
       id: m.id,
       entityType: 'meeting',
@@ -123,7 +131,8 @@ export function buildMemoryIndex(store) {
       customerId: m.customerId || null,
       customerName: customer?.name || null,
       customerColor: customer?.color || null,
-      text: m.aiSummary || (m.rawNotes || '').slice(0, 300),
+      projectId: m.projectId || null,
+      text: textParts.join(' | '),
       subtext: m.title || null,
       sourceRef: m,
     });
