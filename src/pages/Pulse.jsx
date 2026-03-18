@@ -168,7 +168,7 @@ export default function Pulse() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-          <Heart size={20} className="text-rose-400" /> Pulse
+          <Heart size={20} className="text-rose-600" /> Pulse
         </h1>
       </div>
 
@@ -254,7 +254,7 @@ export default function Pulse() {
           </div>
           {weekAvg && (
             <div className="text-right">
-              <p className="text-sm font-semibold text-foreground">
+              <p className="text-sm font-mono font-semibold text-foreground">
                 {weekAvg}/5 {STRESS_LEVELS.find(s => s.level === Math.round(Number(weekAvg)))?.emoji}
               </p>
               <p className="text-[10px] text-muted-foreground">7-day avg</p>
@@ -283,8 +283,8 @@ export default function Pulse() {
               <AreaChart data={trendData.filter(d => d.level !== null)} margin={{ top: 10, right: 10, bottom: 0, left: 4 }}>
                 <defs>
                   <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#f43f5e" stopOpacity={0.3} />
-                    <stop offset="100%" stopColor="#10b981" stopOpacity={0.05} />
+                    <stop offset="0%" stopColor="#C44A4A" stopOpacity={0.3} />
+                    <stop offset="100%" stopColor="#2BAF54" stopOpacity={0.05} />
                   </linearGradient>
                 </defs>
                 <XAxis
@@ -306,7 +306,7 @@ export default function Pulse() {
                 <Area
                   type="monotone"
                   dataKey="level"
-                  stroke="#f43f5e"
+                  stroke="#C44A4A"
                   strokeWidth={2}
                   fill={`url(#${gradientId})`}
                   dot={({ cx, cy, payload }) => {
@@ -318,7 +318,7 @@ export default function Pulse() {
                       </text>
                     );
                   }}
-                  activeDot={{ r: 5, fill: '#f43f5e', stroke: 'hsl(var(--card))', strokeWidth: 2 }}
+                  activeDot={{ r: 5, fill: '#C44A4A', stroke: 'hsl(var(--card))', strokeWidth: 2 }}
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -365,7 +365,7 @@ export default function Pulse() {
                   {/* Stressor badge */}
                   <div className="flex-shrink-0">
                     {log.stressor && (
-                      <span className="inline-flex items-center rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 text-[10px] font-semibold px-2 py-0.5">
+                      <span className="inline-flex items-center rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-semibold px-2 py-0.5">
                         {STRESSOR_LABELS[log.stressor] || log.stressor}
                       </span>
                     )}

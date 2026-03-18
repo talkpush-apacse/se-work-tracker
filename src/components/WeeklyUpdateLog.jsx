@@ -109,10 +109,10 @@ export default function WeeklyUpdateLog({ weekStart, weekEnd } = {}) {
 
       {/* Migration banner */}
       {migrationBanner > 0 && (
-        <div className="flex items-center gap-2 px-4 py-2.5 mb-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-medium">
+        <div className="flex items-center gap-2 px-4 py-2.5 mb-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium">
           <Check size={13} className="flex-shrink-0" />
           <span>{migrationBanner} annotation{migrationBanner > 1 ? 's' : ''} migrated into Weekly Log</span>
-          <button onClick={() => setMigrationBanner(0)} className="ml-auto text-amber-400/60 hover:text-amber-400 transition-colors"><X size={13} /></button>
+          <button onClick={() => setMigrationBanner(0)} className="ml-auto text-amber-700/60 hover:text-amber-700 transition-colors"><X size={13} /></button>
         </div>
       )}
 

@@ -101,10 +101,10 @@ function CustomCheckbox({ checked, onChange, ariaLabel }) {
         className="sr-only peer"
       />
       <span className={`flex w-4 h-4 rounded border-2 transition-all items-center justify-center
-        peer-focus-visible:ring-2 peer-focus-visible:ring-green-400/60
+        peer-focus-visible:ring-2 peer-focus-visible:ring-primary/60
         ${checked
-          ? 'bg-green-500 border-green-500'
-          : 'bg-secondary border-border hover:border-green-400/50'
+          ? 'bg-status-success border-status-success'
+          : 'bg-secondary border-border hover:border-status-success/50'
         }`}
       >
         {checked && (
@@ -147,7 +147,7 @@ const InlineCustomerCreate = memo(function InlineCustomerCreate({ onCustomerCrea
             type="button"
             onClick={() => setNewCustomer(p => ({ ...p, color: value }))}
             title={name}
-            className={`w-5 h-5 rounded-full transition-all ${newCustomer.color === value ? 'ring-2 ring-white ring-offset-1 ring-offset-gray-900 scale-110' : 'hover:scale-105'}`}
+            className={`w-5 h-5 rounded-full transition-all ${newCustomer.color === value ? 'ring-2 ring-foreground ring-offset-1 ring-offset-background scale-110' : 'hover:scale-105'}`}
             style={{ backgroundColor: value }}
           />
         ))}
@@ -191,8 +191,8 @@ const TaskCard = memo(function TaskCard({ task, customer, isSelected, onSelect, 
   const ageStyle = ageDays < 8
     ? 'text-muted-foreground bg-secondary border-border'
     : ageDays < 14
-      ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
-      : 'text-red-400 bg-red-500/10 border-red-500/20';
+      ? 'text-status-warning bg-amber-50 border-amber-200'
+      : 'text-status-error bg-red-50 border-red-200';
   const [isEditing, setIsEditing] = useState(false);
   const [draftDesc, setDraftDesc] = useState(task.description);
   const editRef = useRef(null);
@@ -219,7 +219,7 @@ const TaskCard = memo(function TaskCard({ task, customer, isSelected, onSelect, 
         isArchived
           ? 'bg-card/40 border-border/60 opacity-60'
           : isSelected
-            ? 'bg-brand-lavender/15 border-indigo-500/40 shadow-lg shadow-indigo-500/10 cursor-pointer'
+            ? 'bg-brand-lavender/15 border-primary/40 shadow-lg shadow-primary/10 cursor-pointer'
             : 'bg-secondary/50 border-border/60 hover:border-border cursor-pointer'
       }`}
     >
@@ -246,14 +246,14 @@ const TaskCard = memo(function TaskCard({ task, customer, isSelected, onSelect, 
               autoFocus
               rows={2}
               onClick={e => e.stopPropagation()}
-              className="w-full bg-muted/60 border border-indigo-500/50 rounded-lg px-2 py-1 text-xs text-foreground resize-none focus:outline-none focus:border-indigo-400 leading-snug"
+              className="w-full bg-muted/60 border border-primary/50 rounded-lg px-2 py-1 text-xs text-foreground resize-none focus:outline-none focus:border-primary leading-snug"
             />
           ) : (
               <div
                 className="group/desc flex items-start gap-1"
                 onClick={e => { if (!isArchived) { e.stopPropagation(); setIsEditing(true); } }}
               >
-                <p className={`flex-1 text-xs font-medium leading-snug line-clamp-2 ${isArchived ? 'text-muted-foreground line-through' : 'text-foreground group-hover/desc:text-indigo-200 cursor-text'}`}>
+                <p className={`flex-1 text-xs font-medium leading-snug line-clamp-2 ${isArchived ? 'text-muted-foreground line-through' : 'text-foreground group-hover/desc:text-primary cursor-text'}`}>
                   {descCleanText}
                   {descTickets.map(t => (
                     <a
@@ -309,7 +309,7 @@ const TaskCard = memo(function TaskCard({ task, customer, isSelected, onSelect, 
         )}
         {/* Task points badge — shown when task is done */}
         {task.points > 0 && (
-          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full border bg-teal-500/10 text-teal-400 border-teal-500/20"
+          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full border bg-teal-50 text-teal-700 border-teal-200"
             title={`${task.points} task point${task.points === 1 ? '' : 's'} earned`}
           >
             ⚡ {task.points}pt{task.points === 1 ? '' : 's'}
@@ -384,7 +384,7 @@ const HistoryItem = memo(function HistoryItem({ h }) {
           {h.provider && (
             <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${
               h.provider === 'claude'
-                ? 'bg-amber-500/15 text-brand-amber border-amber-500/20'
+                ? 'bg-amber-50 text-amber-700 border-amber-200'
                 : 'bg-brand-sage/15 text-brand-sage border-brand-sage/20'
             }`}>
               {h.provider === 'claude' ? 'Claude' : 'ChatGPT'}
@@ -667,7 +667,7 @@ const AIWorkspace = memo(function AIWorkspace({ task, customer }) {
               onClick={() => setOutputType(type)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
                 outputType === type
-                  ? 'bg-brand-lavender border-brand-lavender text-white font-semibold shadow-sm'
+                  ? 'bg-brand-lavender border-brand-lavender text-primary-foreground font-semibold shadow-sm'
                   : 'bg-secondary border-border text-muted-foreground hover:text-foreground hover:border-border'
               }`}
             >
@@ -730,13 +730,13 @@ const AIWorkspace = memo(function AIWorkspace({ task, customer }) {
             {/* Indicators: provider badge + custom prompt dot */}
             <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${
               currentProvider === 'claude'
-                ? 'bg-amber-500/15 text-brand-amber border-amber-500/20'
+                ? 'bg-amber-50 text-amber-700 border-amber-200'
                 : 'bg-brand-sage/15 text-brand-sage border-brand-sage/20'
             }`}>
               {currentProvider === 'claude' ? 'Claude' : 'ChatGPT'}
             </span>
             {customPrompt.trim() && (
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" title="Custom prompt active" />
+              <span className="w-1.5 h-1.5 rounded-full bg-primary" title="Custom prompt active" />
             )}
           </div>
           <ChevronDown size={16} className={`text-muted-foreground/70 transition-transform ${showCustomize ? 'rotate-180' : ''}`} />
@@ -759,8 +759,8 @@ const AIWorkspace = memo(function AIWorkspace({ task, customer }) {
                     className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-all ${
                       currentProvider === opt.value
                         ? opt.value === 'claude'
-                          ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
-                          : 'bg-brand-sage/20 border-brand-sage/40 text-emerald-300'
+                          ? 'bg-amber-50 border-amber-300 text-amber-700'
+                          : 'bg-emerald-50 border-emerald-300 text-emerald-700'
                         : 'bg-secondary border-border text-muted-foreground hover:text-foreground/80 hover:border-border'
                     }`}
                   >
@@ -786,7 +786,7 @@ const AIWorkspace = memo(function AIWorkspace({ task, customer }) {
                       onClick={() => updateAiSettings({ openaiModel: model.value })}
                       className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-all ${
                         (aiSettings.openaiModel || 'gpt-4o') === model.value
-                          ? 'bg-brand-sage/20 border-brand-sage/40 text-emerald-300'
+                          ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
                           : 'bg-secondary border-border text-muted-foreground hover:text-foreground/80 hover:border-border'
                       }`}
                     >
@@ -812,7 +812,7 @@ const AIWorkspace = memo(function AIWorkspace({ task, customer }) {
                       onClick={() => updateAiSettings({ claudeModel: model.value })}
                       className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-all ${
                         (aiSettings.claudeModel || 'claude-sonnet-4-6') === model.value
-                          ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                          ? 'bg-amber-50 border-amber-300 text-amber-700'
                           : 'bg-secondary border-border text-muted-foreground hover:text-foreground/80 hover:border-border'
                       }`}
                     >
@@ -844,7 +844,7 @@ const AIWorkspace = memo(function AIWorkspace({ task, customer }) {
                 value={customPrompt}
                 onChange={e => updateAiSettings({ prompts: { [outputType]: e.target.value } })}
                 placeholder={`Leave blank to use the built-in default prompt for "${AI_OUTPUT_TYPE_LABELS[outputType]}".`}
-                className="w-full bg-secondary border border-border rounded-xl px-3 py-2.5 text-xs text-foreground/90 placeholder-gray-600 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40 resize-none font-mono leading-relaxed"
+                className="w-full bg-secondary border border-border rounded-xl px-3 py-2.5 text-xs text-foreground/90 placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40 resize-none font-mono leading-relaxed"
               />
               <p className="mt-1 text-[10px] text-muted-foreground/70">
                 {customPrompt.trim()
@@ -908,7 +908,7 @@ const AIWorkspace = memo(function AIWorkspace({ task, customer }) {
         onClick={handleGenerate}
         disabled={isGenerating || !userInput.trim()}
         title={!userInput.trim() && !isGenerating ? 'Add context notes to generate' : undefined}
-        className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-brand-lavender hover:bg-brand-lavender/80 disabled:opacity-40 disabled:cursor-not-allowed text-foreground font-bold text-sm transition-all shadow-lg shadow-indigo-600/30"
+        className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-brand-lavender hover:bg-brand-lavender/80 disabled:opacity-40 disabled:cursor-not-allowed text-foreground font-bold text-sm transition-all shadow-lg shadow-primary/20"
       >
         {isGenerating
           ? <><Loader2 size={16} className="animate-spin" /> Generating…</>
@@ -927,7 +927,7 @@ const AIWorkspace = memo(function AIWorkspace({ task, customer }) {
               {currentOutput.provider && (
                 <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${
                   currentOutput.provider === 'claude'
-                    ? 'bg-amber-500/15 text-brand-amber border-amber-500/20'
+                    ? 'bg-amber-50 text-amber-700 border-amber-200'
                     : 'bg-brand-sage/15 text-brand-sage border-brand-sage/20'
                 }`}>
                   {currentOutput.provider === 'claude' ? 'Claude' : 'GPT-4o'}
@@ -953,7 +953,7 @@ const AIWorkspace = memo(function AIWorkspace({ task, customer }) {
             value={editedText}
             onChange={e => setEditedText(e.target.value)}
             rows={Math.max(6, editedText.split('\n').length + 1)}
-            className="w-full bg-transparent text-sm text-foreground/90 leading-relaxed resize-none focus:outline-none placeholder-gray-600"
+            className="w-full bg-transparent text-sm text-foreground/90 leading-relaxed resize-none focus:outline-none placeholder:text-muted-foreground"
             placeholder="Output will appear here…"
           />
           {editedText !== currentOutput.outputText && (
@@ -986,8 +986,8 @@ function TimerQuickTaskForm({ customers, onSubmit, onStartWithoutTask, onCancel 
   const canSubmit = description.trim().length > 0;
 
   return (
-    <div className="mb-3 bg-secondary/60 border border-emerald-500/30 rounded-xl p-3 space-y-3">
-      <p className="text-xs font-semibold text-emerald-400/80 uppercase tracking-wide">Focus Task</p>
+    <div className="mb-3 bg-secondary/60 border border-status-success/30 rounded-xl p-3 space-y-3">
+      <p className="text-xs font-semibold text-status-success/80 uppercase tracking-wide">Focus Task</p>
 
       <div>
         <label className="block text-xs text-muted-foreground mb-1">What are you working on? *</label>
@@ -1022,7 +1022,7 @@ function TimerQuickTaskForm({ customers, onSubmit, onStartWithoutTask, onCancel 
         <button
           type="button"
           onClick={onCancel}
-          className="py-2 px-3 rounded-xl bg-muted hover:bg-gray-600 text-xs font-medium transition-colors"
+          className="py-2 px-3 rounded-xl bg-muted hover:bg-muted/80 text-xs font-medium transition-colors"
         >
           Cancel
         </button>
@@ -1037,7 +1037,7 @@ function TimerQuickTaskForm({ customers, onSubmit, onStartWithoutTask, onCancel 
           type="button"
           disabled={!canSubmit}
           onClick={() => onSubmit(description.trim(), customerId)}
-          className="flex-1 py-2 rounded-xl bg-emerald-700/40 hover:bg-emerald-700/60 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-emerald-300 border border-emerald-700/40 transition-colors"
+          className="flex-1 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-emerald-700 border border-emerald-200 transition-colors"
         >
           Create &amp; Start Timer
         </button>
@@ -1118,7 +1118,7 @@ function QuickAddTaskForm({ customers, onSubmit, onCancel }) {
   };
 
   return (
-    <div className="bg-secondary/60 border border-indigo-500/30 rounded-xl p-3 space-y-3">
+    <div className="bg-secondary/60 border border-primary/30 rounded-xl p-3 space-y-3">
       {/* Header + mode toggle */}
       <div className="flex items-center justify-between">
         <p className="text-xs font-semibold text-brand-lavender/80 uppercase tracking-wide">New Task</p>
@@ -1130,7 +1130,7 @@ function QuickAddTaskForm({ customers, onSubmit, onCancel }) {
               onClick={() => setMode(m)}
               className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all ${
                 mode === m
-                  ? 'bg-brand-lavender text-white'
+                  ? 'bg-brand-lavender text-primary-foreground'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
@@ -1266,7 +1266,7 @@ function QuickAddTaskForm({ customers, onSubmit, onCancel }) {
                   type="button"
                   onClick={() => deleteBulkRow(row.id)}
                   disabled={bulkRows.length === 1}
-                  className="flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-red-400 hover:bg-red-500/10 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+                  className="flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-status-error hover:bg-destructive/10 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
                   title="Remove row"
                 >
                   <X size={12} />
@@ -1328,7 +1328,7 @@ function QuickAddTaskForm({ customers, onSubmit, onCancel }) {
           ariaLabel="Evergreen (resets weekly)"
         />
         <span className="text-xs text-muted-foreground flex items-center gap-1">
-          <RefreshCw size={10} className="text-green-400" /> Evergreen (resets weekly)
+          <RefreshCw size={10} className="text-status-success" /> Evergreen (resets weekly)
         </span>
       </label>
 
@@ -1353,7 +1353,7 @@ function QuickAddTaskForm({ customers, onSubmit, onCancel }) {
         <button
           type="button"
           onClick={onCancel}
-          className="flex-1 py-2 rounded-xl bg-muted hover:bg-gray-600 text-xs font-medium transition-colors"
+          className="flex-1 py-2 rounded-xl bg-muted hover:bg-muted/80 text-xs font-medium transition-colors"
         >
           Cancel
         </button>
@@ -1387,7 +1387,7 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, customer, onOpenDe
     [task.createdAt]
   );
   // Age color: ≤7d muted, >7d amber warning
-  const ageColor = ageDays > 7 ? 'text-[#f59e0b]' : 'text-[#5a5e72]';
+  const ageColor = ageDays > 7 ? 'text-status-warning' : 'text-muted-foreground';
   // Status dot color
   const statusDotColor = { open: 'bg-amber-400', 'in-progress': 'bg-blue-400', blocked: 'bg-red-400', done: 'bg-green-400', archived: 'bg-gray-400' }[task.status] || 'bg-amber-400';
   // Pre-parse Jira URLs once per description change — avoids regex exec on every render
@@ -1401,12 +1401,11 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, customer, onOpenDe
       ref={setNodeRef}
       style={style}
       className={`group flex items-start gap-3 rounded-[10px] px-4 py-[14px] border transition-[all_0.15s_ease]
-        shadow-[0_1px_3px_rgba(0,0,0,0.4),0_0_0_1px_rgba(255,255,255,0.05)]
-        hover:shadow-[0_4px_16px_rgba(0,0,0,0.5),0_0_0_1px_rgba(99,102,241,0.2)]
+        shadow-sm hover:shadow-md
         hover:-translate-y-px
         ${isSelected
-          ? 'bg-[#1f2235] border-indigo-500/40'
-          : 'bg-[#1a1d2e] border-[rgba(255,255,255,0.07)] hover:bg-[#1f2235] hover:border-[rgba(99,102,241,0.2)]'
+          ? 'bg-card border-primary/40'
+          : 'bg-card border-border hover:bg-card-hover hover:border-primary/20'
         }`}
     >
       {/* Bulk select checkbox */}
@@ -1416,7 +1415,7 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, customer, onOpenDe
           checked={!!isSelected}
           onChange={() => onToggleSelect(task.id)}
           onClick={e => e.stopPropagation()}
-          className="w-3.5 h-3.5 mt-[3px] rounded border-border bg-secondary text-indigo-500 focus:ring-ring/40 focus:ring-1 flex-shrink-0 cursor-pointer accent-indigo-500"
+          className="w-3.5 h-3.5 mt-[3px] rounded border-border bg-secondary text-primary focus:ring-ring/40 focus:ring-1 flex-shrink-0 cursor-pointer accent-primary"
         />
       )}
 
@@ -1424,7 +1423,7 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, customer, onOpenDe
       <button
         {...attributes}
         {...listeners}
-        className="cursor-grab active:cursor-grabbing text-[#5a5e72] hover:text-[#8b8fa8] flex-shrink-0 touch-none p-0.5 mt-[2px]"
+        className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-muted-foreground/80 flex-shrink-0 touch-none p-0.5 mt-[2px]"
         onClick={e => e.stopPropagation()}
         aria-label="Drag to reorder"
       >
@@ -1440,7 +1439,7 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, customer, onOpenDe
         {(isTimerActive || customer) && (
           <div className="flex items-center gap-1.5 mb-1.5">
             {isTimerActive && (
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" title="Timer running" />
+              <span className="w-2 h-2 rounded-full bg-status-success animate-pulse flex-shrink-0" title="Timer running" />
             )}
             {customer && (
               <span
@@ -1454,7 +1453,7 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, customer, onOpenDe
         )}
 
         {/* Task title — full word wrap, no truncation */}
-        <p className="text-[14px] font-medium text-[#e8eaf0] leading-[1.5] break-words mb-2">
+        <p className="text-[14px] font-medium text-foreground leading-[1.5] break-words mb-2">
           {descCleanText}
           {descTickets.map(t => (
             <a
@@ -1477,13 +1476,13 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, customer, onOpenDe
             {WORK_TYPE_LABELS[task.workType] || 'Comms'}
           </span>
           <span
-            className={`text-[10px] font-semibold ${ageColor}`}
+            className={`text-[10px] font-semibold font-mono ${ageColor}`}
             title={`Created ${ageDays} day${ageDays === 1 ? '' : 's'} ago`}
           >
             {ageDays}d old
           </span>
           {task.points > 0 && (
-            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full border bg-teal-500/10 text-teal-400 border-teal-500/20">
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full border bg-teal-50 text-teal-700 border-teal-200">
               ⚡ {task.points}pt{task.points === 1 ? '' : 's'}
             </span>
           )}
@@ -1504,10 +1503,10 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, customer, onOpenDe
             updateTask(task.id, { status: e.target.value });
             onStatusChange?.(e.target.value);
           }}
-          className="text-[12px] font-medium rounded-[6px] px-3 py-[5px] border border-[rgba(255,255,255,0.07)] bg-[#1e2130] text-[#8b8fa8] cursor-pointer focus:outline-none"
+          className="text-[12px] font-medium rounded-[6px] px-3 py-[5px] border border-border bg-card text-muted-foreground cursor-pointer focus:outline-none"
         >
           {TASK_STATUSES.map(s => (
-            <option key={s} value={s} className="bg-[#1e2130] text-foreground">{TASK_STATUS_LABELS[s]}</option>
+            <option key={s} value={s} className="bg-card text-foreground">{TASK_STATUS_LABELS[s]}</option>
           ))}
         </select>
       </div>
@@ -1656,7 +1655,7 @@ function TaskDetailView({ task, customer, onBack }) {
               ariaLabel="Evergreen (resets weekly)"
             />
             <span className="text-xs text-muted-foreground flex items-center gap-1">
-              <RefreshCw size={10} className="text-green-400" /> Evergreen (resets weekly)
+              <RefreshCw size={10} className="text-status-success" /> Evergreen (resets weekly)
             </span>
           </label>
 
@@ -1739,7 +1738,7 @@ function TaskDetailView({ task, customer, onBack }) {
                       startTimer(task.workType || 'deep_work', { clientIds: task.customerId ? [task.customerId] : [], taskId: task.id, taskDescription: task.description });
                     }
                   }}
-                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-brand-sage/20 hover:bg-brand-sage/40 text-brand-sage border border-brand-sage/50 transition-all shadow-sm shadow-emerald-500/10"
+                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-brand-sage/20 hover:bg-brand-sage/40 text-brand-sage border border-brand-sage/50 transition-all shadow-sm shadow-status-success/10"
                   title="Start timer for this task"
                 >
                   <Timer size={14} /> Start Timer
@@ -2094,7 +2093,7 @@ export default function Triage() {
           <Tag size={15} className="text-brand-lavender" />
           <h2 className="text-sm font-semibold text-foreground">Task Board</h2>
           {boardTab === 'active' && activeTasks.length > 0 && (
-            <span className="bg-brand-lavender/20 text-brand-lavender border border-indigo-500/20 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+            <span className="bg-brand-lavender/20 text-brand-lavender border border-primary/20 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
               {activeTasks.length} active
             </span>
           )}
@@ -2106,7 +2105,7 @@ export default function Triage() {
           {filtersActive && (
             <button
               onClick={() => filterRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })}
-              className="bg-teal-500/15 text-teal-400 border border-teal-500/20 text-[10px] font-bold px-1.5 py-0.5 rounded-full hover:bg-teal-500/25 transition-colors cursor-pointer"
+              className="bg-teal-50 text-teal-700 border border-teal-200 text-[10px] font-bold px-1.5 py-0.5 rounded-full hover:bg-teal-100 transition-colors cursor-pointer"
               title="Scroll to filter controls"
             >
               filtered ↓
@@ -2118,8 +2117,8 @@ export default function Triage() {
               onClick={() => { setShowTimerTaskForm(v => !v); setShowQuickAdd(false); }}
               className={`ml-auto flex items-center gap-[6px] px-3.5 py-[7px] rounded-[6px] text-[13px] font-medium border transition-[all_0.15s_ease] ${
                 showTimerTaskForm
-                  ? 'bg-emerald-700/20 border-emerald-500/40 text-emerald-400'
-                  : 'bg-[#1a1d2e] border-[rgba(255,255,255,0.07)] text-[#8b8fa8] hover:bg-[#1f2235] hover:text-[#e8eaf0]'
+                  ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                  : 'bg-card border-border text-muted-foreground hover:bg-card-hover hover:text-foreground'
               }`}
               title="Create a focus task and start timer"
             >
@@ -2129,13 +2128,13 @@ export default function Triage() {
           )}
           <button
             onClick={() => setShowLogMeeting(true)}
-            className="flex items-center gap-[6px] px-3.5 py-[7px] rounded-[6px] text-[13px] font-medium border border-[rgba(255,255,255,0.07)] bg-[#1a1d2e] text-[#8b8fa8] hover:bg-[#1f2235] hover:text-[#e8eaf0] transition-[all_0.15s_ease]"
+            className="flex items-center gap-[6px] px-3.5 py-[7px] rounded-[6px] text-[13px] font-medium border border-border bg-card text-muted-foreground hover:bg-card-hover hover:text-foreground transition-[all_0.15s_ease]"
           >
             <Video size={12} /> Log Meeting
           </button>
           <button
             onClick={() => setAiAssistOpen(true)}
-            className="flex items-center gap-[6px] px-3.5 py-[7px] rounded-[6px] text-[13px] font-medium border border-[rgba(255,255,255,0.07)] bg-[#1a1d2e] text-[#8b8fa8] hover:bg-[#1f2235] hover:text-[#e8eaf0] transition-[all_0.15s_ease]"
+            className="flex items-center gap-[6px] px-3.5 py-[7px] rounded-[6px] text-[13px] font-medium border border-border bg-card text-muted-foreground hover:bg-card-hover hover:text-foreground transition-[all_0.15s_ease]"
           >
             <Sparkles size={12} /> AI Assist
           </button>
@@ -2143,8 +2142,8 @@ export default function Triage() {
             onClick={() => { setShowQuickAdd(v => !v); setShowTimerTaskForm(false); }}
             className={`${isRunning ? 'ml-auto' : ''} flex items-center gap-[6px] px-3.5 py-[7px] rounded-[6px] text-[13px] font-medium transition-[all_0.15s_ease] ${
               showQuickAdd
-                ? 'bg-[#818cf8] text-white shadow-[0_4px_12px_rgba(99,102,241,0.45)]'
-                : 'bg-[#6366f1] text-white shadow-[0_2px_8px_rgba(99,102,241,0.35)] hover:bg-[#818cf8] hover:shadow-[0_4px_12px_rgba(99,102,241,0.45)]'
+                ? 'bg-primary text-primary-foreground shadow-md'
+                : 'bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 hover:shadow-md'
             }`}
           >
             <Plus size={12} />
@@ -2196,12 +2195,12 @@ export default function Triage() {
         )}
 
         {/* Filter bar — single horizontal row */}
-        <div ref={filterRowRef} className="flex items-center gap-2 mb-3 overflow-x-auto py-[10px] border-b border-[rgba(255,255,255,0.07)]">
+        <div ref={filterRowRef} className="flex items-center gap-2 mb-3 overflow-x-auto py-[10px] border-b border-border">
           {/* Customer dropdown pill */}
           <select
             value={filterCustomerId}
             onChange={e => handleCustomerFilter(e.target.value)}
-            className="flex-shrink-0 bg-[#1a1d2e] border border-[rgba(255,255,255,0.07)] text-[#8b8fa8] py-[6px] px-[10px] rounded-[6px] text-[12.5px] font-medium whitespace-nowrap focus:outline-none cursor-pointer"
+            className="flex-shrink-0 bg-card border border-border text-muted-foreground py-[6px] px-[10px] rounded-[6px] text-[12.5px] font-medium whitespace-nowrap focus:outline-none cursor-pointer"
           >
             <option value="">All clients</option>
             {customersWithTasks.map(c => (
@@ -2213,7 +2212,7 @@ export default function Triage() {
           <select
             value={filterWorkType}
             onChange={e => { setFilterWorkType(e.target.value); clearSelection(); }}
-            className="flex-shrink-0 bg-[#1a1d2e] border border-[rgba(255,255,255,0.07)] text-[#8b8fa8] py-[6px] px-[10px] rounded-[6px] text-[12.5px] font-medium whitespace-nowrap focus:outline-none cursor-pointer"
+            className="flex-shrink-0 bg-card border border-border text-muted-foreground py-[6px] px-[10px] rounded-[6px] text-[12.5px] font-medium whitespace-nowrap focus:outline-none cursor-pointer"
           >
             <option value="">All types</option>
             {WORK_TYPES.map(wt => (
@@ -2226,7 +2225,7 @@ export default function Triage() {
             <select
               value={filterStatus}
               onChange={e => { setFilterStatus(e.target.value); clearSelection(); }}
-              className="flex-shrink-0 bg-[#1a1d2e] border border-[rgba(255,255,255,0.07)] text-[#8b8fa8] py-[6px] px-[10px] rounded-[6px] text-[12.5px] font-medium whitespace-nowrap focus:outline-none cursor-pointer"
+              className="flex-shrink-0 bg-card border border-border text-muted-foreground py-[6px] px-[10px] rounded-[6px] text-[12.5px] font-medium whitespace-nowrap focus:outline-none cursor-pointer"
             >
               <option value="">All statuses</option>
               {TASK_STATUSES.filter(s => !['done', 'archived'].includes(s)).map(s => (
@@ -2237,16 +2236,16 @@ export default function Triage() {
 
           {/* Vertical divider — shown when Priority Clients chip is active */}
           {filterPriorityClients && (
-            <div className="w-px h-[18px] bg-[rgba(255,255,255,0.07)] flex-shrink-0" />
+            <div className="w-px h-[18px] bg-border flex-shrink-0" />
           )}
 
           {/* Priority Clients — amber chip when active, ghost pill when inactive */}
           {filterPriorityClients ? (
-            <span className="flex-shrink-0 flex items-center gap-1.5 bg-[rgba(245,158,11,0.12)] text-[#f59e0b] border border-[rgba(245,158,11,0.2)] py-1 px-[10px] rounded-[20px] text-[11.5px] font-semibold whitespace-nowrap">
+            <span className="flex-shrink-0 flex items-center gap-1.5 bg-amber-50 text-status-warning border border-amber-200 py-1 px-[10px] rounded-[20px] text-[11.5px] font-semibold whitespace-nowrap">
               Priority Clients
               <button
                 onClick={() => { setFilterPriorityClients(false); clearSelection(); }}
-                className="text-[#f59e0b] hover:text-amber-300 ml-0.5 leading-none"
+                className="text-status-warning hover:text-amber-600 ml-0.5 leading-none"
                 aria-label="Remove Priority Clients filter"
               >
                 ✕
@@ -2255,7 +2254,7 @@ export default function Triage() {
           ) : (
             <button
               onClick={() => { setFilterPriorityClients(true); clearSelection(); }}
-              className="flex-shrink-0 flex items-center gap-[6px] bg-[#1a1d2e] border border-[rgba(255,255,255,0.07)] text-[#8b8fa8] py-[6px] px-[10px] rounded-[6px] text-[12.5px] font-medium whitespace-nowrap hover:bg-[#1f2235] hover:text-[#e8eaf0] transition-[all_0.15s_ease]"
+              className="flex-shrink-0 flex items-center gap-[6px] bg-card border border-border text-muted-foreground py-[6px] px-[10px] rounded-[6px] text-[12.5px] font-medium whitespace-nowrap hover:bg-card-hover hover:text-foreground transition-[all_0.15s_ease]"
             >
               <Pin size={11} /> Priority Clients
             </button>
@@ -2265,7 +2264,7 @@ export default function Triage() {
           {filtersActive && (
             <button
               onClick={clearAllFilters}
-              className="ml-auto flex-shrink-0 text-[12px] text-[#5a5e72] hover:text-[#8b8fa8] transition-colors whitespace-nowrap"
+              className="ml-auto flex-shrink-0 text-[12px] text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap"
             >
               Clear all filters
             </button>
@@ -2291,7 +2290,7 @@ export default function Triage() {
             In Progress
             {inProgressTasks.length > 0 && (
               <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-                boardTab === 'in-progress' ? 'bg-indigo-500/20 text-indigo-400' : 'bg-muted text-muted-foreground'
+                boardTab === 'in-progress' ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'
               }`}>
                 {inProgressTasks.length}
               </span>
@@ -2306,7 +2305,7 @@ export default function Triage() {
             Closed
             {closedTasks.length > 0 && (
               <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-                boardTab === 'closed' ? 'bg-gray-600 text-foreground/80' : 'bg-muted text-muted-foreground'
+                boardTab === 'closed' ? 'bg-muted text-foreground/80' : 'bg-muted text-muted-foreground'
               }`}>
                 {closedTasks.length}
               </span>
@@ -2315,14 +2314,14 @@ export default function Triage() {
           <button
             onClick={() => { setBoardTab('evergreen'); setFilterStatus(''); setFilterCustomerId(''); setFilterWorkType(''); setFilterPriorityClients(false); clearSelection(); }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              boardTab === 'evergreen' ? 'bg-green-500/15 text-green-400 shadow-sm' : 'text-muted-foreground hover:text-foreground'
+              boardTab === 'evergreen' ? 'bg-emerald-50 text-emerald-700 shadow-sm' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             <RefreshCw size={12} />
             Evergreen
             {evergreenTasks.length > 0 && (
               <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-                boardTab === 'evergreen' ? 'bg-green-500/20 text-green-400' : 'bg-muted text-muted-foreground'
+                boardTab === 'evergreen' ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground'
               }`}>
                 {evergreenTasks.length}
               </span>
@@ -2331,14 +2330,14 @@ export default function Triage() {
           <button
             onClick={() => { setBoardTab('meetings'); setFilterStatus(''); setFilterCustomerId(''); setFilterWorkType(''); setFilterPriorityClients(false); clearSelection(); }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              boardTab === 'meetings' ? 'bg-blue-500/15 text-blue-400 shadow-sm' : 'text-muted-foreground hover:text-foreground'
+              boardTab === 'meetings' ? 'bg-blue-50 text-blue-700 shadow-sm' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             <Video size={12} />
             Meetings
             {pendingMeetingsCount > 0 && (
               <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-                boardTab === 'meetings' ? 'bg-blue-500/20 text-blue-400' : 'bg-amber-500/20 text-amber-400'
+                boardTab === 'meetings' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
               }`}>
                 {pendingMeetingsCount}
               </span>
@@ -2348,7 +2347,7 @@ export default function Triage() {
 
         {/* Bulk action bar — shown when tasks are selected */}
         {boardTab === 'active' && selectedTaskIds.size > 0 && (
-          <div className="flex items-center gap-3 bg-brand-lavender/10 border border-indigo-500/30 rounded-xl px-4 py-2.5 mb-3 flex-wrap">
+          <div className="flex items-center gap-3 bg-brand-lavender/10 border border-primary/30 rounded-xl px-4 py-2.5 mb-3 flex-wrap">
             <div className="flex items-center gap-1.5">
               <CheckSquare size={13} className="text-brand-lavender" />
               <span className="text-xs font-semibold text-brand-lavender/80">{selectedTaskIds.size} selected</span>
@@ -2405,17 +2404,17 @@ export default function Triage() {
         {/* Active tab — draggable task list */}
         {boardTab === 'active' && (
           activeTasks.length === 0 ? (
-            <div className="bg-[#1a1d2e] border border-dashed border-[rgba(255,255,255,0.1)] rounded-[10px] px-8 py-12 flex flex-col items-center text-center gap-[14px]">
+            <div className="bg-card border border-dashed border-border rounded-[10px] px-8 py-12 flex flex-col items-center text-center gap-[14px]">
               {/* Icon */}
-              <div className="w-14 h-14 rounded-[16px] bg-[rgba(99,102,241,0.15)] flex items-center justify-center flex-shrink-0">
-                <Check size={26} className="text-[#6366f1]" />
+              <div className="w-14 h-14 rounded-[16px] bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <Check size={26} className="text-primary" />
               </div>
               {/* Title */}
-              <h3 className="text-[15px] font-semibold text-[#e8eaf0]">
+              <h3 className="text-[15px] font-semibold text-foreground">
                 {filtersActive ? 'No tasks match this filter.' : "You're all caught up on active tasks"}
               </h3>
               {/* Subtitle */}
-              <p className="text-[13px] text-[#5a5e72] max-w-[340px] leading-[1.6]">
+              <p className="text-[13px] text-muted-foreground max-w-[340px] leading-[1.6]">
                 {filtersActive
                   ? 'Try adjusting your filters or clear them to see all tasks.'
                   : 'No more tasks in this view. Add a new task or switch to In Progress to keep the momentum going.'}
@@ -2424,13 +2423,13 @@ export default function Triage() {
               <div className="flex gap-2 mt-1">
                 <button
                   onClick={() => { setBoardTab('in-progress'); setFilterStatus(''); setFilterCustomerId(''); setFilterWorkType(''); setFilterPriorityClients(false); clearSelection(); }}
-                  className="flex items-center gap-[6px] px-3.5 py-[7px] rounded-[6px] text-[13px] font-medium border border-[rgba(255,255,255,0.07)] bg-[#1a1d2e] text-[#8b8fa8] hover:bg-[#1f2235] hover:text-[#e8eaf0] transition-[all_0.15s_ease]"
+                  className="flex items-center gap-[6px] px-3.5 py-[7px] rounded-[6px] text-[13px] font-medium border border-border bg-card text-muted-foreground hover:bg-card-hover hover:text-foreground transition-[all_0.15s_ease]"
                 >
                   View All Tasks
                 </button>
                 <button
                   onClick={() => { setShowQuickAdd(v => !v); setShowTimerTaskForm(false); }}
-                  className="flex items-center gap-[6px] px-3.5 py-[7px] rounded-[6px] text-[13px] font-medium bg-[#6366f1] text-white shadow-[0_2px_8px_rgba(99,102,241,0.35)] hover:bg-[#818cf8] hover:shadow-[0_4px_12px_rgba(99,102,241,0.45)] transition-[all_0.15s_ease]"
+                  className="flex items-center gap-[6px] px-3.5 py-[7px] rounded-[6px] text-[13px] font-medium bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 hover:shadow-md transition-[all_0.15s_ease]"
                 >
                   + Add Task
                 </button>
@@ -2552,7 +2551,7 @@ export default function Triage() {
         {boardTab === 'evergreen' && (
           evergreenTasks.length === 0 ? (
             <div className="bg-card border border-border rounded-2xl px-5 py-10 text-center">
-              <RefreshCw size={24} className="text-green-400/60 mx-auto mb-2" />
+              <RefreshCw size={24} className="text-status-success/60 mx-auto mb-2" />
               <p className="text-muted-foreground text-sm">No evergreen tasks.</p>
               <p className="text-muted-foreground/70 text-xs mt-1">Evergreen tasks auto-reset to open every Monday so they can be tracked weekly.</p>
             </div>
@@ -2584,7 +2583,7 @@ export default function Triage() {
     {/* Auto-save toast — appears bottom-right when timer session is saved */}
     {autoSaveToast && (
       <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 text-sm
-                      text-emerald-400 bg-card border border-emerald-500/20 rounded-xl
+                      text-status-success bg-card border border-status-success/20 rounded-xl
                       px-4 py-2.5 shadow-lg pointer-events-none">
         <Check size={14} />
         Auto-saved {autoSaveToast.pts} pts · {autoSaveToast.customerName}
@@ -2596,7 +2595,7 @@ export default function Triage() {
       <button
         onClick={() => setShowVoiceComms(true)}
         title="Record a voice note"
-        className="fixed bottom-20 right-6 z-40 flex items-center gap-2 rounded-full text-white shadow-lg px-5 py-3.5 transition-all active:scale-95 md:bottom-[5.5rem] md:right-8 bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/30"
+        className="fixed bottom-20 right-6 z-40 flex items-center gap-2 rounded-full text-primary-foreground shadow-lg px-5 py-3.5 transition-all active:scale-95 md:bottom-[5.5rem] md:right-8 bg-primary hover:bg-primary/90 shadow-primary/20"
       >
         <Mic size={18} /><span className="text-sm font-semibold">Voice</span>
       </button>,

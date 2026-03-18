@@ -151,7 +151,7 @@ export default function FileAttachments({ attachments = [], onUpdate }) {
     <div className="space-y-3">
       {/* Error banner */}
       {error && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs">
           <AlertCircle size={14} className="flex-shrink-0" />
           {error}
         </div>
@@ -165,28 +165,28 @@ export default function FileAttachments({ attachments = [], onUpdate }) {
         onDrop={handleDrop}
         className={`border-2 border-dashed rounded-xl px-4 py-3 text-center transition-colors ${
           isDragging
-            ? 'border-indigo-500 bg-indigo-500/10'
-            : 'border-gray-700/50 hover:border-gray-600'
+            ? 'border-brand-lavender bg-brand-lavender/10'
+            : 'border-border hover:border-muted-foreground'
         }`}
       >
         {uploading ? (
           <div className="flex flex-col items-center gap-2 py-1">
-            <Loader2 size={20} className="animate-spin text-indigo-400" />
-            <div className="w-full max-w-[200px] bg-gray-800 rounded-full h-1.5">
+            <Loader2 size={20} className="animate-spin text-brand-lavender" />
+            <div className="w-full max-w-[200px] bg-muted rounded-full h-1.5">
               <div
-                className="bg-indigo-500 h-1.5 rounded-full transition-all"
+                className="bg-primary h-1.5 rounded-full transition-all"
                 style={{ width: `${uploadProgress}%` }}
               />
             </div>
-            <span className="text-xs text-gray-400">{uploadProgress}%</span>
+            <span className="text-xs text-muted-foreground">{uploadProgress}%</span>
           </div>
         ) : (
           <label className="cursor-pointer flex flex-col items-center gap-1.5">
-            <Upload size={18} className="text-gray-500" />
-            <span className="text-xs text-gray-400">
-              Drop file here or <span className="text-indigo-400 underline">browse</span>
+            <Upload size={18} className="text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">
+              Drop file here or <span className="text-brand-lavender underline">browse</span>
             </span>
-            <span className="text-[10px] text-gray-600">
+            <span className="text-[10px] text-muted-foreground/60">
               Images, PDFs, docs up to 4.5 MB
             </span>
             <input
@@ -208,7 +208,7 @@ export default function FileAttachments({ attachments = [], onUpdate }) {
             return (
               <div
                 key={att.id}
-                className="flex items-center gap-2 p-2 rounded-lg bg-gray-800/50 border border-gray-700/40 group"
+                className="flex items-center gap-2 p-2 rounded-lg bg-card border border-border group"
               >
                 {/* Thumbnail or icon */}
                 {isImageType(att.type) ? (
@@ -218,15 +218,15 @@ export default function FileAttachments({ attachments = [], onUpdate }) {
                     className="w-8 h-8 rounded object-cover flex-shrink-0"
                   />
                 ) : (
-                  <div className="w-8 h-8 rounded bg-gray-700/50 flex items-center justify-center flex-shrink-0">
-                    <Icon size={16} className="text-gray-400" />
+                  <div className="w-8 h-8 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                    <Icon size={16} className="text-muted-foreground" />
                   </div>
                 )}
 
                 {/* Name + size */}
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs text-gray-300 truncate">{att.name}</p>
-                  <p className="text-[10px] text-gray-600">{formatFileSize(att.size)}</p>
+                  <p className="text-xs text-foreground truncate">{att.name}</p>
+                  <p className="text-[10px] text-muted-foreground">{formatFileSize(att.size)}</p>
                 </div>
 
                 {/* Download */}
@@ -234,7 +234,7 @@ export default function FileAttachments({ attachments = [], onUpdate }) {
                   href={att.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="p-1 text-gray-500 hover:text-indigo-400 transition-colors"
+                  className="p-1 text-muted-foreground hover:text-brand-lavender transition-colors"
                   title="Download"
                 >
                   <Download size={14} />
@@ -243,7 +243,7 @@ export default function FileAttachments({ attachments = [], onUpdate }) {
                 {/* Delete */}
                 <button
                   onClick={() => setDeleteTarget(att)}
-                  className="p-1 text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                  className="p-1 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all"
                   title="Delete"
                 >
                   <Trash2 size={14} />

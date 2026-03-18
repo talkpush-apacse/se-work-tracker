@@ -26,7 +26,7 @@ const TAG_LABELS = {
 };
 const TAG_COLORS = {
   ...WEEKLY_UPDATE_LOG_COLORS,
-  skip: '#6b7280',
+  skip: '#9C8E7E',
 };
 
 // System prompt for batch AI summaries (uses email body content for executive-quality output)
@@ -420,7 +420,7 @@ export default function CalendarEmailImport({ customers, addWeeklyUpdateLog, aiS
                     <button
                       onClick={handleBulkAdd}
                       disabled={taggedCount === 0}
-                      className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/15 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/25 disabled:opacity-40 transition-all"
+                      className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-semibold hover:bg-emerald-100 disabled:opacity-40 transition-all"
                     >
                       <Check size={12} />
                       Add All Tagged ({taggedCount})
@@ -431,26 +431,26 @@ export default function CalendarEmailImport({ customers, addWeeklyUpdateLog, aiS
 
               {/* Status messages */}
               {fetchError === 'connect' && (
-                <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs">
+                <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-xs">
                   <AlertCircle size={13} className="mt-0.5 flex-shrink-0" />
                   <span>Connect Google Calendar or Gmail in the Integrations tab first.</span>
                 </div>
               )}
               {fetchError && fetchError !== 'connect' && (
-                <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+                <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs">
                   <AlertCircle size={13} className="mt-0.5 flex-shrink-0" />
                   <span>{fetchError}</span>
                 </div>
               )}
               {summaryError && (
-                <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+                <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs">
                   <AlertCircle size={13} className="mt-0.5 flex-shrink-0" />
                   <span>AI summary failed: {summaryError}</span>
-                  <button onClick={() => setSummaryError(null)} className="ml-auto text-red-400/60 hover:text-red-400"><X size={11} /></button>
+                  <button onClick={() => setSummaryError(null)} className="ml-auto text-red-700/60 hover:text-red-700"><X size={11} /></button>
                 </div>
               )}
               {successMsg && (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium">
+                <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium">
                   <Check size={13} />
                   <span>{successMsg}</span>
                 </div>
@@ -460,7 +460,7 @@ export default function CalendarEmailImport({ customers, addWeeklyUpdateLog, aiS
               {isFetching && (
                 <div className="space-y-2 py-2">
                   {[0, 1, 2].map(i => (
-                    <div key={i} className="animate-pulse flex items-start gap-3 p-3 rounded-xl border border-border bg-secondary/10">
+                    <div key={i} className="animate-pulse flex items-start gap-3 p-3 rounded-xl border border-border bg-muted">
                       <div className="h-4 w-14 bg-secondary rounded-full flex-shrink-0 mt-0.5" />
                       <div className="flex-1 space-y-2 min-w-0">
                         <div className="h-3 bg-secondary rounded w-3/4" />
@@ -478,14 +478,14 @@ export default function CalendarEmailImport({ customers, addWeeklyUpdateLog, aiS
                     const state = itemState[item.id] || { tag: 'highlight', customerId: '', summary: '', editing: false };
                     const isSkipped = state.tag === 'skip';
                     const isAdded = state.added;
-                    const tagColor = TAG_COLORS[state.tag] || '#6b7280';
+                    const tagColor = TAG_COLORS[state.tag] || '#9C8E7E';
 
                     return (
                       <div
                         key={item.id}
                         className={`rounded-xl border px-3 py-2.5 transition-all ${
                           isAdded
-                            ? 'border-emerald-500/30 bg-emerald-500/5 opacity-60'
+                            ? 'border-emerald-200 bg-emerald-50 opacity-60'
                             : isSkipped
                             ? 'border-border bg-secondary/30 opacity-50'
                             : 'border-border bg-card'
@@ -495,11 +495,11 @@ export default function CalendarEmailImport({ customers, addWeeklyUpdateLog, aiS
                         <div className="flex items-start gap-2 mb-2">
                           {/* Source icon — star indicator for starred emails */}
                           {item.source === 'calendar' ? (
-                            <Calendar size={13} className="text-blue-400 mt-0.5 flex-shrink-0" />
+                            <Calendar size={13} className="text-blue-700 mt-0.5 flex-shrink-0" />
                           ) : (
                             <div className="flex items-center gap-1 mt-0.5 flex-shrink-0">
-                              <Mail size={13} className="text-purple-400" />
-                              {item.starred && <Star size={11} className="text-amber-400 fill-amber-400" />}
+                              <Mail size={13} className="text-purple-700" />
+                              {item.starred && <Star size={11} className="text-amber-600 fill-amber-600" />}
                             </div>
                           )}
                           <div className="min-w-0 flex-1">
@@ -524,7 +524,7 @@ export default function CalendarEmailImport({ customers, addWeeklyUpdateLog, aiS
 
                           {/* Added badge */}
                           {isAdded && (
-                            <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-400 flex-shrink-0">
+                            <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-700 flex-shrink-0">
                               <Check size={11} /> Added
                             </span>
                           )}
@@ -570,7 +570,7 @@ export default function CalendarEmailImport({ customers, addWeeklyUpdateLog, aiS
                             {/* Tag pills */}
                             {TAG_TYPES.map(tag => {
                               const active = state.tag === tag;
-                              const color = TAG_COLORS[tag] || '#6b7280';
+                              const color = TAG_COLORS[tag] || '#9C8E7E';
                               return (
                                 <button
                                   key={tag}
@@ -607,7 +607,7 @@ export default function CalendarEmailImport({ customers, addWeeklyUpdateLog, aiS
                             {!isSkipped && (
                               <button
                                 onClick={() => handleAddSingle(item)}
-                                className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-400 text-[10px] font-semibold hover:bg-emerald-500/25 transition-all"
+                                className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-700 text-[10px] font-semibold hover:bg-emerald-100 transition-all"
                               >
                                 <Check size={10} /> Add
                               </button>

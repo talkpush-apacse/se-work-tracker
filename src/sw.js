@@ -19,7 +19,7 @@ registerRoute(navRoute);
 registerRoute(
   ({ url }) => url.pathname.startsWith('/api/'),
   new StaleWhileRevalidate({
-    cacheName: 'api-cache',
+    cacheName: 'api-cache-v2',
     plugins: [
       new CacheableResponsePlugin({ statuses: [0, 200] }),
       new ExpirationPlugin({

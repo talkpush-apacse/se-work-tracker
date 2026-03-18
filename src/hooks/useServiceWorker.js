@@ -15,13 +15,21 @@ export function useServiceWorker() {
   const waitingSW = useRef(null);
   const dismissTimer = useRef(null);
 
-  // ── Online / Offline ──
+  // ── Online / Offline (debounced by 1s to avoid flicker) ──
   useEffect(() => {
-    const goOffline = () => setIsOffline(true);
-    const goOnline = () => setIsOffline(false);
+    let timer;
+    const goOffline = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => setIsOffline(true), 1000);
+    };
+    const goOnline = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => setIsOffline(false), 1000);
+    };
     window.addEventListener('offline', goOffline);
     window.addEventListener('online', goOnline);
     return () => {
+      clearTimeout(timer);
       window.removeEventListener('offline', goOffline);
       window.removeEventListener('online', goOnline);
     };

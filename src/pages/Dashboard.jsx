@@ -32,18 +32,18 @@ function CustomerBadge({ customerId, customers, size = 'sm' }) {
 function StatCard({ icon: Icon, label, value, sub, color = 'indigo' }) {
   const colors = {
     indigo: 'text-brand-lavender bg-brand-lavender/10',
-    violet: 'text-violet-400 bg-violet-500/10',
+    violet: 'text-purple-700 bg-purple-50',
     amber: 'text-brand-amber bg-amber-500/10',
     emerald: 'text-brand-sage bg-brand-sage/10',
-    rose: 'text-rose-400 bg-rose-500/10',
+    rose: 'text-red-700 bg-red-50',
   };
   return (
     <div className="bg-card border border-border rounded-2xl p-4">
       <div className={`inline-flex p-2 rounded-xl mb-3 ${colors[color]}`}>
         <Icon size={18} className={colors[color].split(' ')[0]} />
       </div>
-      <p className="text-2xl font-bold text-foreground">{value}</p>
-      <p className="text-sm text-muted-foreground mt-0.5">{label}</p>
+      <p className="text-2xl font-mono font-bold text-foreground">{value}</p>
+      <p className="text-sm font-sans text-muted-foreground mt-0.5">{label}</p>
       {sub && <p className="text-xs text-muted-foreground/70 mt-0.5">{sub}</p>}
     </div>
   );
@@ -155,9 +155,9 @@ export default function Dashboard({ onNavigate }) {
   };
 
   const rankIcon = (i) => {
-    if (i === 0) return <Trophy size={16} className="text-yellow-400" />;
+    if (i === 0) return <Trophy size={16} className="text-amber-700" />;
     if (i === 1) return <span className="text-muted-foreground font-bold text-sm">2</span>;
-    if (i === 2) return <span className="text-orange-400 font-bold text-sm">3</span>;
+    if (i === 2) return <span className="text-orange-600 font-bold text-sm">3</span>;
     return <span className="text-muted-foreground/70 text-sm font-medium">{i + 1}</span>;
   };
 
@@ -172,9 +172,9 @@ export default function Dashboard({ onNavigate }) {
           </p>
         </div>
         {streak > 0 && (
-          <div className="flex items-center gap-2 bg-orange-500/10 border border-orange-500/30 rounded-xl px-3 py-2">
-            <Flame size={16} className="text-orange-400" />
-            <span className="text-sm font-bold text-orange-300">{streak} day streak</span>
+          <div className="flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-xl px-3 py-2">
+            <Flame size={16} className="text-orange-600" />
+            <span className="text-sm font-bold text-orange-600">{streak} day streak</span>
           </div>
         )}
       </div>
@@ -201,7 +201,7 @@ export default function Dashboard({ onNavigate }) {
                 <div className={`inline-flex p-2 rounded-xl mb-2 ${WORK_TYPE_COLORS[wt].bg}`}>
                   <Icon size={16} className={WORK_TYPE_COLORS[wt].text} />
                 </div>
-                <p className="text-lg font-bold text-foreground">{hrs}h</p>
+                <p className="text-lg font-mono font-bold text-foreground">{hrs}h</p>
                 <p className="text-sm text-muted-foreground">{WORK_TYPE_LABELS[wt]}</p>
                 <p className="text-xs text-muted-foreground/70 mt-0.5">
                   {pct}% of total · {target > 0 ? `${target}h target` : 'no target'}
@@ -218,10 +218,10 @@ export default function Dashboard({ onNavigate }) {
 
       {/* Weekly summary banner */}
       {totalPts > 0 && (
-        <div className="bg-gradient-to-r from-indigo-900/50 to-violet-900/30 border border-indigo-700/40 rounded-2xl p-4">
-          <p className="text-sm text-indigo-200">
+        <div className="bg-gradient-to-r from-primary/10 to-primary/5 border border-border rounded-2xl p-4">
+          <p className="text-sm text-foreground">
             <span className="font-bold text-foreground">Weekly Summary:</span> You've invested{' '}
-            <span className="text-yellow-400 font-bold">{Number(totalPts).toFixed(1)} points</span> and{' '}
+            <span className="text-amber-700 font-bold">{Number(totalPts).toFixed(1)} points</span> and{' '}
             <span className="text-brand-sage font-bold">{totalHrs.toFixed(1)}h</span> across{' '}
             {new Set(weekPoints.map(p => p.customerId).filter(Boolean)).size} customers.
             {topCustomer && <> Top focus: <span className="text-brand-lavender/80 font-semibold">{topCustomer.name}</span>.</>}
@@ -233,7 +233,7 @@ export default function Dashboard({ onNavigate }) {
         {/* Leaderboard */}
         <div className="xl:col-span-2 bg-card border border-border rounded-2xl overflow-hidden">
           <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-            <h2 className="font-semibold text-foreground flex items-center gap-2"><Trophy size={16} className="text-yellow-400" /> Customer Leaderboard</h2>
+            <h2 className="font-semibold text-foreground flex items-center gap-2"><Trophy size={16} className="text-amber-700" /> Customer Leaderboard</h2>
             <span className="text-xs text-muted-foreground">By total points</span>
           </div>
           {leaderboard.length === 0 ? (
@@ -242,7 +242,7 @@ export default function Dashboard({ onNavigate }) {
               <button onClick={() => onNavigate('customers')} className="mt-3 text-sm text-brand-lavender hover:text-brand-lavender/80">Add your first customer →</button>
             </div>
           ) : (
-            <div className="divide-y divide-gray-800/60">
+            <div className="divide-y divide-border">
               {leaderboard.map((customer, i) => {
                 const pct = maxPoints > 0 ? (customer.totalPoints / maxPoints) * 100 : 0;
                 const isFlashing = flashId === customer.id;
@@ -250,13 +250,13 @@ export default function Dashboard({ onNavigate }) {
                 return (
                   <div
                     key={customer.id}
-                    className={`px-5 py-3.5 hover:bg-secondary/50 transition-colors ${i === 0 ? 'bg-yellow-500/5' : ''}`}
+                    className={`px-5 py-3.5 hover:bg-card-hover transition-colors ${i === 0 ? 'bg-amber-50/50' : ''}`}
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-7 flex items-center justify-center flex-shrink-0">{rankIcon(i)}</div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`font-semibold text-sm ${i === 0 ? 'text-yellow-100' : 'text-foreground'}`}>{customer.name}</span>
+                          <span className={`font-semibold text-sm ${i === 0 ? 'text-foreground' : 'text-foreground'}`}>{customer.name}</span>
                           <span className="text-[10px] text-muted-foreground">{customer.taskCount} tasks</span>
                         </div>
                         <div className="mt-1.5 h-1 bg-secondary rounded-full overflow-hidden">
@@ -268,9 +268,9 @@ export default function Dashboard({ onNavigate }) {
                       </div>
                       <div className="text-right flex-shrink-0">
                         <div className="relative">
-                          <p className={`font-bold text-sm ${i === 0 ? 'text-yellow-400' : 'text-foreground'}`}>{Number(customer.totalPoints).toFixed(1)} pts</p>
+                          <p className={`font-mono font-bold text-sm ${i === 0 ? 'text-amber-700' : 'text-foreground'}`}>{Number(customer.totalPoints).toFixed(1)} pts</p>
                           {isFlashing && (
-                            <span className="point-flash absolute -top-1 right-0 text-xs font-bold text-yellow-400 whitespace-nowrap">+pts!</span>
+                            <span className="point-flash absolute -top-1 right-0 text-xs font-bold text-amber-700 whitespace-nowrap">+pts!</span>
                           )}
                         </div>
                         <p className="text-[11px] text-muted-foreground">{customer.totalHours.toFixed(1)}h</p>
@@ -329,7 +329,7 @@ export default function Dashboard({ onNavigate }) {
               </button>
             </div>
           ) : (
-            <div className="divide-y divide-gray-800/60 max-h-96 overflow-y-auto scrollbar-thin">
+            <div className="divide-y divide-border max-h-96 overflow-y-auto scrollbar-thin">
               {recentActivity.map(entry => (
                 <div key={entry.id} className="px-4 py-3">
                   <div className="flex items-start justify-between gap-2">
@@ -365,15 +365,15 @@ export default function Dashboard({ onNavigate }) {
                 <button
                   key={okr.id}
                   onClick={() => onNavigate('okrs')}
-                  className="bg-secondary/50 rounded-xl p-4 border border-border/50 text-left w-full cursor-pointer hover:border-indigo-500/50 hover:bg-secondary/80 transition-all"
+                  className="bg-secondary/50 rounded-xl p-4 border border-border/50 text-left w-full cursor-pointer hover:border-primary/50 hover:bg-card-hover transition-all"
                 >
                   <p className="text-sm font-semibold text-foreground leading-snug mb-3 line-clamp-2">{okr.title}</p>
                   <div className="h-1.5 bg-muted rounded-full overflow-hidden mb-2">
-                    <div className="h-full bg-indigo-500 rounded-full transition-all duration-700" style={{ width: `${pct}%` }} />
+                    <div className="h-full bg-primary rounded-full transition-all duration-700" style={{ width: `${pct}%` }} />
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-muted-foreground">{okr.taskCount} task{okr.taskCount !== 1 ? 's' : ''}</span>
-                    <span className="text-foreground font-bold">{Number(okr.totalPoints).toFixed(1)} pts · {okr.totalHours.toFixed(1)}h</span>
+                    <span className="text-foreground font-mono font-bold">{Number(okr.totalPoints).toFixed(1)} pts · {okr.totalHours.toFixed(1)}h</span>
                   </div>
                 </button>
               );

@@ -11,7 +11,7 @@ function SheetOverlay({ onClick }) {
   return (
     <DialogPrimitive.Overlay
       onClick={onClick}
-      className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+      className="fixed inset-0 z-50 bg-black/30 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
     />
   );
 }
@@ -47,7 +47,7 @@ function CopyButton({ text }) {
       onClick={handleCopy}
       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all"
     >
-      {copied ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
+      {copied ? <Check size={12} className="text-emerald-700" /> : <Copy size={12} />}
       {copied ? 'Copied!' : 'Copy text'}
     </button>
   );

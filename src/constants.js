@@ -40,12 +40,12 @@ export const TASK_TYPE_LABELS = {
 };
 
 export const TASK_TYPE_COLORS = {
-  mine:         { bg: 'bg-blue-500/15',   text: 'text-blue-400',   border: 'border-blue-500/20' },
-  coordinate:   { bg: 'bg-amber-500/15',  text: 'text-amber-400',  border: 'border-amber-500/20' },
-  comms:        { bg: 'bg-purple-500/15', text: 'text-purple-400', border: 'border-purple-500/20' },
-  'focus-time': { bg: 'bg-teal-500/15',   text: 'text-teal-400',   border: 'border-teal-500/20' },
-  evergreen:    { bg: 'bg-green-500/15',  text: 'text-green-400',  border: 'border-green-500/20' },
-  recurring:    { bg: 'bg-yellow-500/15', text: 'text-yellow-400', border: 'border-yellow-500/20' },
+  mine:         { bg: 'bg-blue-50',   text: 'text-blue-700',   border: 'border-blue-200' },
+  coordinate:   { bg: 'bg-amber-50',  text: 'text-amber-700',  border: 'border-amber-200' },
+  comms:        { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
+  'focus-time': { bg: 'bg-teal-50',   text: 'text-teal-700',   border: 'border-teal-200' },
+  evergreen:    { bg: 'bg-green-50',  text: 'text-green-700',  border: 'border-green-200' },
+  recurring:    { bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-200' },
 };
 
 // Points awarded per task type when a task is marked 'done'
@@ -71,11 +71,11 @@ export const TASK_STATUS_LABELS = {
 };
 
 export const TASK_STATUS_COLORS = {
-  'open': { bg: 'bg-gray-500/15', text: 'text-gray-400', border: 'border-gray-500/20' },
-  'in-progress': { bg: 'bg-indigo-500/15', text: 'text-indigo-400', border: 'border-indigo-500/20' },
-  'done': { bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-500/20' },
-  'blocked': { bg: 'bg-red-500/15', text: 'text-red-400', border: 'border-red-500/20' },
-  'archived': { bg: 'bg-gray-800/60', text: 'text-gray-600', border: 'border-gray-700/40' },
+  'open': { bg: 'bg-gray-100', text: 'text-gray-600', border: 'border-gray-200' },
+  'in-progress': { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
+  'done': { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
+  'blocked': { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200' },
+  'archived': { bg: 'bg-gray-100', text: 'text-gray-500', border: 'border-gray-200' },
 };
 
 // Task recipients — who this task/message is directed at
@@ -99,14 +99,14 @@ export const AI_OUTPUT_TYPE_LABELS = {
 };
 
 export const ACTIVITY_COLORS = {
-  'Scoping':           '#6366f1',
-  'Configuration':     '#10b981',
-  'Testing':           '#f43f5e',
-  'UAT':               '#8b5cf6',
+  'Scoping':           '#3578DB',
+  'Configuration':     '#2BAF54',
+  'Testing':           '#C44A4A',
+  'UAT':               '#9B59B6',
   'Training':          '#f97316',
-  'Hypercare':         '#f59e0b',
+  'Hypercare':         '#C47F0A',
   'Reporting':         '#06b6d4',
-  'General Admin':     '#6b7280',
+  'General Admin':     '#9C8E7E',
   'Account Management':'#ec4899',
 };
 
@@ -118,9 +118,9 @@ export const TASK_INTERACTION_TYPE_LABELS = {
   'Focus Time': 'Focus Time',
 };
 export const TASK_INTERACTION_TYPE_COLORS = {
-  'Meeting':    '#8b5cf6',
-  'Email':      '#6366f1',
-  'Focus Time': '#10b981',
+  'Meeting':    '#9B59B6',
+  'Email':      '#3578DB',
+  'Focus Time': '#2BAF54',
 };
 
 // ─── Work Types (bandwidth-first tracking) ──────────────────────────────────
@@ -134,10 +134,10 @@ export const WORK_TYPE_LABELS = {
 };
 
 export const WORK_TYPE_COLORS = {
-  deep_work: { bg: 'bg-teal-500/15',   text: 'text-teal-400',   border: 'border-teal-500/20', hex: '#14b8a6' },
-  meetings:  { bg: 'bg-blue-500/15',   text: 'text-blue-400',   border: 'border-blue-500/20', hex: '#3b82f6' },
-  comms:     { bg: 'bg-purple-500/15', text: 'text-purple-400', border: 'border-purple-500/20', hex: '#8b5cf6' },
-  admin:     { bg: 'bg-amber-500/15',  text: 'text-amber-400',  border: 'border-amber-500/20', hex: '#f59e0b' },
+  deep_work: { bg: 'bg-teal-50',   text: 'text-teal-700',   border: 'border-teal-200', hex: '#14b8a6' },
+  meetings:  { bg: 'bg-blue-50',   text: 'text-blue-700',   border: 'border-blue-200', hex: '#3b82f6' },
+  comms:     { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', hex: '#8b5cf6' },
+  admin:     { bg: 'bg-amber-50',  text: 'text-amber-700',  border: 'border-amber-200', hex: '#f59e0b' },
 };
 
 // Default weekly hour targets per work type (must sum to ≤ 40)
@@ -189,10 +189,10 @@ export const AUTO_TRACK_MIN_SECONDS = 30;  // Ignore sessions shorter than 30s
 export const ANNOTATION_TAGS = ['good', 'bad', 'learning', 'product'];
 export const ANNOTATION_TAG_LABELS = { good: 'Good', bad: 'Bad', learning: 'Learning', product: 'Product' };
 export const ANNOTATION_TAG_COLORS = {
-  good:     '#10b981',  // emerald green
-  bad:      '#f43f5e',  // rose red
-  learning: '#f59e0b',  // amber yellow
-  product:  '#6366f1',  // indigo purple
+  good:     '#2BAF54',  // earthy green
+  bad:      '#C44A4A',  // warm red
+  learning: '#C47F0A',  // warm amber
+  product:  '#3578DB',  // warm blue
 };
 
 // ─── Weekly Update Log ────────────────────────────────────────────────────────
@@ -207,13 +207,13 @@ export const WEEKLY_UPDATE_LOG_LABELS = {
   'next-week-priority': 'Next Week Priority',
 };
 export const WEEKLY_UPDATE_LOG_COLORS = {
-  highlight:            '#10b981',  // emerald green
-  lowlight:             '#f43f5e',  // rose red
-  neutral:              '#6b7280',  // gray
-  learning:             '#3b82f6',  // blue
-  shoutout:             '#f59e0b',  // amber/gold
-  annotation:           '#8b5cf6',  // violet
-  'next-week-priority': '#f97316',  // orange
+  highlight:            '#2BAF54',  // earthy green
+  lowlight:             '#C44A4A',  // warm red
+  neutral:              '#9C8E7E',  // warm taupe
+  learning:             '#3578DB',  // warm blue
+  shoutout:             '#C47F0A',  // warm amber
+  annotation:           '#9B59B6',  // warm purple
+  'next-week-priority': '#f97316',  // warm orange
 };
 
 // ─── Weekly Email Generator ───────────────────────────────────────────────────
@@ -247,10 +247,10 @@ export const MILESTONE_STATUS_LABELS = {
 };
 
 export const MILESTONE_STATUS_COLORS = {
-  'pending':     '#f59e0b',
-  'in-progress': '#6366f1',
-  'completed':   '#10b981',
-  'cancelled':   '#6b7280',
+  'pending':     '#C47F0A',
+  'in-progress': '#3578DB',
+  'completed':   '#2BAF54',
+  'cancelled':   '#9C8E7E',
 };
 
 // ─── RAG Memory Search ────────────────────────────────────────────────────────

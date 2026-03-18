@@ -3,85 +3,114 @@
 @tailwind utilities;
 
 /* ─────────────────────────────────────────────
-   Design System Color Tokens
-   Light mode (fallback) + dark mode (default)
+   Design System Color Tokens — NutriLog Warm Earthy Theme
+   Light mode (default) + dark mode (opt-in via .dark class)
 ───────────────────────────────────────────── */
 @layer base {
   :root {
-    /* Light mode values */
-    --background:    60 100% 98%;
-    --foreground:    240 10% 8%;
-    --card:          0 0% 100%;
-    --card-foreground: 240 10% 8%;
+    /* Warm earthy light theme (default) */
+    --background:    30 45% 96%;      /* #FAF6F1 warm parchment */
+    --foreground:    30 30% 13%;      /* #2C2418 deep warm brown */
+    --card:          0 0% 100%;       /* #FFFFFF */
+    --card-foreground: 30 30% 13%;    /* #2C2418 */
+    --card-hover:    36 30% 93%;      /* #F5F0E8 warm cream */
     --popover:       0 0% 100%;
-    --popover-foreground: 240 10% 8%;
-    --primary:       240 10% 8%;
-    --primary-foreground: 50 30% 92%;
-    --secondary:     60 30% 95%;
-    --secondary-foreground: 240 10% 8%;
-    --muted:         60 20% 93%;
-    --muted-foreground: 240 5% 45%;
-    --accent:        298 72% 85%;
-    --accent-foreground: 240 10% 8%;
-    --destructive:   0 65% 60%;
-    --destructive-foreground: 50 30% 92%;
-    --border:        240 5% 85%;
-    --input:         240 5% 75%;
-    --ring:          240 10% 8%;
+    --popover-foreground: 30 30% 13%;
+    --primary:       255 40% 55%;     /* warm lavender — CTA bg */
+    --primary-foreground: 0 0% 100%;  /* white text on lavender */
+    --secondary:     36 30% 96%;      /* warm off-white */
+    --secondary-foreground: 30 30% 13%;
+    --muted:         36 20% 94%;      /* #F0E9DF warm neutral */
+    --muted-foreground: 30 15% 55%;   /* #9C8E7E soft taupe */
+    --accent:        255 40% 55%;     /* lavender accent */
+    --accent-foreground: 0 0% 100%;   /* white on accent */
+    --destructive:   0 50% 52%;       /* #C44A4A warm red */
+    --destructive-foreground: 0 0% 100%;
+    --border:        33 25% 87%;      /* #E8E0D4 warm sand */
+    --input:         33 20% 83%;      /* #DDD5C8 input border */
+    --input-bg:      34 22% 95%;      /* #F7F3ED input background */
+    --ring:          255 40% 55%;     /* lavender focus ring */
 
-    /* Sidebar light */
-    --sidebar-background:        240 6% 11%;
-    --sidebar-foreground:        0 0% 95%;
-    --sidebar-accent:            240 5% 17%;
-    --sidebar-accent-foreground: 0 0% 95%;
-    --sidebar-border:            240 5% 17%;
+    /* Sidebar — warm light */
+    --sidebar-background:        0 0% 100%;     /* white sidebar */
+    --sidebar-foreground:        30 30% 13%;    /* #2C2418 */
+    --sidebar-accent:            255 40% 96%;   /* light lavender tint */
+    --sidebar-accent-foreground: 30 30% 13%;
+    --sidebar-border:            33 25% 87%;    /* #E8E0D4 */
+    --sidebar-muted:             30 15% 55%;    /* #9C8E7E */
 
     /* Border radius base */
     --radius: 0.375rem;
 
-    /* Brand palette — light values */
+    /* Brand palette — warm light values */
     --brand-sage:          139 28% 74%;
     --brand-sage-lightest: 139 25% 88%;
     --brand-sage-lighter:  139 28% 80%;
     --brand-sage-darker:   139 30% 58%;
 
-    --brand-lavender:          223 64% 84%;
-    --brand-lavender-lightest: 223 55% 92%;
-    --brand-lavender-lighter:  223 60% 88%;
-    --brand-lavender-darker:   223 45% 68%;
+    --brand-lavender:          255 40% 55%;     /* warmed-up primary lavender */
+    --brand-lavender-lightest: 255 40% 96%;     /* very light tint */
+    --brand-lavender-lighter:  255 40% 88%;
+    --brand-lavender-darker:   255 45% 45%;     /* darker for links */
 
-    --brand-pink:          298 72% 85%;
-    --brand-pink-lightest: 298 60% 92%;
-    --brand-pink-lighter:  298 65% 88%;
-    --brand-pink-darker:   298 50% 70%;
+    --brand-pink:          298 50% 70%;
+    --brand-pink-lightest: 298 30% 92%;
+    --brand-pink-lighter:  298 35% 85%;
+    --brand-pink-darker:   298 40% 55%;
 
     --brand-amber:          36 86% 64%;
     --brand-amber-lightest: 36 75% 82%;
     --brand-amber-lighter:  36 80% 74%;
     --brand-amber-darker:   36 80% 52%;
+
+    /* Status colors — warmed up */
+    --status-success: 143 58% 43%;   /* #2BAF54 earthy green */
+    --status-error:   0 50% 52%;     /* #C44A4A warm red */
+    --status-warning: 38 88% 40%;    /* #C47F0A warm amber */
+    --status-info:    214 70% 53%;   /* #3578DB warm blue */
+    --status-focus:   282 35% 53%;   /* #9B59B6 warm purple */
+
+    /* Kanban column header tints */
+    --kanban-open:       207 60% 95%;   /* #E8F4FD warm blue tint */
+    --kanban-progress:   38 70% 93%;    /* #FDF3E0 warm amber tint */
+    --kanban-done:       143 50% 93%;   /* #E5F6EA warm green tint */
+    --kanban-blocked:    0 50% 94%;     /* #FDE8E8 warm red tint */
+    --kanban-open-fg:    207 70% 35%;   /* dark blue text */
+    --kanban-progress-fg: 38 80% 30%;   /* dark amber text */
+    --kanban-done-fg:    143 60% 28%;   /* dark green text */
+    --kanban-blocked-fg: 0 55% 38%;     /* dark red text */
+
+    /* Skeleton loader */
+    --skeleton-from: 36 20% 93%;     /* #F0E9DF */
+    --skeleton-to:   34 22% 95%;     /* #F7F3ED */
+
+    /* Dividers */
+    --divider: 36 25% 93%;           /* #F0E9DF subtle */
   }
 
   .dark {
-    /* Dark mode values (active by default) */
+    /* Dark mode values (opt-in via .dark class) */
     --background:    240 8% 9%;
     --foreground:    50 30% 92%;
     --card:          240 6% 13%;
     --card-foreground: 50 30% 92%;
+    --card-hover:    240 5% 17%;
     --popover:       240 6% 13%;
     --popover-foreground: 50 30% 92%;
-    --primary:       50 30% 92%;
+    --primary:       255 50% 65%;
     --primary-foreground: 240 10% 8%;
     --secondary:     240 5% 18%;
     --secondary-foreground: 50 30% 92%;
     --muted:         240 5% 18%;
     --muted-foreground: 240 5% 65%;
-    --accent:        298 50% 65%;
-    --accent-foreground: 50 30% 92%;
+    --accent:        255 50% 65%;
+    --accent-foreground: 240 10% 8%;
     --destructive:   0 55% 55%;
     --destructive-foreground: 50 30% 92%;
-    --border:        240 5% 40%;
-    --input:         240 5% 40%;
-    --ring:          50 30% 92%;
+    --border:        240 5% 25%;
+    --input:         240 5% 30%;
+    --input-bg:      240 6% 15%;
+    --ring:          255 50% 65%;
 
     /* Sidebar dark */
     --sidebar-background:        240 6% 11%;
@@ -89,17 +118,18 @@
     --sidebar-accent:            240 5% 17%;
     --sidebar-accent-foreground: 0 0% 95%;
     --sidebar-border:            240 5% 23%;
+    --sidebar-muted:             240 5% 55%;
 
-    /* Brand palette — dark adjusted (hue preserved, lightness adjusted) */
+    /* Brand palette — dark adjusted */
     --brand-sage:          139 25% 62%;
     --brand-sage-lightest: 139 20% 30%;
     --brand-sage-lighter:  139 22% 36%;
     --brand-sage-darker:   139 30% 72%;
 
-    --brand-lavender:          223 50% 70%;
-    --brand-lavender-lightest: 223 30% 28%;
-    --brand-lavender-lighter:  223 35% 34%;
-    --brand-lavender-darker:   223 55% 78%;
+    --brand-lavender:          255 50% 65%;
+    --brand-lavender-lightest: 255 30% 28%;
+    --brand-lavender-lighter:  255 35% 34%;
+    --brand-lavender-darker:   255 55% 78%;
 
     --brand-pink:          298 40% 65%;
     --brand-pink-lightest: 298 25% 26%;
@@ -110,6 +140,30 @@
     --brand-amber-lightest: 36 45% 26%;
     --brand-amber-lighter:  36 50% 32%;
     --brand-amber-darker:   36 75% 65%;
+
+    /* Status colors — dark mode */
+    --status-success: 143 58% 43%;
+    --status-error:   0 50% 52%;
+    --status-warning: 38 88% 40%;
+    --status-info:    214 70% 53%;
+    --status-focus:   282 35% 53%;
+
+    /* Kanban — dark mode */
+    --kanban-open:       207 40% 18%;
+    --kanban-progress:   38 40% 18%;
+    --kanban-done:       143 35% 16%;
+    --kanban-blocked:    0 35% 18%;
+    --kanban-open-fg:    207 60% 70%;
+    --kanban-progress-fg: 38 70% 65%;
+    --kanban-done-fg:    143 50% 65%;
+    --kanban-blocked-fg: 0 50% 65%;
+
+    /* Skeleton — dark */
+    --skeleton-from: 240 5% 16%;
+    --skeleton-to:   240 5% 20%;
+
+    --card-hover: 240 5% 17%;
+    --divider: 240 5% 20%;
   }
 
   * {
@@ -157,6 +211,22 @@
   .pl-safe { padding-left: env(safe-area-inset-left); }
   .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
   .mt-safe { margin-top: env(safe-area-inset-top); }
+
+  /* Skeleton loading pulse — warm colors */
+  .skeleton-pulse {
+    animation: skeleton-pulse 1.5s ease-in-out infinite;
+    background: hsl(var(--skeleton-from));
+  }
+  @keyframes skeleton-pulse {
+    0%, 100% { background-color: hsl(var(--skeleton-from)); }
+    50% { background-color: hsl(var(--skeleton-to)); }
+  }
+
+  /* Font utility for numeric displays */
+  .font-mono-num {
+    font-family: 'Space Mono', ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+  }
 }
 
 /* ─────────────────────────────────────────────
@@ -188,7 +258,7 @@
 .rich-text-editor-content .ProseMirror em { font-style: italic; }
 .rich-text-editor-content .ProseMirror u { text-decoration: underline; }
 .rich-text-editor-content .ProseMirror a {
-  color: hsl(var(--brand-lavender));
+  color: hsl(var(--brand-lavender-darker));
   text-decoration: underline;
   cursor: pointer;
 }
@@ -213,7 +283,7 @@
 .rich-text-display u { text-decoration: underline; }
 .rich-text-display h2 { font-size: 1em; font-weight: 700; margin-bottom: 0.25em; }
 .rich-text-display h3 { font-size: 0.9em; font-weight: 600; margin-bottom: 0.2em; }
-.rich-text-display a { color: hsl(var(--brand-lavender)); text-decoration: underline; }
+.rich-text-display a { color: hsl(var(--brand-lavender-darker)); text-decoration: underline; }
 .rich-text-display img { max-width: 100%; border-radius: 0.5rem; margin: 0.5em 0; }
 .rich-text-display blockquote {
   border-left: 3px solid hsl(var(--border));

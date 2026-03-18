@@ -76,7 +76,7 @@ function AISummarySection({ data, onUpdateActionItem, onConvertActionItem, onReg
             <ul className="space-y-1 pl-1">
               {decisions.map((d, i) => (
                 <li key={i} className="flex items-start gap-1.5 text-xs text-foreground/80">
-                  <span className="flex-shrink-0 mt-0.5 text-emerald-400">•</span>
+                  <span className="flex-shrink-0 mt-0.5 text-emerald-700">•</span>
                   {d}
                 </li>
               ))}
@@ -100,7 +100,7 @@ function AISummarySection({ data, onUpdateActionItem, onConvertActionItem, onReg
             <ul className="space-y-1 pl-1">
               {openQuestions.map((q, i) => (
                 <li key={i} className="flex items-start gap-1.5 text-xs text-foreground/80">
-                  <span className="flex-shrink-0 mt-0.5 text-amber-400">•</span>
+                  <span className="flex-shrink-0 mt-0.5 text-amber-700">•</span>
                   {q}
                 </li>
               ))}
@@ -318,7 +318,7 @@ export default function MeetingEntryModal({
               type="date"
               value={form.meetingDate}
               onChange={e => setForm(p => ({ ...p, meetingDate: e.target.value }))}
-              className="w-full h-9 bg-secondary border border-border rounded-xl px-3 text-sm text-foreground [color-scheme:dark] focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+              className="w-full h-9 bg-secondary border border-border rounded-xl px-3 text-sm text-foreground [color-scheme:light] focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
             />
           </div>
 
@@ -351,9 +351,9 @@ export default function MeetingEntryModal({
 
         {/* ── AI error ── */}
         {aiError && (
-          <div className="flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-500/5 px-3 py-2.5">
-            <AlertCircle size={13} className="text-red-400 mt-0.5 flex-shrink-0" />
-            <p className="text-xs text-red-400">{aiError}</p>
+          <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5">
+            <AlertCircle size={13} className="text-red-700 mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-red-700">{aiError}</p>
           </div>
         )}
 

@@ -21,6 +21,7 @@ export default {
         card: {
           DEFAULT:    'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
+          hover:      'hsl(var(--card-hover))',
         },
         primary: {
           DEFAULT:    'hsl(var(--primary))',
@@ -44,7 +45,9 @@ export default {
         },
         border:  'hsl(var(--border))',
         input:   'hsl(var(--input))',
+        'input-bg': 'hsl(var(--input-bg))',
         ring:    'hsl(var(--ring))',
+        divider: 'hsl(var(--divider))',
         // Popover
         popover: {
           DEFAULT:    'hsl(var(--popover))',
@@ -57,7 +60,23 @@ export default {
           accent:             'hsl(var(--sidebar-accent))',
           'accent-foreground':'hsl(var(--sidebar-accent-foreground))',
           border:             'hsl(var(--sidebar-border))',
+          muted:              'hsl(var(--sidebar-muted))',
         },
+        // Status colors
+        'status-success': 'hsl(var(--status-success))',
+        'status-error':   'hsl(var(--status-error))',
+        'status-warning': 'hsl(var(--status-warning))',
+        'status-info':    'hsl(var(--status-info))',
+        'status-focus':   'hsl(var(--status-focus))',
+        // Kanban column headers
+        'kanban-open':        'hsl(var(--kanban-open))',
+        'kanban-progress':    'hsl(var(--kanban-progress))',
+        'kanban-done':        'hsl(var(--kanban-done))',
+        'kanban-blocked':     'hsl(var(--kanban-blocked))',
+        'kanban-open-fg':     'hsl(var(--kanban-open-fg))',
+        'kanban-progress-fg': 'hsl(var(--kanban-progress-fg))',
+        'kanban-done-fg':     'hsl(var(--kanban-done-fg))',
+        'kanban-blocked-fg':  'hsl(var(--kanban-blocked-fg))',
         // Brand palette
         'brand-sage': {
           DEFAULT: 'hsl(var(--brand-sage))',
@@ -92,8 +111,9 @@ export default {
         '2xl':'calc(var(--radius) + 6px)',
       },
       fontFamily: {
-        sans: ['Space Grotesk', ...fontFamily.sans],
-        nav:  ['Space Grotesk', ...fontFamily.sans],
+        sans: ['Plus Jakarta Sans', ...fontFamily.sans],
+        nav:  ['Plus Jakarta Sans', ...fontFamily.sans],
+        mono: ['Space Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
       animation: {
         // Design system animations
@@ -135,7 +155,7 @@ export default {
         },
         pulseOnce: {
           '0%':   { transform: 'scale(1)' },
-          '50%':  { transform: 'scale(1.2)', color: '#facc15' },
+          '50%':  { transform: 'scale(1.2)', color: 'hsl(var(--brand-amber))' },
           '100%': { transform: 'scale(1)' },
         },
       },
