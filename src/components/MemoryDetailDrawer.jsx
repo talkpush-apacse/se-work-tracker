@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { X, Copy, Check, ExternalLink } from 'lucide-react';
+import { X, Copy, Check, ExternalLink, Paperclip } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { WORK_TYPE_LABELS, TASK_STATUS_LABELS, MILESTONE_STATUS_LABELS, AI_OUTPUT_TYPE_LABELS } from '../constants';
 import { getEntryColors } from '../utils/memoryIndex';
@@ -188,6 +188,39 @@ function WeeklyLogExtras({ entry }) {
   );
 }
 
+function AttachmentList({ attachments }) {
+  if (!attachments?.length) return null;
+  return (
+    <Section label="Attachments">
+      <div className="space-y-1.5">
+        {attachments.map((att) => (
+          <a
+            key={att.id}
+            href={att.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 p-2 rounded-lg bg-secondary/50 border border-border hover:bg-accent/30 transition-colors group"
+          >
+            {att.type?.startsWith('image/') ? (
+              <img src={att.url} alt={att.name} className="w-8 h-8 rounded object-cover flex-shrink-0" />
+            ) : (
+              <div className="w-8 h-8 rounded bg-secondary flex items-center justify-center flex-shrink-0">
+                <Paperclip size={14} className="text-muted-foreground" />
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-foreground truncate">{att.name}</p>
+              <p className="text-[10px] text-muted-foreground">
+                {att.size < 1024 ? `${att.size} B` : att.size < 1024 * 1024 ? `${(att.size / 1024).toFixed(1)} KB` : `${(att.size / (1024 * 1024)).toFixed(1)} MB`}
+              </p>
+            </div>
+          </a>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
 // ── Main Drawer ───────────────────────────────────────────────────────────────
 
 export default function MemoryDetailDrawer({ entry, onClose, onNavigateToTriage, extraActions }) {
@@ -258,6 +291,11 @@ export default function MemoryDetailDrawer({ entry, onClose, onNavigateToTriage,
           {entry.entityType === 'milestone'   && <MilestoneExtras  entry={entry} />}
           {entry.entityType === 'activityLog' && <ActivityExtras   entry={entry} />}
           {entry.entityType === 'weeklyLog'   && <WeeklyLogExtras  entry={entry} />}
+
+          {/* Attachments (annotations, tasks, etc.) */}
+          {entry.sourceRef?.attachments?.length > 0 && (
+            <AttachmentList attachments={entry.sourceRef.attachments} />
+          )}
 
           {/* Deep link for tasks */}
           {entry.entityType === 'task' && (
