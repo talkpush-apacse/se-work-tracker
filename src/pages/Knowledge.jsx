@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   Brain, Search, Sparkles, StickyNote, X, Loader2, ChevronDown, Plus, AlertCircle, PencilLine, Trash2,
-  CheckSquare, Square, CheckCheck, Database,
+  CheckSquare, Square, CheckCheck, Database, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import {
   format, parseISO, formatDistanceToNow, differenceInDays,
@@ -553,6 +553,10 @@ export default function Knowledge({ onNavigate }) {
   const [showAddNote, setShowAddNote]       = useState(false);
   const [editingAnnotation, setEditingAnnotation] = useState(null);
 
+  // Pagination
+  const PAGE_SIZE = 50;
+  const [currentPage, setCurrentPage]       = useState(1);
+
   // Bulk select
   const [selectedIds, setSelectedIds]       = useState(new Set());
   const [showBulkConfirm, setShowBulkConfirm] = useState(false);
@@ -578,6 +582,11 @@ export default function Knowledge({ onNavigate }) {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedQuery, selectedTypes, selectedCustomer, dateRange]);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedQuery, selectedTypes, selectedCustomer, dateRange, ragMode]);
 
   // ── Build memory index ──
   const memoryIndex = useMemo(() => buildMemoryIndex(store), [
@@ -620,6 +629,19 @@ export default function Knowledge({ onNavigate }) {
   // ── Display entries: RAG sources or keyword-filtered ──
   const displayEntries = ragMode ? ragSourceEntries.map(s => s.entry) : filteredEntries;
 
+  // ── Pagination ──
+  const totalPages = Math.max(1, Math.ceil(displayEntries.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const pageStart = (safePage - 1) * PAGE_SIZE;
+  const pageEnd = Math.min(pageStart + PAGE_SIZE, displayEntries.length);
+  const paginatedEntries = displayEntries.slice(pageStart, pageEnd);
+
+  const handlePageChange = useCallback((page) => {
+    setCurrentPage(page);
+    // Scroll to top of the results list
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
   const queryWords = useMemo(
     () => debouncedQuery.trim().toLowerCase().split(/\s+/).filter(Boolean),
     [debouncedQuery]
@@ -631,12 +653,12 @@ export default function Knowledge({ onNavigate }) {
     return new RegExp(`(${escaped.join('|')})`, 'gi');
   }, [queryWords]);
 
-  // ── Virtualization ──
-  const shouldVirtualize = displayEntries.length > 200;
-  const { containerRef, slice } = useWindowVirtualizer(displayEntries.length, shouldVirtualize);
-  const visibleEntries = shouldVirtualize ? displayEntries.slice(slice.start, slice.end) : displayEntries;
+  // ── Virtualization (applied to the current page) ──
+  const shouldVirtualize = paginatedEntries.length > 200;
+  const { containerRef, slice } = useWindowVirtualizer(paginatedEntries.length, shouldVirtualize);
+  const visibleEntries = shouldVirtualize ? paginatedEntries.slice(slice.start, slice.end) : paginatedEntries;
   const paddingTop = shouldVirtualize ? slice.start * ITEM_HEIGHT : 0;
-  const paddingBottom = shouldVirtualize ? Math.max(0, (displayEntries.length - slice.end) * ITEM_HEIGHT) : 0;
+  const paddingBottom = shouldVirtualize ? Math.max(0, (paginatedEntries.length - slice.end) * ITEM_HEIGHT) : 0;
 
   // ── RAG search ──
   const handleRagSearch = useCallback(async () => {
@@ -742,7 +764,7 @@ export default function Knowledge({ onNavigate }) {
       if (shiftKey && lastSelectedIndexRef.current !== null) {
         const from = Math.min(lastSelectedIndexRef.current, index);
         const to = Math.max(lastSelectedIndexRef.current, index);
-        displayEntries.slice(from, to + 1)
+        paginatedEntries.slice(from, to + 1)
           .filter(e => DELETABLE_TYPES.has(e.entityType))
           .forEach(e => next.add(getEntryKey(e)));
       } else {
@@ -752,7 +774,7 @@ export default function Knowledge({ onNavigate }) {
       return next;
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [displayEntries]);
+  }, [paginatedEntries]);
 
   const handleSelectAll = () => {
     if (selectedIds.size > 0) {
@@ -760,7 +782,7 @@ export default function Knowledge({ onNavigate }) {
       lastSelectedIndexRef.current = null;
     } else {
       const all = new Set(
-        displayEntries.filter(e => DELETABLE_TYPES.has(e.entityType)).map(getEntryKey)
+        paginatedEntries.filter(e => DELETABLE_TYPES.has(e.entityType)).map(getEntryKey)
       );
       setSelectedIds(all);
     }
@@ -998,7 +1020,13 @@ export default function Knowledge({ onNavigate }) {
             </span>
           ) : (
             <span>
-              Showing <span className="font-medium text-foreground">{displayEntries.length}</span> of{' '}
+              Showing{' '}
+              {displayEntries.length > PAGE_SIZE ? (
+                <>
+                  <span className="font-medium text-foreground">{pageStart + 1}–{pageEnd}</span> of{' '}
+                </>
+              ) : null}
+              <span className="font-medium text-foreground">{displayEntries.length}</span> of{' '}
               <span className="font-medium text-foreground">{memoryIndex.length}</span> entries
             </span>
           )}
@@ -1033,7 +1061,7 @@ export default function Knowledge({ onNavigate }) {
       )}
 
       {/* ── Results list ── */}
-      {ragSearching ? null : displayEntries.length === 0 ? (
+      {ragSearching ? null : paginatedEntries.length === 0 ? (
         <div className="bg-card border border-border rounded-2xl px-6 py-12 text-center">
           <Search size={28} className="text-muted-foreground/30 mx-auto mb-3" />
           <p className="text-sm text-muted-foreground font-medium">
@@ -1103,6 +1131,66 @@ export default function Knowledge({ onNavigate }) {
           )}
 
           {paddingBottom > 0 && <div style={{ height: paddingBottom }} />}
+        </div>
+      )}
+
+      {/* ── Pagination controls ── */}
+      {totalPages > 1 && !ragSearching && (
+        <div className="flex items-center justify-center gap-1 pt-2 pb-1">
+          <button
+            onClick={() => handlePageChange(safePage - 1)}
+            disabled={safePage <= 1}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <ChevronLeft size={14} />
+            Prev
+          </button>
+
+          {(() => {
+            const pages = [];
+            const showPage = (p) => (
+              <button
+                key={p}
+                onClick={() => handlePageChange(p)}
+                className={`min-w-[32px] h-8 px-2 rounded-lg text-xs font-medium transition-all ${
+                  p === safePage
+                    ? 'bg-brand-lavender/15 text-brand-lavender border border-brand-lavender/30'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+                }`}
+              >
+                {p}
+              </button>
+            );
+            const ellipsis = (key) => (
+              <span key={key} className="px-1 text-muted-foreground/40 text-xs">…</span>
+            );
+
+            // Always show first page
+            pages.push(showPage(1));
+
+            if (safePage > 3) pages.push(ellipsis('el'));
+
+            // Window around current page
+            const from = Math.max(2, safePage - 1);
+            const to = Math.min(totalPages - 1, safePage + 1);
+            for (let p = from; p <= to; p++) pages.push(showPage(p));
+
+            if (safePage < totalPages - 2) pages.push(ellipsis('er'));
+
+            // Always show last page
+            if (totalPages > 1) pages.push(showPage(totalPages));
+
+            return pages;
+          })()}
+
+          <button
+            onClick={() => handlePageChange(safePage + 1)}
+            disabled={safePage >= totalPages}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            Next
+            <ChevronRight size={14} />
+          </button>
         </div>
       )}
 
