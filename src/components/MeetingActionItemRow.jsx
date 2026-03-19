@@ -41,7 +41,7 @@ export default function MeetingActionItemRow({ item, onConvert, onUpdate }) {
   return (
     <div
       className={`flex items-start gap-2.5 py-2 px-1 rounded-lg transition-colors ${
-        flash ? 'bg-green-500/10' : ''
+        flash ? 'bg-emerald-50' : ''
       }`}
     >
       {/* Checkbox (local visual state only) */}
@@ -75,7 +75,7 @@ export default function MeetingActionItemRow({ item, onConvert, onUpdate }) {
         {/* Convert / linked button */}
         {isLinked ? (
           <span className="flex items-center gap-1 text-[10px] text-muted-foreground/60 px-2 py-0.5 rounded-md bg-secondary border border-border">
-            <Check size={9} className="text-green-400" />
+            <Check size={9} className="text-emerald-700" />
             Linked
           </span>
         ) : (

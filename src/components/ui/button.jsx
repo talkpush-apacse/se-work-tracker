@@ -8,14 +8,14 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default:     'bg-primary text-primary-foreground hover:bg-primary/85 active:bg-primary/75',
-        cta:         'bg-accent text-foreground hover:bg-accent/80 active:bg-accent/60',
+        default:     'bg-primary text-primary-foreground hover:bg-primary/85 active:bg-primary/75 shadow-sm',
+        cta:         'bg-primary text-primary-foreground hover:bg-primary/85 active:bg-primary/75 shadow-sm',
         destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90 active:bg-destructive/80',
-        outline:     'border border-border bg-card hover:bg-secondary text-foreground active:bg-secondary/80',
-        secondary:   'bg-secondary text-secondary-foreground hover:bg-secondary/80 active:bg-secondary/60',
-        ghost:       'hover:bg-secondary text-muted-foreground hover:text-foreground active:bg-secondary/60',
-        link:        'border border-accent text-accent-foreground hover:bg-accent/10 active:bg-accent/20',
-        accent:      'bg-accent text-accent-foreground hover:bg-accent/80 active:bg-accent/60',
+        outline:     'border border-border bg-card hover:bg-card-hover text-foreground active:bg-card-hover/80',
+        secondary:   'bg-card border border-border text-foreground hover:bg-card-hover active:bg-card-hover/80',
+        ghost:       'hover:bg-card-hover text-foreground active:bg-card-hover/80',
+        link:        'border border-primary/30 text-primary hover:bg-primary/10 active:bg-primary/20',
+        accent:      'bg-primary text-primary-foreground hover:bg-primary/85 active:bg-primary/75 shadow-sm',
         sage:        'bg-brand-sage text-foreground hover:bg-brand-sage/80 active:bg-brand-sage/60',
       },
       size: {

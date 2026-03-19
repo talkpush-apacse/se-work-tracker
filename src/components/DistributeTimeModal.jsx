@@ -264,7 +264,7 @@ export default function DistributeTimeModal({ session, onClose, initialCustomerI
                       {customer.name}
                     </span>
                     {customer.pinned && (
-                      <span className="text-[9px] text-amber-400 bg-amber-400/10 border border-amber-400/20 px-1.5 py-0.5 rounded-full font-semibold flex-shrink-0">
+                      <span className="text-[9px] text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full font-semibold flex-shrink-0">
                         Priority
                       </span>
                     )}
@@ -454,7 +454,7 @@ export default function DistributeTimeModal({ session, onClose, initialCustomerI
 
       {/* Discard confirmation */}
       {showDiscard && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
           <div className="w-full max-w-sm bg-card border border-border rounded-2xl shadow-2xl p-6">
             <h3 className="text-base font-semibold text-foreground mb-2">Discard this session?</h3>
             <p className="text-sm text-muted-foreground mb-5">

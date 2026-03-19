@@ -64,22 +64,22 @@ export default function TimerWidget() {
   return (
     <>
       {isRunning && (
-        <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-emerald-700/50 bg-emerald-950/60 px-5 py-3 shadow-lg shadow-emerald-900/20 animate-fade-in">
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-border bg-card px-5 py-3 shadow-sm animate-fade-in">
           {/* Pulsing indicator + work type info */}
           <div className="flex items-center gap-3 min-w-0">
             <span className="relative flex h-2.5 w-2.5 flex-shrink-0">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-status-success opacity-60" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-status-success" />
             </span>
 
-            <Icon size={15} className="text-emerald-400 flex-shrink-0" />
+            <Icon size={15} className="text-status-success flex-shrink-0" />
 
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-white truncate leading-tight">
+              <p className="text-sm font-semibold text-foreground truncate leading-tight">
                 {label}
               </p>
               {clientLabel && (
-                <span className="text-[10px] text-emerald-400/70">
+                <span className="text-[10px] text-muted-foreground">
                   {clientLabel}
                 </span>
               )}
@@ -87,14 +87,14 @@ export default function TimerWidget() {
           </div>
 
           {/* Live elapsed clock */}
-          <span className="font-mono text-lg font-bold text-emerald-300 tabular-nums flex-shrink-0">
+          <span className="font-mono text-lg font-bold text-foreground tabular-nums flex-shrink-0">
             {formatHMS(elapsedSeconds)}
           </span>
 
           {/* Stop button */}
           <button
             onClick={stopTimer}
-            className="flex items-center gap-1.5 rounded-xl bg-red-600/20 px-3 py-1.5 text-xs font-bold text-red-400 transition-colors hover:bg-red-600/40 hover:text-red-300 flex-shrink-0 border border-red-700/30 cursor-pointer"
+            className="flex items-center gap-1.5 rounded-xl bg-destructive/10 px-3 py-1.5 text-xs font-bold text-destructive transition-colors hover:bg-destructive/20 flex-shrink-0 border border-destructive/20 cursor-pointer"
           >
             <Square size={11} fill="currentColor" />
             Stop

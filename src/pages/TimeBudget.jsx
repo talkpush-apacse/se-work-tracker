@@ -291,7 +291,7 @@ export default function TimeBudget() {
 
   // Budget bar color
   const barColor = isOverBudget ? 'bg-red-500' : isNearBudget ? 'bg-amber-500' : 'bg-emerald-500';
-  const barBg = isOverBudget ? 'bg-red-500/10' : isNearBudget ? 'bg-amber-500/10' : 'bg-emerald-500/10';
+  const barBg = isOverBudget ? 'bg-red-50' : isNearBudget ? 'bg-amber-50' : 'bg-emerald-50';
 
   // Week navigation
   const goToPrevWeek = () => setCurrentDate(d => subWeeks(d, 1));
@@ -444,7 +444,7 @@ export default function TimeBudget() {
         </div>
 
         {/* Stacked progress bar */}
-        <div className="w-full h-4 rounded-full bg-secondary overflow-hidden flex">
+        <div className="w-full h-4 rounded-full bg-muted overflow-hidden flex">
           {WORK_TYPES.map(wt => {
             const pct = totalTargetHours > 0 ? (workTypeHours[wt] / totalTargetHours) * 100 : 0;
             if (pct <= 0) return null;
@@ -498,11 +498,11 @@ export default function TimeBudget() {
                     <span className="text-xs font-medium text-foreground">{WORK_TYPE_LABELS[wt]}</span>
                   </div>
                   <span className="text-xs text-muted-foreground">
-                    <span className={`font-semibold ${over ? 'text-amber-400' : 'text-foreground'}`}>{logged}h</span>
+                    <span className={`font-mono font-semibold ${over ? 'text-amber-700' : 'text-foreground'}`}>{logged}h</span>
                     {' / '}{target}h
                   </span>
                 </div>
-                <div className="w-full h-2 rounded-full bg-secondary overflow-hidden">
+                <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
                   <div
                     className="h-full rounded-full transition-all duration-500"
                     style={{ width: `${pct}%`, backgroundColor: WORK_TYPE_COLORS[wt].hex }}
@@ -564,8 +564,8 @@ export default function TimeBudget() {
               key={i}
               className={`flex items-start gap-2.5 px-4 py-2.5 rounded-xl border text-xs ${
                 alert.type === 'warning'
-                  ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
-                  : 'bg-blue-500/10 border-blue-500/20 text-blue-400'
+                  ? 'bg-amber-50 border-amber-200 text-amber-700'
+                  : 'bg-blue-50 border-blue-200 text-blue-700'
               }`}
             >
               <AlertCircle size={13} className="mt-0.5 flex-shrink-0" />
@@ -601,23 +601,23 @@ export default function TimeBudget() {
         <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
           <div className="text-center">
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Meetings</p>
-            <p className="text-lg font-bold text-foreground">{fmtHrs(meetingHours)}</p>
+            <p className="text-lg font-mono font-bold text-foreground">{fmtHrs(meetingHours)}</p>
           </div>
           <div className="text-center">
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Tasks</p>
-            <p className="text-lg font-bold text-foreground">{fmtHrs(taskHours)}</p>
+            <p className="text-lg font-mono font-bold text-foreground">{fmtHrs(taskHours)}</p>
           </div>
           <div className="text-center">
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Logged</p>
-            <p className="text-lg font-bold text-purple-400">{fmtHrs(loggedHours)}</p>
+            <p className="text-lg font-mono font-bold text-purple-700">{fmtHrs(loggedHours)}</p>
           </div>
           <div className="text-center">
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Budgeted</p>
-            <p className="text-lg font-bold text-foreground">{fmtHrs(budgeted)} <span className="text-xs font-normal text-muted-foreground">/ {totalBudgetHours}h</span></p>
+            <p className="text-lg font-mono font-bold text-foreground">{fmtHrs(budgeted)} <span className="text-xs font-normal text-muted-foreground">/ {totalBudgetHours}h</span></p>
           </div>
           <div className="text-center">
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Available</p>
-            <p className={`text-lg font-bold ${isOverBudget ? 'text-red-400' : 'text-foreground'}`}>
+            <p className={`text-lg font-mono font-bold ${isOverBudget ? 'text-red-700' : 'text-foreground'}`}>
               {isOverBudget ? `${fmtHrs(Math.abs(remaining))} over` : fmtHrs(remaining)}
             </p>
           </div>
@@ -628,7 +628,7 @@ export default function TimeBudget() {
       <div className="bg-card border border-border rounded-2xl overflow-hidden">
         <div className="px-4 py-3 border-b border-border">
           <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-            <Timer size={14} className="text-purple-400" />
+            <Timer size={14} className="text-purple-700" />
             Focus Time Logged
             <span className="text-xs font-normal text-muted-foreground">({fmtHrs(loggedHours)})</span>
           </h2>
@@ -663,7 +663,7 @@ export default function TimeBudget() {
                       title={isIncluded ? 'Exclude from budget' : 'Include in budget'}
                     >
                       {isIncluded
-                        ? <CheckSquare size={14} className="text-purple-400" />
+                        ? <CheckSquare size={14} className="text-purple-700" />
                         : <Square size={14} />
                       }
                     </button>
@@ -673,7 +673,7 @@ export default function TimeBudget() {
                       }`}>{description}</p>
                       <div className="flex items-center gap-1.5 mt-0.5">
                         {customer && (
-                          <span className="inline-flex items-center gap-1 text-[10px] text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded-full">
+                          <span className="inline-flex items-center gap-1 text-[10px] text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded-full">
                             <User size={8} />
                             {customer.name}
                           </span>
@@ -701,7 +701,7 @@ export default function TimeBudget() {
           <div className="px-4 py-3 border-b border-border flex items-center justify-between">
             <div>
               <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                <Calendar size={14} className="text-blue-400" />
+                <Calendar size={14} className="text-blue-700" />
                 Meetings
                 <span className="text-xs font-normal text-muted-foreground">({meetingHours}h)</span>
               </h2>
@@ -753,7 +753,7 @@ export default function TimeBudget() {
                 <button
                   onClick={addManualMeeting}
                   disabled={!newManualMeeting.summary.trim()}
-                  className="flex items-center gap-1 px-3 h-8 rounded-lg bg-blue-500/15 text-blue-400 text-xs font-semibold hover:bg-blue-500/25 disabled:opacity-40 transition-all"
+                  className="flex items-center gap-1 px-3 h-8 rounded-lg bg-blue-50 text-blue-700 text-xs font-semibold hover:bg-blue-100 disabled:opacity-40 transition-all"
                 >
                   <Plus size={12} /> Add
                 </button>
@@ -779,7 +779,7 @@ export default function TimeBudget() {
             {canCopyFromLastWeek && (
               <button
                 onClick={handleCopyFromLastWeek}
-                className="w-full flex items-center justify-center gap-2 px-3 py-3 rounded-xl border border-dashed border-blue-500/30 bg-blue-500/5 text-blue-400 text-xs font-medium hover:bg-blue-500/10 transition-all"
+                className="w-full flex items-center justify-center gap-2 px-3 py-3 rounded-xl border border-dashed border-blue-300 bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100 transition-all"
               >
                 <Copy size={12} />
                 Copy from last week ({lastWeekBudget.meetings.length} meetings)
@@ -787,7 +787,7 @@ export default function TimeBudget() {
             )}
 
             {fetchError && (
-              <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+              <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs">
                 <AlertCircle size={12} className="mt-0.5 flex-shrink-0" />
                 <span>{fetchError}</span>
               </div>
@@ -819,7 +819,7 @@ export default function TimeBudget() {
                   title={m.included ? 'Exclude from budget' : 'Include in budget'}
                 >
                   {m.included
-                    ? <CheckSquare size={14} className="text-blue-400" />
+                    ? <CheckSquare size={14} className="text-blue-700" />
                     : <Square size={14} />
                   }
                 </button>
@@ -830,10 +830,10 @@ export default function TimeBudget() {
                   <div className="flex items-center gap-1.5">
                     {m.day && <p className="text-[10px] text-muted-foreground">{m.day}{m.startTime ? ` · ${m.startTime}` : ''}</p>}
                     {m.source === 'manual' && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 font-semibold">Manual</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 font-semibold">Manual</span>
                     )}
                     {m.source === 'copied' && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-400 font-semibold">Copied</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-semibold">Copied</span>
                     )}
                   </div>
                 </div>
@@ -843,7 +843,7 @@ export default function TimeBudget() {
                 {(m.source === 'manual' || m.source === 'copied') && (
                   <button
                     onClick={() => deleteManualMeeting(m.calendarEventId)}
-                    className="p-1 text-muted-foreground hover:text-red-400 transition-colors flex-shrink-0"
+                    className="p-1 text-muted-foreground hover:text-red-700 transition-colors flex-shrink-0"
                     title="Remove"
                   >
                     <Trash2 size={12} />
@@ -858,7 +858,7 @@ export default function TimeBudget() {
         <div className="bg-card border border-border rounded-2xl overflow-hidden">
           <div className="px-4 py-3 border-b border-border">
             <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <Clock size={14} className="text-teal-400" />
+              <Clock size={14} className="text-teal-700" />
               Tasks & Focus Time
               <span className="text-xs font-normal text-muted-foreground">({taskHours}h)</span>
             </h2>
@@ -979,7 +979,7 @@ export default function TimeBudget() {
                     </select>
                     <button
                       onClick={() => removeBudgetTask(t.id)}
-                      className="p-1 text-muted-foreground hover:text-red-400 transition-colors flex-shrink-0"
+                      className="p-1 text-muted-foreground hover:text-red-700 transition-colors flex-shrink-0"
                       title="Remove"
                     >
                       <Trash2 size={12} />

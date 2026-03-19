@@ -115,7 +115,7 @@ export default function BulkAddCustomersModal({ onClose }) {
                 key={i}
                 className={`flex items-center gap-3 px-3 py-2 border-b border-secondary/60 last:border-0 ${item.skip ? 'opacity-40' : ''}`}
               >
-                <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: item.skip ? '#6b7280' : item.color }} />
+                <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: item.skip ? '#9C8E7E' : item.color }} />
                 <span className={`text-sm flex-1 ${item.skip ? 'line-through text-muted-foreground' : 'text-foreground'}`}>{item.name}</span>
                 {item.skip && (
                   <span className="text-[10px] text-brand-amber flex-shrink-0">{item.reason}</span>

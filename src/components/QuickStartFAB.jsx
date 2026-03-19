@@ -11,7 +11,7 @@ export default function QuickStartFAB() {
     <button
       onClick={() => startTimer('deep_work')}
       aria-label="Quick start Deep Work timer"
-      className="fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full bg-brand-sage-darker hover:bg-brand-sage active:scale-95 text-white shadow-lg shadow-black/20 px-5 py-3.5 transition-all md:bottom-8 md:right-8"
+      className="fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full bg-primary hover:bg-primary/90 active:scale-95 text-primary-foreground shadow-lg shadow-black/10 px-5 py-3.5 transition-all md:bottom-8 md:right-8"
       title="Quick start Deep Work timer"
     >
       <Play size={18} fill="currentColor" />

@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   Brain, Search, Sparkles, StickyNote, X, Loader2, ChevronDown, Plus, AlertCircle, PencilLine, Trash2,
-  CheckSquare, Square, CheckCheck, Database, ChevronLeft, ChevronRight,
+  CheckSquare, Square, CheckCheck, Database, Paperclip,
 } from 'lucide-react';
 import {
   format, parseISO, formatDistanceToNow, differenceInDays,
@@ -14,14 +14,15 @@ import { chunkMemoryEntries } from '../utils/chunker';
 import { ragSearch } from '../utils/ragSearch';
 import { ANNOTATION_TAGS, ANNOTATION_TAG_LABELS } from '../constants';
 import MemoryDetailDrawer from '../components/MemoryDetailDrawer';
+import FileAttachments from '../components/FileAttachments';
 
 // ── Source badge config for auto-indexed annotations ──────────────────────────
 const SOURCE_BADGE_CONFIG = {
-  'ai-output':     { label: 'AI Draft',      cls: 'bg-purple-500/15 text-purple-400 border-purple-500/20' },
-  'meeting':       { label: 'Meeting',        cls: 'bg-blue-500/15 text-blue-400 border-blue-500/20' },
-  'task':          { label: 'Task',           cls: 'bg-green-500/15 text-green-400 border-green-500/20' },
-  'weekly-update': { label: 'Update',         cls: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
-  'weekly-report': { label: 'Weekly Report',  cls: 'bg-violet-500/15 text-violet-400 border-violet-500/20' },
+  'ai-output':     { label: 'AI Draft',      cls: 'bg-purple-50 text-purple-700 border-purple-200' },
+  'meeting':       { label: 'Meeting',        cls: 'bg-blue-50 text-blue-700 border-blue-200' },
+  'task':          { label: 'Task',           cls: 'bg-green-50 text-green-700 border-green-200' },
+  'weekly-update': { label: 'Update',         cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+  'weekly-report': { label: 'Weekly Report',  cls: 'bg-violet-50 text-violet-700 border-violet-200' },
 };
 
 // ── Type filter options ────────────────────────────────────────────────────────
@@ -106,7 +107,7 @@ function highlightText(text, regex) {
   return parts.map((part, i) => {
     regex.lastIndex = 0;
     return regex.test(part)
-      ? <mark key={i} className="bg-amber-400/30 text-foreground rounded px-0.5">{part}</mark>
+      ? <mark key={i} className="bg-amber-100 text-foreground rounded px-0.5">{part}</mark>
       : part;
   });
 }
@@ -200,7 +201,7 @@ function TypeDropdown({ selectedTypes, onToggle, onClear }) {
                 <span className={`w-3 h-3 rounded-sm border flex-shrink-0 flex items-center justify-center ${
                   active ? 'bg-brand-lavender border-brand-lavender' : 'border-border'
                 }`}>
-                  {active && <span className="text-white text-[8px] leading-none">✓</span>}
+                  {active && <span className="text-foreground text-[8px] leading-none">✓</span>}
                 </span>
                 {opt.label}
               </button>
@@ -260,17 +261,18 @@ function AddNoteModal({ customers, initialData, onSave, onClose }) {
   const [text, setText] = useState(initialData?.text || '');
   const [customerId, setCustomerId] = useState(initialData?.customerId || '');
   const [tag, setTag] = useState(initialData?.tag || '');
+  const [attachments, setAttachments] = useState(initialData?.attachments || []);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!text.trim()) return;
-    onSave({ text: text.trim(), customerId: customerId || null, tag: tag || null });
+    onSave({ text: text.trim(), customerId: customerId || null, tag: tag || null, attachments });
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative bg-background border border-border rounded-2xl shadow-2xl w-full max-w-md p-5 space-y-4">
+      <div className="relative bg-background border border-border rounded-2xl shadow-2xl w-full max-w-lg p-5 space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold text-foreground">
             {initialData ? 'Edit Note' : 'Add Note'}
@@ -318,6 +320,17 @@ function AddNoteModal({ customers, initialData, onSave, onClose }) {
             </div>
           </div>
 
+          {/* File attachments */}
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-1.5 flex items-center gap-1">
+              <Paperclip size={11} /> Attachments
+            </label>
+            <FileAttachments
+              attachments={attachments}
+              onUpdate={setAttachments}
+            />
+          </div>
+
           <div className="flex justify-end gap-2 pt-1">
             <button type="button" onClick={onClose} className="px-4 py-2 rounded-xl border border-border text-xs text-muted-foreground hover:text-foreground transition-colors">
               Cancel
@@ -325,7 +338,7 @@ function AddNoteModal({ customers, initialData, onSave, onClose }) {
             <button
               type="submit"
               disabled={!text.trim()}
-              className="px-4 py-2 rounded-xl bg-brand-lavender text-white text-xs font-semibold hover:bg-brand-lavender/80 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              className="px-4 py-2 rounded-xl bg-brand-lavender text-foreground text-xs font-semibold hover:bg-brand-lavender/80 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
             >
               {initialData ? 'Save changes' : 'Add note'}
             </button>
@@ -364,7 +377,7 @@ function MemoryCard({ entry, highlightRegex, similarityPct, onClick, isSelected,
       onClick={handleCardClick}
       className={`relative border rounded-2xl px-4 py-3 hover:shadow-sm transition-all cursor-pointer group ${
         isSelected
-          ? 'bg-teal-500/10 border-teal-500/40 ring-1 ring-teal-500/30'
+          ? 'bg-teal-50 border-teal-300 ring-1 ring-teal-200'
           : 'bg-card border-border hover:bg-accent/30'
       }`}
     >
@@ -383,9 +396,9 @@ function MemoryCard({ entry, highlightRegex, similarityPct, onClick, isSelected,
         {/* Icon + type badge */}
         <div className="flex flex-col items-center gap-1 flex-shrink-0 mt-0.5">
           {entry.entityType === 'artifact'
-            ? <Sparkles size={16} className="text-violet-400" />
+            ? <Sparkles size={16} className="text-primary" />
             : entry.entityType === 'task-note'
-              ? <StickyNote size={16} className="text-amber-400" />
+              ? <StickyNote size={16} className="text-amber-700" />
               : <span className="text-base leading-none">{entry.icon}</span>
           }
           <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md border ${colors.bg} ${colors.text} ${colors.border} whitespace-nowrap`}>
@@ -414,7 +427,7 @@ function MemoryCard({ entry, highlightRegex, similarityPct, onClick, isSelected,
             {entry.subtext && (
               <span className={`text-[10px] px-1.5 py-0.5 rounded border ${
                 entry.entityType === 'meeting'
-                  ? 'font-bold bg-blue-500/10 text-blue-400 border-blue-500/20'
+                  ? 'font-bold bg-blue-50 text-blue-700 border-blue-200'
                   : 'bg-secondary text-muted-foreground border-border'
               }`}>
                 {entry.subtext}
@@ -424,6 +437,12 @@ function MemoryCard({ entry, highlightRegex, similarityPct, onClick, isSelected,
             {entry.entityType === 'annotation' && entry.sourceRef?.autoGenerated && SOURCE_BADGE_CONFIG[entry.sourceRef.source] && (
               <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full border ${SOURCE_BADGE_CONFIG[entry.sourceRef.source].cls}`}>
                 {SOURCE_BADGE_CONFIG[entry.sourceRef.source].label}
+              </span>
+            )}
+            {/* Attachment count badge */}
+            {entry.sourceRef?.attachments?.length > 0 && (
+              <span className="flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-gray-500/15 text-gray-400 border border-gray-500/20">
+                <Paperclip size={9} /> {entry.sourceRef.attachments.length}
               </span>
             )}
             {/* Similarity badge for RAG source results */}
@@ -443,12 +462,12 @@ function MemoryCard({ entry, highlightRegex, similarityPct, onClick, isSelected,
               {/* Meeting pill badges */}
               <div className="flex items-center gap-1.5 mt-1">
                 {(entry.sourceRef.actionItems || []).filter(a => typeof a === 'object' ? !a.triaged : true).length > 0 && (
-                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20">
+                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
                     {(entry.sourceRef.actionItems || []).filter(a => typeof a === 'object' ? !a.triaged : true).length} pending actions
                   </span>
                 )}
                 {(entry.sourceRef.decisions || []).length > 0 && (
-                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                     {(entry.sourceRef.decisions || []).length} decision{(entry.sourceRef.decisions || []).length > 1 ? 's' : ''}
                   </span>
                 )}
@@ -808,13 +827,13 @@ export default function Knowledge({ onNavigate }) {
   };
 
   // ── Annotation CRUD ──
-  const handleSaveNote = ({ text, customerId, tag }) => {
+  const handleSaveNote = ({ text, customerId, tag, attachments }) => {
     const today = format(new Date(), 'yyyy-MM-dd');
     if (editingAnnotation) {
-      updateAnnotation(editingAnnotation.id, { text, customerId, tag, date: editingAnnotation.date || today });
+      updateAnnotation(editingAnnotation.id, { text, customerId, tag, attachments: attachments || [], date: editingAnnotation.date || today });
       setEditingAnnotation(null);
     } else {
-      addAnnotation({ text, customerId, tag, date: today });
+      addAnnotation({ text, customerId, tag, attachments: attachments || [], date: today });
     }
     setShowAddNote(false);
   };
@@ -874,7 +893,7 @@ export default function Knowledge({ onNavigate }) {
               }
             </button>
             {rebuildLabel && (
-              <span className={`text-[10px] ${rebuildStatus === 'error' ? 'text-red-400' : 'text-muted-foreground'}`}>
+              <span className={`text-[10px] ${rebuildStatus === 'error' ? 'text-red-700' : 'text-muted-foreground'}`}>
                 {rebuildLabel}
               </span>
             )}
@@ -899,7 +918,7 @@ export default function Knowledge({ onNavigate }) {
           onChange={e => setQuery(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && query.trim()) handleRagSearch(); }}
           placeholder="Search tasks, meetings, learnings, decisions…"
-          className="w-full h-12 bg-card border border-border rounded-2xl pl-11 pr-28 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40 transition-all"
+          className="w-full h-12 bg-input-bg border border-border rounded-xl pl-11 pr-28 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40 transition-all"
         />
         <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
           {query && (
@@ -916,7 +935,7 @@ export default function Knowledge({ onNavigate }) {
             title={ragMode ? 'Clear AI results' : 'AI semantic search (RAG)'}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
               ragMode
-                ? 'bg-brand-lavender text-white hover:bg-brand-lavender/80'
+                ? 'bg-brand-lavender text-foreground hover:bg-brand-lavender/80'
                 : 'bg-brand-lavender/15 text-brand-lavender hover:bg-brand-lavender/25'
             }`}
           >
@@ -976,13 +995,13 @@ export default function Knowledge({ onNavigate }) {
 
       {/* ── RAG error ── */}
       {ragError && (
-        <div className="rounded-2xl border border-red-500/30 bg-red-500/5 px-4 py-3 flex items-start gap-2">
-          <AlertCircle size={14} className="text-red-400 mt-0.5 flex-shrink-0" />
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 flex items-start gap-2">
+          <AlertCircle size={14} className="text-red-700 mt-0.5 flex-shrink-0" />
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-red-400">AI search failed</p>
-            <p className="text-[11px] text-red-400/70 mt-0.5">{ragError}</p>
+            <p className="text-xs font-medium text-red-700">AI search failed</p>
+            <p className="text-[11px] text-red-700/70 mt-0.5">{ragError}</p>
           </div>
-          <button onClick={() => setRagError(null)} className="text-red-400/60 hover:text-red-400">
+          <button onClick={() => setRagError(null)} className="text-red-700/60 hover:text-red-700">
             <X size={13} />
           </button>
         </div>
@@ -1210,7 +1229,7 @@ export default function Knowledge({ onNavigate }) {
               </button>
               <button
                 onClick={() => handleDeleteAnnotation(selectedEntry)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-500/30 text-xs text-red-400 hover:bg-red-500/10 transition-all"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-200 text-xs text-red-700 hover:bg-red-50 transition-all"
               >
                 <Trash2 size={12} /> Delete
               </button>
@@ -1251,7 +1270,7 @@ export default function Knowledge({ onNavigate }) {
             </button>
             <button
               onClick={() => setShowBulkConfirm(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/10 text-red-500 text-xs font-semibold hover:bg-red-500/20 transition-all border border-red-500/20"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-50 text-red-700 text-xs font-semibold hover:bg-red-100 transition-all border border-red-200"
             >
               <Trash2 size={12} />
               Delete {selectedIds.size}
@@ -1277,7 +1296,7 @@ export default function Knowledge({ onNavigate }) {
               </button>
               <button
                 onClick={handleBulkDelete}
-                className="px-4 py-2 rounded-xl bg-red-500 text-white text-xs font-semibold hover:bg-red-600 transition-all"
+                className="px-4 py-2 rounded-xl bg-red-500 text-foreground text-xs font-semibold hover:bg-red-600 transition-all"
               >
                 Delete {selectedIds.size} item{selectedIds.size !== 1 ? 's' : ''}
               </button>

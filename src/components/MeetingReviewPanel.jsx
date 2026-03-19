@@ -55,12 +55,12 @@ function MeetingCard({ meeting, customer, onTriageItem, onConvertToTask, onMarkA
           </div>
         </button>
         {isDone && (
-          <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-semibold flex-shrink-0">
+          <span className="flex items-center gap-1 text-[10px] text-emerald-700 font-semibold flex-shrink-0">
             <Check size={10} /> Done
           </span>
         )}
         {!isDone && pendingCount > 0 && (
-          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20 flex-shrink-0">
+          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 flex-shrink-0">
             {pendingCount} pending
           </span>
         )}
@@ -87,7 +87,7 @@ function MeetingCard({ meeting, customer, onTriageItem, onConvertToTask, onMarkA
                   <div key={item.id || item.text} className="flex items-center gap-2 group">
                     <button
                       onClick={() => !item.triaged && onTriageItem(meeting.id, item.id)}
-                      className={`flex-shrink-0 ${item.triaged ? 'text-emerald-400' : 'text-muted-foreground hover:text-foreground'}`}
+                      className={`flex-shrink-0 ${item.triaged ? 'text-emerald-700' : 'text-muted-foreground hover:text-foreground'}`}
                       disabled={item.triaged}
                     >
                       {item.triaged ? <CheckSquare size={13} /> : <Square size={13} />}
@@ -98,13 +98,13 @@ function MeetingCard({ meeting, customer, onTriageItem, onConvertToTask, onMarkA
                     {!item.triaged && (
                       <button
                         onClick={() => onConvertToTask(meeting.id, item.id)}
-                        className="opacity-0 group-hover:opacity-100 flex items-center gap-1 text-[10px] font-medium text-brand-lavender hover:text-brand-lavender/80 transition-all px-1.5 py-0.5 rounded border border-indigo-500/30 bg-brand-lavender/10"
+                        className="opacity-0 group-hover:opacity-100 flex items-center gap-1 text-[10px] font-medium text-brand-lavender hover:text-brand-lavender/80 transition-all px-1.5 py-0.5 rounded border border-brand-lavender/20 bg-brand-lavender/10"
                       >
                         <ArrowRight size={9} /> Task
                       </button>
                     )}
                     {item.triaged && item.taskId && (
-                      <span className="text-[10px] text-emerald-400/70 font-medium">✓ Task</span>
+                      <span className="text-[10px] text-emerald-700/70 font-medium">✓ Task</span>
                     )}
                   </div>
                 ))}
@@ -121,7 +121,7 @@ function MeetingCard({ meeting, customer, onTriageItem, onConvertToTask, onMarkA
               <ul className="space-y-0.5">
                 {decisions.map((d, i) => (
                   <li key={i} className="flex items-start gap-1.5 text-xs text-foreground/80">
-                    <span className="flex-shrink-0 mt-0.5 text-emerald-400">•</span>
+                    <span className="flex-shrink-0 mt-0.5 text-emerald-700">•</span>
                     {d}
                   </li>
                 ))}
@@ -276,7 +276,7 @@ export default function MeetingReviewPanel() {
       {/* Meeting list grouped by customer */}
       {filteredMeetings.length === 0 ? (
         <div className="bg-card border border-border rounded-2xl px-5 py-10 text-center">
-          <Check size={24} className="text-emerald-400/60 mx-auto mb-2" />
+          <Check size={24} className="text-emerald-700/60 mx-auto mb-2" />
           <p className="text-muted-foreground text-sm">
             {pendingOnly ? 'No pending meetings to review.' : 'No meetings found.'}
           </p>

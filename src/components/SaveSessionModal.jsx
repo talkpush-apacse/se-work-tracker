@@ -317,7 +317,7 @@ export default function SaveSessionModal({ session, onClose }) {
 
       {/* Discard confirmation — z-60 to sit above this z-50 modal */}
       {showDiscard && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
           <div className="w-full max-w-sm bg-card border border-border rounded-2xl shadow-2xl p-6">
             <h3 className="text-base font-semibold text-foreground mb-2">Discard this session?</h3>
             <p className="text-sm text-muted-foreground mb-5">

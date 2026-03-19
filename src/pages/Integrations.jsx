@@ -155,7 +155,7 @@ export default function Integrations() {
         {/* Card header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
               <Calendar size={18} className="text-blue-500" />
             </div>
             <div>
@@ -183,10 +183,10 @@ export default function Integrations() {
 
         {/* Setup warning — shown when no client ID is configured */}
         {!HAS_CLIENT_ID && (
-          <div className="px-5 py-3 bg-amber-500/10 border-b border-amber-500/20">
-            <p className="text-xs text-amber-600 dark:text-amber-400">
+          <div className="px-5 py-3 bg-amber-50 border-b border-amber-200">
+            <p className="text-xs text-amber-700">
               <strong>Setup required:</strong> Add{' '}
-              <code className="bg-amber-500/10 px-1 rounded font-mono">VITE_GOOGLE_CLIENT_ID</code>{' '}
+              <code className="bg-amber-50 px-1 rounded font-mono">VITE_GOOGLE_CLIENT_ID</code>{' '}
               to your Vercel environment variables, then redeploy.
             </p>
           </div>
@@ -374,7 +374,7 @@ export default function Integrations() {
         {/* Card header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-red-500/10 flex items-center justify-center flex-shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center flex-shrink-0">
               <Mail size={18} className="text-red-500" />
             </div>
             <div>
@@ -402,10 +402,10 @@ export default function Integrations() {
 
         {/* Setup warning — shown when no client ID is configured */}
         {!HAS_CLIENT_ID && (
-          <div className="px-5 py-3 bg-amber-500/10 border-b border-amber-500/20">
-            <p className="text-xs text-amber-600 dark:text-amber-400">
+          <div className="px-5 py-3 bg-amber-50 border-b border-amber-200">
+            <p className="text-xs text-amber-700">
               <strong>Setup required:</strong> Add{' '}
-              <code className="bg-amber-500/10 px-1 rounded font-mono">VITE_GOOGLE_CLIENT_ID</code>{' '}
+              <code className="bg-amber-50 px-1 rounded font-mono">VITE_GOOGLE_CLIENT_ID</code>{' '}
               to your Vercel environment variables, then redeploy.
             </p>
           </div>

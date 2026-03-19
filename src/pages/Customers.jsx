@@ -40,14 +40,14 @@ function CustomerForm({ initial = {}, onSubmit, onCancel }) {
               type="button"
               onClick={() => setForm(p => ({ ...p, color: value }))}
               title={name}
-              className={`w-8 h-8 rounded-full transition-all ${form.color === value ? 'ring-2 ring-white ring-offset-2 ring-offset-gray-800 scale-110' : 'hover:scale-105'}`}
+              className={`w-8 h-8 rounded-full transition-all ${form.color === value ? 'ring-2 ring-foreground ring-offset-2 ring-offset-card scale-110' : 'hover:scale-105'}`}
               style={{ backgroundColor: value }}
             />
           ))}
         </div>
       </div>
       <div className="flex gap-3 pt-1">
-        <button type="button" onClick={onCancel} className="flex-1 py-2.5 rounded-xl bg-muted hover:bg-gray-600 text-sm font-medium transition-colors">Cancel</button>
+        <button type="button" onClick={onCancel} className="flex-1 py-2.5 rounded-xl bg-muted hover:bg-card-hover text-sm font-medium transition-colors">Cancel</button>
         <button type="submit" className="flex-1 py-2.5 rounded-xl bg-brand-lavender hover:bg-brand-lavender/80 text-sm font-bold text-foreground transition-colors">{initial.id ? 'Save Changes' : 'Add Customer'}</button>
       </div>
     </form>
@@ -60,7 +60,7 @@ const CustomerRow = memo(function CustomerRow({ customer, taskCount, totalPoints
     <div
       className={`rounded-2xl transition-all ${
         customer.pinned
-          ? 'bg-amber-950/20 border border-amber-700/40'
+          ? 'bg-amber-50 border border-amber-200'
           : 'bg-card border border-border'
       }`}
     >
@@ -89,20 +89,20 @@ const CustomerRow = memo(function CustomerRow({ customer, taskCount, totalPoints
         {/* Stats */}
         <div className="hidden sm:flex items-center gap-4 flex-shrink-0 text-center">
           <div>
-            <p className="text-sm font-bold" style={{ color: customer.color }}>{taskCount}</p>
+            <p className="text-sm font-mono font-bold" style={{ color: customer.color }}>{taskCount}</p>
             <p className="text-[10px] text-muted-foreground">Tasks</p>
           </div>
           <div>
-            <p className="text-sm font-bold text-foreground">{Number(totalPoints).toFixed(1)}</p>
+            <p className="text-sm font-mono font-bold text-foreground">{Number(totalPoints).toFixed(1)}</p>
             <p className="text-[10px] text-muted-foreground">Points</p>
           </div>
           <div>
-            <p className="text-sm font-bold text-foreground">{totalHours.toFixed(1)}</p>
+            <p className="text-sm font-mono font-bold text-foreground">{totalHours.toFixed(1)}</p>
             <p className="text-[10px] text-muted-foreground">Hours</p>
           </div>
           {taskPts > 0 && (
             <div>
-              <p className="text-sm font-bold text-teal-400">⚡{Number(taskPts).toFixed(1)}</p>
+              <p className="text-sm font-mono font-bold text-teal-700">⚡{Number(taskPts).toFixed(1)}</p>
               <p className="text-[10px] text-muted-foreground">Task Pts</p>
             </div>
           )}
@@ -115,11 +115,11 @@ const CustomerRow = memo(function CustomerRow({ customer, taskCount, totalPoints
             title={customer.pinned ? 'Remove from priority' : 'Mark as priority'}
             className={`p-1.5 rounded-lg transition-colors ${
               customer.pinned
-                ? 'text-amber-400 hover:text-amber-300 hover:bg-amber-900/40'
-                : 'text-muted-foreground hover:text-amber-400 hover:bg-secondary'
+                ? 'text-amber-600 hover:text-amber-500 hover:bg-amber-50'
+                : 'text-muted-foreground hover:text-amber-600 hover:bg-secondary'
             }`}
           >
-            <Star size={13} className={customer.pinned ? 'fill-amber-400' : ''} />
+            <Star size={13} className={customer.pinned ? 'fill-amber-600' : ''} />
           </button>
           <button onClick={(e) => { e.stopPropagation(); onEdit(customer); }}   className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"><Pencil size={13} /></button>
           <button onClick={(e) => { e.stopPropagation(); onDelete(customer); }} className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-secondary transition-colors"><Trash2 size={13} /></button>
@@ -246,8 +246,8 @@ export default function Customers() {
           {pinnedCustomers.length > 0 && (
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <Star size={13} className="fill-amber-400 text-amber-400" />
-                <span className="text-sm font-semibold text-amber-300">Priority</span>
+                <Star size={13} className="fill-amber-600 text-amber-600" />
+                <span className="text-sm font-semibold text-amber-700">Priority</span>
                 <span className="text-xs text-muted-foreground/70">({pinnedCustomers.length})</span>
               </div>
               <div className="flex flex-col gap-3">

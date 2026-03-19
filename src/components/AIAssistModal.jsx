@@ -245,7 +245,7 @@ export default function AIAssistModal({ onClose }) {
 
         {/* Success state */}
         {saved && (
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">
             <Check size={13} />
             Task created!
           </div>
@@ -274,9 +274,9 @@ export default function AIAssistModal({ onClose }) {
               title={isListening ? 'Stop recording' : 'Record voice'}
               className={`absolute bottom-2 right-2 p-1.5 rounded-lg transition-colors ${
                 isListening
-                  ? 'text-red-400 bg-red-500/15 border border-red-500/30 animate-pulse'
+                  ? 'text-red-700 bg-red-50 border border-red-200 animate-pulse'
                   : isTranscribing
-                    ? 'text-amber-400 bg-amber-500/15 border border-amber-500/30'
+                    ? 'text-amber-700 bg-amber-50 border border-amber-200'
                     : 'text-muted-foreground hover:text-foreground bg-secondary border border-border hover:border-ring'
               }`}
             >
@@ -289,10 +289,10 @@ export default function AIAssistModal({ onClose }) {
             </button>
           </div>
           {isListening && (
-            <p className="mt-1 text-[10px] text-red-400 font-medium">Recording… click mic to stop</p>
+            <p className="mt-1 text-[10px] text-red-700 font-medium">Recording… click mic to stop</p>
           )}
           {isTranscribing && (
-            <p className="mt-1 text-[10px] text-amber-400 font-medium">Transcribing…</p>
+            <p className="mt-1 text-[10px] text-amber-700 font-medium">Transcribing…</p>
           )}
         </div>
 
