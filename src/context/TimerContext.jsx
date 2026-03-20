@@ -39,16 +39,19 @@ export function TimerProvider({ children }) {
       workType: timer.workType,
       clientIds: timer.clientIds,
       taskId: timer.taskId,
+      pendingTasks: timer.pendingTasks,
       startedAt: timer.startedAt,
       stoppedSession: timer.stoppedSession,
       clearStoppedSession: timer.clearStoppedSession,
       startTimer: timer.startTimer,
       stopTimer: timer.stopTimer,
+      addPendingTask: timer.addPendingTask,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
-      timer.isRunning, timer.workType, timer.clientIds, timer.taskId, timer.startedAt,
-      timer.stoppedSession, timer.clearStoppedSession, timer.startTimer, timer.stopTimer,
+      timer.isRunning, timer.workType, timer.clientIds, timer.taskId, timer.pendingTasks,
+      timer.startedAt, timer.stoppedSession, timer.clearStoppedSession,
+      timer.startTimer, timer.stopTimer, timer.addPendingTask,
     ]
   );
 

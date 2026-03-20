@@ -72,6 +72,7 @@ export function useTimer() {
       taskId: current.taskId ?? null,
       taskDescription: current.taskDescription ?? null,
       okrId: current.okrId ?? null,
+      pendingTasks: current.pendingTasks || [],
       elapsedSeconds: elapsed,
       startedAt: current.startedAt,
     };
@@ -143,12 +144,21 @@ export function useTimer() {
     if (existing && existing.isRunning) return;
 
     const startedAt = new Date().toISOString();
-    const state = { workType, clientIds, taskId, taskDescription, okrId, startedAt, isRunning: true };
+    const state = { workType, clientIds, taskId, taskDescription, okrId, pendingTasks: [], startedAt, isRunning: true };
     saveTimerState(state);
     setTimerState(state);
     setElapsedSeconds(0);
     startInterval(startedAt);
   }, [startInterval]);
+
+  // Append a task note to the running timer without stopping it
+  const addPendingTask = useCallback((task) => {
+    const current = loadTimerState();
+    if (!current) return;
+    const updated = { ...current, pendingTasks: [...(current.pendingTasks || []), task] };
+    saveTimerState(updated);
+    setTimerState(updated);
+  }, []);
 
   const clearStoppedSession = useCallback(() => {
     setStoppedSession(null);
@@ -159,11 +169,13 @@ export function useTimer() {
     workType: timerState?.workType ?? null,
     clientIds: timerState?.clientIds ?? [],
     taskId: timerState?.taskId ?? null,
+    pendingTasks: timerState?.pendingTasks ?? [],
     elapsedSeconds,
     startedAt: timerState?.startedAt ?? null,
     stoppedSession,
     clearStoppedSession,
     startTimer,
     stopTimer,
+    addPendingTask,
   };
 }

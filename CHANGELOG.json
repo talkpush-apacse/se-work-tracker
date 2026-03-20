@@ -1,6 +1,19 @@
 {
   "versions": [
     {
+      "version": "2.19.0",
+      "codename": "Epoch Rising",
+      "date": "2026-03-20",
+      "summary": "Add mid-session task quick-add to running timer",
+      "changes": [
+        { "type": "feature", "description": "Added + Task button on running timer widget to log tasks on the go" },
+        { "type": "feature", "description": "Queued tasks show as a preview list inside the popover with count badge" },
+        { "type": "feature", "description": "Pending tasks auto-populate SaveSessionModal rows when timer is stopped" },
+        { "type": "feature", "description": "Client pre-filled in popover when timer has exactly one tagged client" },
+        { "type": "feature", "description": "Press Enter to add tasks rapidly; Escape closes the popover" }
+      ]
+    },
+    {
       "version": "2.18.1",
       "codename": "Deep Work Fluid",
       "date": "2026-03-17",

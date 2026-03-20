@@ -30,13 +30,23 @@ export default function SaveSessionModal({ session, onClose }) {
   const [points, setPoints]     = useState(String(prefilledPoints));
   const [hours, setHours]       = useState(String(prefilledHours));
 
-  // Task rows — each row has id, description, clientId, okrId
-  const [taskRows, setTaskRows] = useState(() => [{
-    id: nextRowId(),
-    description: session.taskDescription || '',
-    clientId: (session.clientIds || [])[0] || '',
-    okrId: session.okrId || '',
-  }]);
+  // Task rows — seeded from mid-session task notes if any, otherwise a blank row
+  const [taskRows, setTaskRows] = useState(() => {
+    if (session.pendingTasks && session.pendingTasks.length > 0) {
+      return session.pendingTasks.map(t => ({
+        id: nextRowId(),
+        description: t.description || '',
+        clientId: t.clientId || (session.clientIds || [])[0] || '',
+        okrId: t.okrId || session.okrId || '',
+      }));
+    }
+    return [{
+      id: nextRowId(),
+      description: session.taskDescription || '',
+      clientId: (session.clientIds || [])[0] || '',
+      okrId: session.okrId || '',
+    }];
+  });
 
   const [errors, setErrors]           = useState({});
   const [showDiscard, setShowDiscard]   = useState(false);
