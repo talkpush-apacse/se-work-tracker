@@ -22,19 +22,43 @@ Rules:
 - Format as an email if it sounds like one (include Subject: line), otherwise format as a short message
 - Do not add information that wasn't in the voice note
 - Keep it short — enterprise clients are busy
-- Output only the final draft, no explanation or preamble`;
+- Output only the final draft, no explanation or preamble
+- You may use basic markdown: **bold** for emphasis, and - bullet lists where appropriate
+- Do not use pound-sign headings or code blocks`;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function formatDuration(s) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
-function textToHtml(text) {
-  return text
-    .split(/\n{2,}/)
-    .map(p => `<p>${p.trim().replace(/\n/g, '<br/>')}</p>`)
-    .filter(p => p !== '<p></p>')
-    .join('');
+function markdownToHtml(markdown) {
+  const lines = markdown.split('\n');
+  let html = '';
+  let inList = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i];
+    // Apply inline formatting
+    let line = raw
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/__(.+?)__/g, '<strong>$1</strong>');
+
+    if (/^[-*]\s+/.test(raw)) {
+      if (!inList) { html += '<ul>'; inList = true; }
+      html += `<li>${line.replace(/^[-*]\s+/, '')}</li>`;
+    } else {
+      if (inList) { html += '</ul>'; inList = false; }
+      if (line.trim() === '') {
+        // skip blank lines (paragraph breaks handled implicitly)
+      } else {
+        html += `<p>${line}</p>`;
+      }
+    }
+  }
+
+  if (inList) html += '</ul>';
+  return html;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -170,7 +194,7 @@ export default function VoiceCommsModal({ onClose }) {
       })).trim();
       if (!draftText) throw new Error('No draft received from Claude.');
 
-      editor?.commands.setContent(textToHtml(draftText));
+      editor?.commands.setContent(markdownToHtml(draftText));
       setStep('editing');
     } catch (err) {
       setError(err.message);
@@ -190,10 +214,21 @@ export default function VoiceCommsModal({ onClose }) {
     startRecording();
   }
 
-  // ── Copy plain text ────────────────────────────────────────────────────────
-  function handleCopy() {
+  // ── Copy as rich text (HTML for Gmail etc, plain text fallback) ───────────
+  async function handleCopy() {
+    const html = editor?.getHTML() || '';
     const text = editor?.getText({ blockSeparator: '\n\n' }) || '';
-    navigator.clipboard.writeText(text.trim());
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/html':  new Blob([html],        { type: 'text/html' }),
+          'text/plain': new Blob([text.trim()], { type: 'text/plain' }),
+        }),
+      ]);
+    } catch {
+      // Fallback for browsers that don't support ClipboardItem
+      await navigator.clipboard.writeText(text.trim());
+    }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }

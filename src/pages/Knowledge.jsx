@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  Brain, Search, Sparkles, StickyNote, X, Loader2, ChevronDown, Plus, AlertCircle, PencilLine, Trash2,
+  Brain, Search, Sparkles, StickyNote, X, Loader2, ChevronDown, ChevronLeft, ChevronRight, Plus, AlertCircle, PencilLine, Trash2,
   CheckSquare, Square, CheckCheck, Database, Paperclip,
 } from 'lucide-react';
 import {
