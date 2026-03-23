@@ -193,8 +193,7 @@ export default function WeeklyUpdateLog({ weekStart, weekEnd } = {}) {
           rows={2}
           value={logForm.text}
           onChange={e => setLogForm(p => ({ ...p, text: e.target.value }))}
-          placeholder="What happened? (max 300 chars)"
-          maxLength={300}
+          placeholder="What happened?"
           className="w-full rounded-xl border border-border bg-input px-3 py-2 text-sm resize-none text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
         />
 
