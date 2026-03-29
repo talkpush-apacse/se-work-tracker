@@ -11,7 +11,7 @@ import { format } from 'date-fns';
  * @param {Date} end - Range end
  * @returns {Promise<Array>} Array of Google Calendar event objects (timed events only)
  */
-export async function fetchCalendarEvents(token, start, end) {
+export async function fetchCalendarEvents(token, start, end, { meetingsOnly = false } = {}) {
   const url = new URL('https://www.googleapis.com/calendar/v3/calendars/primary/events');
   url.searchParams.set('timeMin',      start.toISOString());
   url.searchParams.set('timeMax',      end.toISOString());
@@ -30,7 +30,11 @@ export async function fetchCalendarEvents(token, start, end) {
     throw err;
   }
   const data = await res.json();
-  return (data.items || []).filter(e => e.status !== 'cancelled' && e.start?.dateTime);
+  const events = (data.items || []).filter(e => e.status !== 'cancelled' && e.start?.dateTime);
+  if (meetingsOnly) {
+    return events.filter(e => e.attendees && e.attendees.length >= 2);
+  }
+  return events;
 }
 
 /**

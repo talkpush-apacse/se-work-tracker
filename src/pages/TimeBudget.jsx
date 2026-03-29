@@ -131,7 +131,7 @@ export default function TimeBudget() {
     setIsFetching(true);
     setFetchError(null);
     try {
-      const events = await fetchCalendarEvents(googleToken, weekStart, weekEnd);
+      const events = await fetchCalendarEvents(googleToken, weekStart, weekEnd, { meetingsOnly: true });
       const meetingsList = events.map(eventToMeeting);
       // Preserve include/exclude state for calendar events already in the list, keep manual + copied entries
       setMeetings(prev => {
@@ -311,7 +311,7 @@ export default function TimeBudget() {
   const [editTargets, setEditTargets] = useState(currentTargets);
   useEffect(() => { setEditTargets(currentTargets); }, [currentTargets]);
 
-  // Time logs for current week, grouped by work type
+  // Time logs for current week, grouped by work type (includes checked meeting hours)
   const workTypeHours = useMemo(() => {
     const hours = { deep_work: 0, meetings: 0, comms: 0, admin: 0 };
     timeLogs.forEach(log => {
@@ -320,10 +320,13 @@ export default function TimeBudget() {
         hours[log.workType] += log.hours || 0;
       }
     });
+    // Add included meeting hours to the meetings bucket
+    const inclMeetingHours = meetings.filter(m => m.included).reduce((sum, m) => sum + m.durationHours, 0);
+    hours.meetings += inclMeetingHours;
     // Round
     Object.keys(hours).forEach(k => { hours[k] = Math.round(hours[k] * 100) / 100; });
     return hours;
-  }, [timeLogs, weekKey]);
+  }, [timeLogs, weekKey, meetings]);
 
   const totalLoggedByType = useMemo(
     () => WORK_TYPES.reduce((s, wt) => s + workTypeHours[wt], 0),
