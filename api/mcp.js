@@ -234,6 +234,73 @@ export default async function handler(req, res) {
     }
   );
 
+  // ── Tool: add_weekly_log ──────────────────────────────────────────────────────
+  server.tool(
+    'add_weekly_log',
+    'Add a weekly update log entry — highlight, lowlight, learning, shoutout, next-week-priority, or neutral.',
+    {
+      type: z
+        .enum(['highlight', 'lowlight', 'learning', 'shoutout', 'next-week-priority', 'neutral', 'annotation'])
+        .describe('The type of log entry.'),
+      text: z
+        .string()
+        .max(300)
+        .describe('The log entry text. Max 300 characters.'),
+      customer_name: z
+        .string()
+        .optional()
+        .describe('Optional: link this log to a customer by name (fuzzy match).'),
+      date: z
+        .string()
+        .optional()
+        .describe('Optional: date in YYYY-MM-DD format. Defaults to today.'),
+    },
+    async ({ type, text, customer_name, date }) => {
+      const customers = await getEntity('customers');
+
+      // Resolve optional customer
+      let customerId = null;
+      if (customer_name) {
+        const lower = customer_name.toLowerCase();
+        const customer = customers.find(c => c.name.toLowerCase().includes(lower));
+        if (!customer) {
+          return {
+            content: [{
+              type: 'text',
+              text: `Customer "${customer_name}" not found. Available: ${customers.map(c => c.name).join(', ')}`,
+            }],
+          };
+        }
+        customerId = customer.id;
+      }
+
+      // Validate optional date
+      const resolvedDate = date && /^\d{4}-\d{2}-\d{2}$/.test(date)
+        ? date
+        : new Date().toISOString().slice(0, 10);
+
+      const log = {
+        id:        randomUUID(),
+        createdAt: new Date().toISOString(),
+        date:      resolvedDate,
+        type,
+        text:      text.trim().slice(0, 300),
+        ...(customerId ? { customerId } : {}),
+      };
+
+      const logs = await getEntity('weeklyUpdateLogs');
+      logs.push(log);
+      await putEntity('weeklyUpdateLogs', logs);
+
+      return {
+        content: [{
+          type: 'text',
+          text: `Weekly log added:\n${JSON.stringify(log, null, 2)}`,
+        }],
+      };
+    }
+  );
+
   // ── Stateless transport (one per request, safe for Vercel serverless) ─────────
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined, // disable sessions — stateless mode
