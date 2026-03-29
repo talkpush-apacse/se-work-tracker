@@ -1,0 +1,244 @@
+/**
+ * POST /api/mcp — MCP (Model Context Protocol) endpoint for Work Tracker.
+ *
+ * Lets Claude Desktop / Claude.ai call tools like list_tasks, add_task, etc.
+ * Auth: Bearer token via Authorization header OR ?token= query param (Claude.ai connectors)
+ */
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { z } from 'zod';
+import { randomUUID } from 'crypto';
+import { sql } from './_db.js';
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+function isAuthorized(req) {
+  const secret = process.env.API_SECRET;
+  if (!secret) return false;
+  const header = req.headers['authorization'] || '';
+  const headerToken = header.replace(/^Bearer\s+/i, '').trim();
+  if (headerToken && headerToken === secret) return true;
+  if (req.query?.token && req.query.token === secret) return true;
+  return false;
+}
+
+// ── DB helpers ────────────────────────────────────────────────────────────────
+async function getEntity(entityName) {
+  const rows = await sql`SELECT data FROM app_data WHERE entity_name = ${entityName}`;
+  return rows.length > 0 && Array.isArray(rows[0].data) ? rows[0].data : [];
+}
+
+async function putEntity(entityName, data) {
+  await sql`
+    INSERT INTO app_data (entity_name, data, updated_at)
+    VALUES (${entityName}, ${JSON.stringify(data)}::jsonb, now())
+    ON CONFLICT (entity_name) DO UPDATE
+      SET data       = ${JSON.stringify(data)}::jsonb,
+          updated_at = now()
+  `;
+}
+
+// ── Format a task for output (resolve customer name) ─────────────────────────
+function formatTask(task, customers) {
+  const customer = customers.find(c => c.id === task.customerId);
+  return {
+    id:           task.id,
+    description:  task.description,
+    status:       task.status,
+    workType:     task.workType,
+    isEvergreen:  task.isEvergreen ?? false,
+    customerName: customer?.name ?? null,
+    points:       task.points ?? 0,
+    createdAt:    task.createdAt,
+    closedAt:     task.closedAt ?? null,
+  };
+}
+
+// ── Vercel handler ────────────────────────────────────────────────────────────
+export default async function handler(req, res) {
+  // CORS — needed for Claude.ai connector iframe context
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, Mcp-Session-Id');
+  if (req.method === 'OPTIONS') return res.status(204).end();
+
+  if (!isAuthorized(req)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  // ── Build a fresh MCP server per request (stateless — safe for serverless) ──
+  const server = new McpServer({
+    name:    'work-tracker',
+    version: '1.0.0',
+  });
+
+  // ── Tool: list_tasks ─────────────────────────────────────────────────────────
+  server.tool(
+    'list_tasks',
+    'List tasks from the Work Tracker. Optionally filter by status.',
+    {
+      status: z
+        .enum(['open', 'in-progress', 'done', 'blocked'])
+        .optional()
+        .describe('Filter by status. Omit to return all non-archived tasks.'),
+    },
+    async ({ status }) => {
+      const [tasks, customers] = await Promise.all([
+        getEntity('tasks'),
+        getEntity('customers'),
+      ]);
+      const filtered = status
+        ? tasks.filter(t => t.status === status)
+        : tasks.filter(t => t.status !== 'archived');
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify(filtered.map(t => formatTask(t, customers)), null, 2),
+        }],
+      };
+    }
+  );
+
+  // ── Tool: get_tasks_by_customer ───────────────────────────────────────────────
+  server.tool(
+    'get_tasks_by_customer',
+    'Get tasks for a specific customer. Fuzzy-matches the customer name.',
+    {
+      customer_name: z.string().describe('The customer or account name to search for.'),
+    },
+    async ({ customer_name }) => {
+      const [tasks, customers] = await Promise.all([
+        getEntity('tasks'),
+        getEntity('customers'),
+      ]);
+      const lower = customer_name.toLowerCase();
+      const matched = customers.filter(c => c.name.toLowerCase().includes(lower));
+      if (matched.length === 0) {
+        return { content: [{ type: 'text', text: `No customer found matching "${customer_name}".` }] };
+      }
+      const matchedIds = new Set(matched.map(c => c.id));
+      const filtered = tasks.filter(t => matchedIds.has(t.customerId) && t.status !== 'archived');
+      if (filtered.length === 0) {
+        return { content: [{ type: 'text', text: `No tasks found for customer matching "${customer_name}".` }] };
+      }
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify(filtered.map(t => formatTask(t, customers)), null, 2),
+        }],
+      };
+    }
+  );
+
+  // ── Tool: add_task ────────────────────────────────────────────────────────────
+  server.tool(
+    'add_task',
+    'Add a new task to the Work Tracker.',
+    {
+      description:   z.string().describe('The task description.'),
+      customer_name: z.string().describe('The customer or account this task is for.'),
+      work_type: z
+        .enum(['deep_work', 'meetings', 'comms', 'admin'])
+        .optional()
+        .describe('Type of work. Defaults to comms.'),
+      is_evergreen: z
+        .boolean()
+        .optional()
+        .describe('Whether this is a recurring evergreen task. Defaults to false.'),
+      status: z
+        .enum(['open', 'in-progress'])
+        .optional()
+        .describe('Initial status. Defaults to open.'),
+    },
+    async ({ description, customer_name, work_type, is_evergreen, status }) => {
+      const customers = await getEntity('customers');
+      const lower = customer_name.toLowerCase();
+      const customer = customers.find(c => c.name.toLowerCase().includes(lower));
+      if (!customer) {
+        return {
+          content: [{
+            type: 'text',
+            text: `Customer "${customer_name}" not found. Available customers: ${customers.map(c => c.name).join(', ')}`,
+          }],
+        };
+      }
+
+      const tasks = await getEntity('tasks');
+      const task = {
+        id:             randomUUID(),
+        createdAt:      new Date().toISOString(),
+        customerId:     customer.id,
+        okrId:          null,
+        meetingEntryId: null,
+        description:    description.trim(),
+        workType:       work_type ?? 'comms',
+        isEvergreen:    is_evergreen ?? false,
+        status:         status ?? 'open',
+        assigneeOrTeam: null,
+        points:         0,
+        closedAt:       null,
+        ticketUrl:      null,
+        notes:          null,
+        attachments:    [],
+      };
+      tasks.push(task);
+      await putEntity('tasks', tasks);
+
+      return {
+        content: [{
+          type: 'text',
+          text: `Task created:\n${JSON.stringify(formatTask(task, customers), null, 2)}`,
+        }],
+      };
+    }
+  );
+
+  // ── Tool: update_task_status ──────────────────────────────────────────────────
+  server.tool(
+    'update_task_status',
+    'Update the status of a task by its ID.',
+    {
+      task_id: z.string().describe('The UUID of the task to update.'),
+      status: z
+        .enum(['open', 'in-progress', 'done', 'blocked'])
+        .describe('The new status.'),
+    },
+    async ({ task_id, status }) => {
+      const [tasks, customers] = await Promise.all([
+        getEntity('tasks'),
+        getEntity('customers'),
+      ]);
+      const idx = tasks.findIndex(t => t.id === task_id);
+      if (idx === -1) {
+        return { content: [{ type: 'text', text: `Task "${task_id}" not found.` }] };
+      }
+
+      tasks[idx].status = status;
+      // Set / clear closedAt alongside status
+      if (status === 'done' && !tasks[idx].closedAt) {
+        tasks[idx].closedAt = new Date().toISOString();
+      } else if (status !== 'done') {
+        tasks[idx].closedAt = null;
+      }
+
+      await putEntity('tasks', tasks);
+      return {
+        content: [{
+          type: 'text',
+          text: `Task updated:\n${JSON.stringify(formatTask(tasks[idx], customers), null, 2)}`,
+        }],
+      };
+    }
+  );
+
+  // ── Stateless transport (one per request, safe for Vercel serverless) ─────────
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: undefined, // disable sessions — stateless mode
+  });
+
+  await server.connect(transport);
+  await transport.handleRequest(req, res, req.body);
+}
