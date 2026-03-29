@@ -6,8 +6,8 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   Clock, ChevronLeft, ChevronRight, Plus, Trash2, Calendar, Loader2,
-  AlertCircle, Settings, Check, X, CheckSquare, Square, Timer, User, Copy,
-  Brain, Users, MessageSquare, ClipboardList, RotateCcw, ChevronDown, ChevronUp,
+  AlertCircle, Settings, X, CheckSquare, Square, Copy,
+  Brain, Users, MessageSquare, ClipboardList, RotateCcw,
 } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, parseISO, differenceInMinutes, isThursday, isFriday, isSaturday, isSunday } from 'date-fns';
 import { useAppStore } from '../context/StoreContext';
@@ -31,7 +31,6 @@ const DEFAULT_BUDGET = 40;
 const HOUR_OPTIONS = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6, 8];
 // Stable empty array to prevent infinite re-render when budget has no excludedPointIds
 const EMPTY_EXCLUDED = [];
-
 /** Compute the week-start date string (YYYY-MM-DD) for a given date */
 function getWeekStartKey(date) {
   return format(startOfWeek(date, { weekStartsOn: 0 }), 'yyyy-MM-dd');
@@ -54,19 +53,8 @@ function eventToMeeting(event) {
   };
 }
 
-/** Format a decimal hour value as "Xh Ym" (e.g. 5.75 → "5h 45m", 2 → "2h", 0.5 → "30m") */
-function fmtHrs(h) {
-  const abs = Math.abs(h);
-  const hrs = Math.floor(abs);
-  const mins = Math.round((abs - hrs) * 60);
-  const sign = h < 0 ? '-' : '';
-  if (mins === 0) return `${sign}${hrs}h`;
-  if (hrs === 0) return `${sign}${mins}m`;
-  return `${sign}${hrs}h ${mins}m`;
-}
-
 export default function TimeBudget() {
-  const { customers, addTask, okrs, points, timeLogs, getTimeBudget, upsertTimeBudget, getWorkTypeTargets, upsertWorkTypeTargets } = useAppStore();
+  const { timeLogs, getTimeBudget, upsertTimeBudget, getWorkTypeTargets, upsertWorkTypeTargets } = useAppStore();
   const { googleToken, logout } = useGoogleAuth();
 
   // Week navigation — default to current week
@@ -95,11 +83,6 @@ export default function TimeBudget() {
   const [showManualMeeting, setShowManualMeeting] = useState(false);
   const [newManualMeeting, setNewManualMeeting] = useState({ summary: '', durationHours: 1 });
 
-  // New task form — aligned with Triage QuickAddTaskForm fields
-  const [newTask, setNewTask] = useState({
-    description: '', hours: 1, customerId: '',
-    workType: 'comms', okrId: '', isEvergreen: false,
-  });
 
   // Re-load from store when week changes
   useEffect(() => {
@@ -170,12 +153,6 @@ export default function TimeBudget() {
     ));
   }, []);
 
-  // Toggle focus time session inclusion in budget
-  const togglePointInclusion = useCallback((pointId) => {
-    setExcludedPointIds(prev =>
-      prev.includes(pointId) ? prev.filter(id => id !== pointId) : [...prev, pointId]
-    );
-  }, []);
 
   // Add a manual meeting entry
   const addManualMeeting = useCallback(() => {
@@ -215,84 +192,11 @@ export default function TimeBudget() {
     setHasFetched(true);
   }, [lastWeekBudget]);
 
-  // Task CRUD — auto-creates a linked Triage task on add
-  const addBudgetTask = useCallback(() => {
-    if (!newTask.description.trim()) return;
-
-    // Auto-create linked Triage task
-    const triageTask = addTask({
-      description: newTask.description.trim(),
-      customerId: newTask.customerId || undefined,
-      workType: newTask.workType,
-      isEvergreen: newTask.isEvergreen || undefined,
-      okrId: newTask.okrId || undefined,
-      status: 'open',
-    });
-
-    // Add budget task linked to the Triage task
-    setBudgetTasks(prev => [...prev, {
-      id: crypto.randomUUID(),
-      description: newTask.description.trim(),
-      hours: newTask.hours,
-      customerId: newTask.customerId || undefined,
-      workType: newTask.workType,
-      okrId: newTask.okrId || undefined,
-      taskId: triageTask.id,
-    }]);
-
-    setNewTask({
-      description: '', hours: 1, customerId: '',
-      workType: 'comms', okrId: '', isEvergreen: false,
-    });
-  }, [newTask, addTask]);
-
-  const removeBudgetTask = useCallback((id) => {
-    setBudgetTasks(prev => prev.filter(t => t.id !== id));
-  }, []);
-
-  const updateBudgetTaskHours = useCallback((id, hours) => {
-    setBudgetTasks(prev => prev.map(t => t.id === id ? { ...t, hours } : t));
-  }, []);
-
-  // Focus time logged — read from points for the current week
-  const weeklyLoggedSessions = useMemo(() => {
-    return points
-      .filter(p => p.hours > 0 && p.timestamp)
-      .filter(p => {
-        const t = new Date(p.timestamp);
-        return t >= weekStart && t <= weekEnd;
-      })
-      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-  }, [points, weekStart, weekEnd]);
-
-  const loggedHours = useMemo(
-    () => Math.round(
-      weeklyLoggedSessions
-        .filter(s => !excludedPointIds.includes(s.id))
-        .reduce((sum, s) => sum + (s.hours || 0), 0) * 100
-    ) / 100,
-    [weeklyLoggedSessions, excludedPointIds]
-  );
-
   // Calculations
   const meetingHours = useMemo(
     () => meetings.filter(m => m.included).reduce((sum, m) => sum + m.durationHours, 0),
     [meetings]
   );
-  const taskHours = useMemo(
-    () => budgetTasks.reduce((sum, t) => sum + t.hours, 0),
-    [budgetTasks]
-  );
-  const budgeted = meetingHours + taskHours + loggedHours;
-  const remaining = totalBudgetHours - budgeted;
-  const budgetPercent = totalBudgetHours > 0 ? Math.min((budgeted / totalBudgetHours) * 100, 100) : 0;
-  const isOverBudget = remaining < 0;
-  const isNearBudget = budgetPercent >= 80 && !isOverBudget;
-
-  // Budget bar color
-  const barColor = isOverBudget ? 'bg-red-500' : isNearBudget ? 'bg-amber-500' : 'bg-emerald-500';
-  const barBg = isOverBudget ? 'bg-red-50' : isNearBudget ? 'bg-amber-50' : 'bg-emerald-50';
-
   // Week navigation
   const goToPrevWeek = () => setCurrentDate(d => subWeeks(d, 1));
   const goToNextWeek = () => setCurrentDate(d => addWeeks(d, 1));
@@ -300,7 +204,6 @@ export default function TimeBudget() {
 
   // ── Bandwidth: Work Type breakdown from timeLogs ──────────────────────────
   const [showTargetsEditor, setShowTargetsEditor] = useState(false);
-  const [showDetailSections, setShowDetailSections] = useState(false);
 
   // Get targets for this week (or defaults)
   const currentTargets = useMemo(() => {
@@ -578,128 +481,7 @@ export default function TimeBudget() {
         </div>
       )}
 
-      {/* ── Original Budget Summary (collapsible) ─────────────────────────── */}
-      <div>
-        <button
-          onClick={() => setShowDetailSections(v => !v)}
-          className="w-full flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors mb-3"
-        >
-          {showDetailSections ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          Budget Planning Details
-          <span className="text-[10px] font-normal">(meetings, tasks, focus time)</span>
-        </button>
-      </div>
-
-      {showDetailSections && (<>
-      {/* Summary card */}
-      <div className="bg-card border border-border rounded-2xl px-5 py-4 space-y-3">
-        {/* Budget bar */}
-        <div className={`w-full h-3 rounded-full ${barBg} overflow-hidden`}>
-          <div
-            className={`h-full rounded-full ${barColor} transition-all duration-500`}
-            style={{ width: `${Math.min(budgetPercent, 100)}%` }}
-          />
-        </div>
-
-        <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
-          <div className="text-center">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Meetings</p>
-            <p className="text-lg font-mono font-bold text-foreground">{fmtHrs(meetingHours)}</p>
-          </div>
-          <div className="text-center">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Tasks</p>
-            <p className="text-lg font-mono font-bold text-foreground">{fmtHrs(taskHours)}</p>
-          </div>
-          <div className="text-center">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Logged</p>
-            <p className="text-lg font-mono font-bold text-purple-700">{fmtHrs(loggedHours)}</p>
-          </div>
-          <div className="text-center">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Budgeted</p>
-            <p className="text-lg font-mono font-bold text-foreground">{fmtHrs(budgeted)} <span className="text-xs font-normal text-muted-foreground">/ {totalBudgetHours}h</span></p>
-          </div>
-          <div className="text-center">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Available</p>
-            <p className={`text-lg font-mono font-bold ${isOverBudget ? 'text-red-700' : 'text-foreground'}`}>
-              {isOverBudget ? `${fmtHrs(Math.abs(remaining))} over` : fmtHrs(remaining)}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Focus Time Logged section */}
-      <div className="bg-card border border-border rounded-2xl overflow-hidden">
-        <div className="px-4 py-3 border-b border-border">
-          <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-            <Timer size={14} className="text-purple-700" />
-            Focus Time Logged
-            <span className="text-xs font-normal text-muted-foreground">({fmtHrs(loggedHours)})</span>
-          </h2>
-        </div>
-
-        <div className="px-4 py-3">
-          {weeklyLoggedSessions.length === 0 ? (
-            <p className="text-xs text-muted-foreground text-center py-4">
-              No focus time logged this week yet. Complete timer sessions in Triage to track actual hours.
-            </p>
-          ) : (
-            <div className="space-y-1.5 max-h-[20rem] overflow-y-auto">
-              {weeklyLoggedSessions.map(s => {
-                const customer = s.customerId ? customers.find(c => c.id === s.customerId) : null;
-                // Use comment as description, fall back to activity type
-                const description = s.comment || s.activityType || 'Focus session';
-                const sessionDate = s.timestamp ? format(parseISO(s.timestamp), 'EEE MMM d · h:mm a') : '';
-                const isIncluded = !excludedPointIds.includes(s.id);
-                return (
-                  <div
-                    key={s.id}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${
-                      isIncluded
-                        ? 'border-border bg-card'
-                        : 'border-border/50 bg-secondary/30 opacity-50'
-                    }`}
-                  >
-                    {/* Toggle inclusion in budget — matches meeting checkbox pattern */}
-                    <button
-                      onClick={() => togglePointInclusion(s.id)}
-                      className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-                      title={isIncluded ? 'Exclude from budget' : 'Include in budget'}
-                    >
-                      {isIncluded
-                        ? <CheckSquare size={14} className="text-purple-700" />
-                        : <Square size={14} />
-                      }
-                    </button>
-                    <div className="min-w-0 flex-1">
-                      <p className={`text-xs font-medium leading-snug truncate ${
-                        isIncluded ? 'text-foreground' : 'text-muted-foreground line-through'
-                      }`}>{description}</p>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        {customer && (
-                          <span className="inline-flex items-center gap-1 text-[10px] text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded-full">
-                            <User size={8} />
-                            {customer.name}
-                          </span>
-                        )}
-                        <span className="text-[10px] text-muted-foreground">{sessionDate}</span>
-                      </div>
-                    </div>
-                    <span className={`text-xs font-semibold flex-shrink-0 ${
-                      isIncluded ? 'text-foreground' : 'text-muted-foreground'
-                    }`}>
-                      {fmtHrs(s.hours)}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Two-column layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Meetings section */}
+      {/* ── Meetings ────────────────────────────────────────────────────────── */}
         <div className="bg-card border border-border rounded-2xl overflow-hidden">
           <div className="px-4 py-3 border-b border-border flex items-center justify-between">
             <div>
@@ -857,144 +639,6 @@ export default function TimeBudget() {
           </div>
         </div>
 
-        {/* Tasks section */}
-        <div className="bg-card border border-border rounded-2xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-border">
-            <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <Clock size={14} className="text-teal-700" />
-              Tasks & Focus Time
-              <span className="text-xs font-normal text-muted-foreground">({taskHours}h)</span>
-            </h2>
-          </div>
-
-          <div className="px-4 py-3 space-y-2">
-            {/* Add task form — Row 1: Description */}
-            <div className="flex gap-1.5">
-              <input
-                type="text"
-                placeholder="Task description..."
-                value={newTask.description}
-                onChange={e => setNewTask(prev => ({ ...prev, description: e.target.value }))}
-                onKeyDown={e => { if (e.key === 'Enter') addBudgetTask(); }}
-                className="flex-1 min-w-[10rem] h-8 bg-secondary border border-border rounded-lg px-2.5 text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-ring"
-              />
-            </div>
-
-            {/* Row 2: Work Type · Customer · Hours · OKR · Add */}
-            <div className="flex gap-1.5 flex-wrap">
-              {/* Work Type */}
-              <select
-                value={newTask.workType}
-                onChange={e => setNewTask(prev => ({ ...prev, workType: e.target.value }))}
-                className="h-8 bg-secondary border border-border rounded-lg px-1.5 text-xs text-foreground focus:outline-none focus:border-ring w-28"
-              >
-                {WORK_TYPES.map(wt => (
-                  <option key={wt} value={wt}>{WORK_TYPE_LABELS[wt]}</option>
-                ))}
-              </select>
-
-              {/* Customer */}
-              <select
-                value={newTask.customerId}
-                onChange={e => setNewTask(prev => ({ ...prev, customerId: e.target.value }))}
-                className="h-8 bg-secondary border border-border rounded-lg px-1.5 text-xs text-foreground focus:outline-none focus:border-ring max-w-[8rem]"
-              >
-                <option value="">No client</option>
-                {[...customers].sort((a, b) => a.name.localeCompare(b.name)).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-
-              {/* Hours */}
-              <select
-                value={newTask.hours}
-                onChange={e => setNewTask(prev => ({ ...prev, hours: Number(e.target.value) }))}
-                className="h-8 bg-secondary border border-border rounded-lg px-1.5 text-xs text-foreground focus:outline-none focus:border-ring w-20"
-              >
-                {HOUR_OPTIONS.map(h => (
-                  <option key={h} value={h}>{h}h</option>
-                ))}
-              </select>
-
-              {/* OKR (only if OKRs exist) */}
-              {okrs.length > 0 && (
-                <select
-                  value={newTask.okrId}
-                  onChange={e => setNewTask(prev => ({ ...prev, okrId: e.target.value }))}
-                  className="h-8 bg-secondary border border-border rounded-lg px-1.5 text-xs text-foreground focus:outline-none focus:border-ring max-w-[8rem]"
-                >
-                  <option value="">OKR...</option>
-                  {okrs.map(o => (
-                    <option key={o.id} value={o.id}>{o.title}</option>
-                  ))}
-                </select>
-              )}
-
-              {/* Add button */}
-              <button
-                onClick={addBudgetTask}
-                disabled={!newTask.description.trim()}
-                className="flex items-center gap-1 px-3 h-8 rounded-lg bg-brand-lavender/15 text-brand-lavender text-xs font-semibold hover:bg-brand-lavender/25 disabled:opacity-40 transition-all"
-              >
-                <Plus size={12} /> Add
-              </button>
-            </div>
-
-            {/* Task list */}
-            <div className="space-y-1.5 max-h-[20rem] overflow-y-auto">
-              {budgetTasks.length === 0 && (
-                <p className="text-xs text-muted-foreground text-center py-4">
-                  No tasks added yet. Add time blocks for focus work, client tasks, or admin.
-                </p>
-              )}
-
-              {budgetTasks.map(t => {
-                const customer = t.customerId ? customers.find(c => c.id === t.customerId) : null;
-                const typeColor = t.workType ? WORK_TYPE_COLORS[t.workType] : null;
-                return (
-                  <div
-                    key={t.id}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl border border-border bg-card"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {/* Work type badge */}
-                        {t.workType && typeColor && (
-                          <span className={`inline-flex items-center rounded-full text-[9px] font-semibold px-1.5 py-0.5 border ${typeColor.bg} ${typeColor.text} ${typeColor.border}`}>
-                            {WORK_TYPE_LABELS[t.workType] || t.workType}
-                          </span>
-                        )}
-                        <p className="text-xs font-medium text-foreground leading-snug">{t.description}</p>
-                      </div>
-                      {/* Sub-line: customer */}
-                      {customer && (
-                        <div className="flex items-center gap-1 mt-0.5 text-[10px] text-muted-foreground">
-                          <span>{customer.name}</span>
-                        </div>
-                      )}
-                    </div>
-                    <select
-                      value={t.hours}
-                      onChange={e => updateBudgetTaskHours(t.id, Number(e.target.value))}
-                      className="h-6 bg-secondary border border-border rounded-lg px-1 text-[11px] text-foreground focus:outline-none focus:border-ring w-16"
-                    >
-                      {HOUR_OPTIONS.map(h => (
-                        <option key={h} value={h}>{h}h</option>
-                      ))}
-                    </select>
-                    <button
-                      onClick={() => removeBudgetTask(t.id)}
-                      className="p-1 text-muted-foreground hover:text-red-700 transition-colors flex-shrink-0"
-                      title="Remove"
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </div>
-      </>)}
     </div>
   );
 }
