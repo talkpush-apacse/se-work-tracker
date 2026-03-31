@@ -468,7 +468,7 @@ export default function WeeklyReport({ onNavigate }) {
   useEffect(() => {
     if (!gmailEmails || gmailEmails.length === 0) return;
     const weekKey = format(weekStart, 'yyyy-MM-dd');
-    localStorage.setItem(`gpt-email-selections-${weekKey}`, JSON.stringify(emailSelections));
+    try { localStorage.setItem(`gpt-email-selections-${weekKey}`, JSON.stringify(emailSelections)); } catch { /* quota */ }
   }, [emailSelections, weekStart, gmailEmails]);
 
   // Sticky header — show when the page H1 scrolls out of view

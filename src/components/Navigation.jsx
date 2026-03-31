@@ -45,7 +45,7 @@ function loadTabOrder() {
 }
 
 function saveTabOrder(tabs) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(tabs.map(t => t.id)));
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(tabs.map(t => t.id))); } catch { /* quota */ }
 }
 
 // ── Sortable nav item for desktop sidebar ──
