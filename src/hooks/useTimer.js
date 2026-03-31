@@ -22,10 +22,14 @@ function loadTimerState() {
 }
 
 function saveTimerState(state) {
-  if (state === null) {
-    localStorage.removeItem(TIMER_KEY);
-  } else {
-    localStorage.setItem(TIMER_KEY, JSON.stringify(state));
+  try {
+    if (state === null) {
+      localStorage.removeItem(TIMER_KEY);
+    } else {
+      localStorage.setItem(TIMER_KEY, JSON.stringify(state));
+    }
+  } catch {
+    // localStorage full or unavailable — non-critical
   }
 }
 

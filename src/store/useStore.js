@@ -41,7 +41,11 @@ function load(key, fallback = []) {
 }
 
 function save(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // localStorage full or unavailable — non-critical since Neon is source of truth
+  }
 }
 
 // Use the Web Crypto API for collision-free IDs — works in all modern browsers
@@ -132,7 +136,7 @@ function runV2Migration() {
     }
   } catch { /* ignore timer migration errors */ }
 
-  localStorage.setItem(V2_MIGRATION_FLAG, new Date().toISOString());
+  try { localStorage.setItem(V2_MIGRATION_FLAG, new Date().toISOString()); } catch { /* quota */ }
   console.log('[v2] Migration complete — projectId → customerId');
 }
 
@@ -252,7 +256,7 @@ function resetEvergreenTasks() {
     save('gpt-tasks', updated);
     console.log('[evergreen] Reset done evergreen tasks for week of', sundayStr);
   }
-  localStorage.setItem('gpt-evergreen-last-reset', sundayStr);
+  try { localStorage.setItem('gpt-evergreen-last-reset', sundayStr); } catch { /* quota */ }
 }
 
 // ─── V3 Migration: Backfill timeLogs from existing points ──────────────────
@@ -263,7 +267,7 @@ function runV3Migration() {
 
   const points = load(KEYS.points, []);
   if (!points.length) {
-    localStorage.setItem(V3_MIGRATION_FLAG, new Date().toISOString());
+    try { localStorage.setItem(V3_MIGRATION_FLAG, new Date().toISOString()); } catch { /* quota */ }
     return;
   }
 
@@ -295,7 +299,7 @@ function runV3Migration() {
   });
 
   save(KEYS.timeLogs, timeLogs);
-  localStorage.setItem(V3_MIGRATION_FLAG, new Date().toISOString());
+  try { localStorage.setItem(V3_MIGRATION_FLAG, new Date().toISOString()); } catch { /* quota */ }
   console.log('[v3] Backfilled', timeLogs.length, 'timeLogs from points');
 }
 
@@ -440,7 +444,7 @@ export function useStore() {
         const localData = { okrs, customers, points, meetingEntries, tasks, milestones, aiOutputs, aiSettings };
         const result = await seedAllData(localData);
         if (result) {
-          localStorage.setItem(MIGRATION_FLAG, new Date().toISOString());
+          try { localStorage.setItem(MIGRATION_FLAG, new Date().toISOString()); } catch { /* quota */ }
           console.log('[sync] Seed complete:', result.entitiesSeeded, 'entities');
         }
       } else if (neonHasData) {
@@ -486,7 +490,7 @@ export function useStore() {
             claudeModel: remote.aiSettings.claudeModel || prev.claudeModel,
           }));
         }
-        if (!alreadyMigrated) localStorage.setItem(MIGRATION_FLAG, new Date().toISOString());
+        if (!alreadyMigrated) try { localStorage.setItem(MIGRATION_FLAG, new Date().toISOString()); } catch { /* quota */ }
       }
 
       if (!cancelled) {
@@ -797,7 +801,7 @@ export function useStore() {
   const migrateAnnotationsToLogs = useCallback(() => {
     if (localStorage.getItem(MIGRATION_FLAG_KEY)) return 0;
     if (!annotations.length) {
-      localStorage.setItem(MIGRATION_FLAG_KEY, 'true');
+      try { localStorage.setItem(MIGRATION_FLAG_KEY, 'true'); } catch { /* quota */ }
       return 0;
     }
     const TAG_MAP = { good: 'highlight', bad: 'lowlight', learning: 'learning' };
@@ -811,7 +815,7 @@ export function useStore() {
     }));
     setWeeklyUpdateLogs(prev => [...prev, ...migrated]);
     setAnnotations([]);
-    localStorage.setItem(MIGRATION_FLAG_KEY, 'true');
+    try { localStorage.setItem(MIGRATION_FLAG_KEY, 'true'); } catch { /* quota */ }
     return migrated.length;
   }, [annotations]);
 
