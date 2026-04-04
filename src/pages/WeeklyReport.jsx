@@ -15,7 +15,7 @@ import {
 import { Button } from '../components/ui/button';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { fetchCalendarEvents, fetchWeeklyEmailsWithBodies } from '../lib/googleApi';
-import { callClaude } from '../lib/api';
+import { callClaude, callOpenAI } from '../lib/api';
 import WeeklyUpdateLog from '../components/WeeklyUpdateLog';
 
 // ─── Module-level constants ──────────────────────────────────────────────────
@@ -551,30 +551,13 @@ export default function WeeklyReport({ onNavigate }) {
           max_tokens: 1500,
         });
       } else {
-        const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-        if (!apiKey) throw new Error('VITE_OPENAI_API_KEY is not set');
-
-        const res = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type':  'application/json',
-            'Authorization': `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-            model:       aiSettings.openaiModel || 'gpt-4o',
-            temperature: 0.7,
-            messages: [
-              { role: 'system', content: systemPrompt },
-              { role: 'user',   content: context },
-            ],
-          }),
+        output = await callOpenAI({
+          model:       aiSettings.openaiModel || 'gpt-4o',
+          system:      systemPrompt,
+          messages:    [{ role: 'user', content: context }],
+          max_tokens:  1500,
+          temperature: 0.7,
         });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error?.message || `OpenAI API error ${res.status}`);
-        }
-        const data = await res.json();
-        output = data.choices?.[0]?.message?.content || '';
       }
 
       setEmailText(output);

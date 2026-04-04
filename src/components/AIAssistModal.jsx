@@ -3,7 +3,7 @@ import { Mic, MicOff, Loader2, Check, Sparkles } from 'lucide-react';
 import Modal from './Modal';
 import { useAppStore } from '../context/StoreContext';
 import { Button } from './ui/button';
-import { callClaude } from '../lib/api';
+import { callClaude, callOpenAI } from '../lib/api';
 
 // System prompt for standalone AI Assist (email refiner — plain text output)
 const STANDALONE_SYSTEM_PROMPT = `You are an email refiner for a Solutions Engineer at a hiring tech SaaS company. Emails go to enterprise BPO/retail clients — busy managers, directors, VPs who skim.
@@ -176,33 +176,13 @@ export default function AIAssistModal({ onClose }) {
           setTaskDescription(firstLine);
         }
       } else {
-        // OpenAI
-        const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-        if (!apiKey) throw new Error('VITE_OPENAI_API_KEY is not set.');
-
-        const res = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-            model: aiSettings.openaiModel || 'gpt-4o',
-            messages: [
-              { role: 'system', content: STANDALONE_SYSTEM_PROMPT },
-              { role: 'user', content: userInput.trim() },
-            ],
-            temperature: 0.7,
-          }),
+        // OpenAI (via server-side proxy)
+        const text = await callOpenAI({
+          model:       aiSettings.openaiModel || 'gpt-4o',
+          system:      STANDALONE_SYSTEM_PROMPT,
+          messages:    [{ role: 'user', content: userInput.trim() }],
+          temperature: 0.7,
         });
-
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData?.error?.message || `OpenAI error ${res.status}`);
-        }
-
-        const data = await res.json();
-        const text = data.choices?.[0]?.message?.content || '';
         setGeneratedText(text);
         setEditedText(text);
         // Auto-fill task description from first line (up to 120 chars)

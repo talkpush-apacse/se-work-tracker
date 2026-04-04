@@ -11,7 +11,7 @@ import {
 import { format, parseISO, startOfWeek, endOfWeek } from 'date-fns';
 import { useGoogleAuth } from '../context/GoogleAuthContext';
 import { fetchCalendarEvents, fetchGmailMessages } from '../lib/googleApi';
-import { callClaude } from '../lib/api';
+import { callClaude, callOpenAI } from '../lib/api';
 import { WEEKLY_UPDATE_LOG_TYPES, WEEKLY_UPDATE_LOG_LABELS, WEEKLY_UPDATE_LOG_COLORS } from '../constants';
 
 // Log types available for tagging (exclude 'neutral' — not useful for promoted items)
@@ -202,30 +202,13 @@ export default function CalendarEmailImport({ customers, addWeeklyUpdateLog, aiS
           max_tokens: 2000,
         });
       } else {
-        const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-        if (!apiKey) throw new Error('VITE_OPENAI_API_KEY is not set');
-
-        const res = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type':  'application/json',
-            'Authorization': `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-            model:       aiSettings?.openaiModel || 'gpt-4o',
-            temperature: 0.5,
-            messages: [
-              { role: 'system', content: SUMMARY_SYSTEM_PROMPT },
-              { role: 'user',   content: userContent },
-            ],
-          }),
+        output = await callOpenAI({
+          model:       aiSettings?.openaiModel || 'gpt-4o',
+          system:      SUMMARY_SYSTEM_PROMPT,
+          messages:    [{ role: 'user', content: userContent }],
+          max_tokens:  2000,
+          temperature: 0.5,
         });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error?.message || `OpenAI API error ${res.status}`);
-        }
-        const data = await res.json();
-        output = data.choices?.[0]?.message?.content || '';
       }
 
       // Parse the JSON array from AI output

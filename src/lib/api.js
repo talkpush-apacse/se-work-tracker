@@ -133,6 +133,29 @@ export async function callClaude({ model, system, messages, max_tokens }) {
 }
 
 /**
+ * Call the server-side OpenAI proxy.
+ * Replaces all direct `fetch('https://api.openai.com/v1/chat/completions')` calls
+ * so OPENAI_API_KEY is never bundled into the browser build.
+ *
+ * @param {{ model?: string, system?: string, messages: object[], max_tokens?: number, temperature?: number }} params
+ * @returns {Promise<string>} The text from OpenAI's first response choice
+ * @throws {Error} On API or network failure — caller is responsible for try/catch
+ */
+export async function callOpenAI({ model, system, messages, max_tokens, temperature }) {
+  const res = await fetch('/api/openai', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ model, system, messages, max_tokens, temperature }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `OpenAI API error (${res.status})`);
+  }
+  const data = await res.json();
+  return data.text ?? '';
+}
+
+/**
  * Delete a file from Vercel Blob.
  * @param {string} blobUrl - The full Blob URL to delete
  * @returns {boolean} true on success

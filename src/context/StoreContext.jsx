@@ -3,7 +3,8 @@ import { useStore } from '../store/useStore';
 import { buildMemoryIndex } from '../utils/memoryIndex';
 import { chunkMemoryEntries } from '../utils/chunker';
 
-const StoreContext = createContext(null);
+// eslint-disable-next-line react-refresh/only-export-components
+export const StoreContext = createContext(null);
 
 export function StoreProvider({ children }) {
   const store = useStore();
@@ -45,6 +46,7 @@ export function StoreProvider({ children }) {
   return <StoreContext.Provider value={store}>{children}</StoreContext.Provider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAppStore() {
   return useContext(StoreContext);
 }

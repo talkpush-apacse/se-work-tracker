@@ -87,7 +87,12 @@ export default function TimeBudget() {
   // Re-load from store when week changes
   useEffect(() => {
     const budget = getTimeBudget(weekKey);
-    setTotalBudgetHours(budget?.totalBudgetHours ?? DEFAULT_BUDGET);
+    const targets = getWorkTypeTargets(weekKey);
+    // Prefer budget's saved value, fall back to sum of work type targets, then default
+    const targetSum = targets?.targets
+      ? Object.values(targets.targets).reduce((s, v) => s + v, 0)
+      : null;
+    setTotalBudgetHours(budget?.totalBudgetHours ?? targetSum ?? DEFAULT_BUDGET);
     setMeetings(budget?.meetings ?? []);
     setBudgetTasks(budget?.tasks ?? []);
     setHasFetched(!!budget?.meetings?.length);
@@ -95,7 +100,9 @@ export default function TimeBudget() {
     setExcludedPointIds(budget?.excludedPointIds ?? EMPTY_EXCLUDED);
     setFetchError(null);
     setShowManualMeeting(false);
-  }, [weekKey, getTimeBudget]);
+    // Only re-run when navigating to a different week, not on target changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weekKey]);
 
   // Auto-save to store whenever meetings/tasks/budget change
   useEffect(() => {
@@ -272,6 +279,29 @@ export default function TimeBudget() {
     setEditTargets({ ...DEFAULT_WORK_TYPE_TARGETS });
   };
 
+  // When weekly budget changes, proportionally scale work type targets to match
+  const handleBudgetChange = useCallback((newBudget) => {
+    const clamped = Math.max(1, Math.min(168, newBudget));
+    setTotalBudgetHours(clamped);
+    const oldTotal = Object.values(currentTargets).reduce((s, v) => s + v, 0);
+    if (oldTotal > 0) {
+      const ratio = clamped / oldTotal;
+      const scaled = {};
+      WORK_TYPES.forEach(wt => {
+        scaled[wt] = Math.round(currentTargets[wt] * ratio * 2) / 2; // round to nearest 0.5
+      });
+      // Adjust rounding drift on the largest category
+      const scaledTotal = Object.values(scaled).reduce((s, v) => s + v, 0);
+      const diff = clamped - scaledTotal;
+      if (diff !== 0) {
+        const largest = WORK_TYPES.reduce((a, b) => scaled[a] >= scaled[b] ? a : b);
+        scaled[largest] = Math.max(0, scaled[largest] + diff);
+      }
+      upsertWorkTypeTargets(weekKey, scaled);
+      setEditTargets(scaled);
+    }
+  }, [currentTargets, weekKey, upsertWorkTypeTargets]);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -304,7 +334,7 @@ export default function TimeBudget() {
               max={168}
               step={1}
               value={totalBudgetHours}
-              onChange={e => setTotalBudgetHours(Math.max(1, Number(e.target.value)))}
+              onChange={e => handleBudgetChange(Number(e.target.value))}
               className="w-20 h-8 bg-secondary border border-border rounded-lg px-2 text-sm text-foreground text-center focus:outline-none focus:border-ring"
             />
             <span className="text-muted-foreground">hours</span>

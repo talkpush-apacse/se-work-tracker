@@ -14,7 +14,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { parseISO } from 'date-fns';
 import { useAppStore } from '../context/StoreContext';
 import { useTimerContext, useTimerDisplay } from '../context/TimerContext';
-import { callClaude } from '../lib/api';
+import { callClaude, callOpenAI } from '../lib/api';
 import { getWeekRangeForOffset, formatWeekLabel, isInRange } from '../utils/dateHelpers';
 import ConfirmDialog from '../components/ConfirmDialog';
 import FileAttachments from '../components/FileAttachments';
@@ -572,35 +572,13 @@ const AIWorkspace = memo(function AIWorkspace({ task, customer }) {
         setCurrentOutput({ outputType, inputText: userInput.trim(), outputText: text, provider: 'claude' });
         setEditedText(text);
       } else {
-        // ── OpenAI GPT-4o ────────────────────────────────────────────────
-        const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-        if (!apiKey) {
-          throw new Error('VITE_OPENAI_API_KEY is not set. Add it to your .env file and restart the dev server.');
-        }
-
-        const res = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-            model: aiSettings.openaiModel || 'gpt-4o',
-            messages: [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: userInput.trim() },
-            ],
-            temperature: 0.7,
-          }),
+        // ── OpenAI GPT-4o (via server-side proxy) ─────────────────────────
+        const text = await callOpenAI({
+          model:       aiSettings.openaiModel || 'gpt-4o',
+          system:      systemPrompt,
+          messages:    [{ role: 'user', content: userInput.trim() }],
+          temperature: 0.7,
         });
-
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData?.error?.message || `OpenAI error ${res.status}`);
-        }
-
-        const data = await res.json();
-        const text = data.choices?.[0]?.message?.content || '';
         setCurrentOutput({ outputType, inputText: userInput.trim(), outputText: text, provider: 'openai' });
         setEditedText(text);
       }

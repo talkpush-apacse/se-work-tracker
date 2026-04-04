@@ -866,6 +866,32 @@ export function useStore() {
     };
   }, [points]);
 
+  // ─── Generic entity setter ────────────────────────────────────────────────
+  // Allows pages to replace a full entity array/object while preserving the
+  // existing localStorage + Neon sync pipeline handled by the save effects.
+  const updateEntity = useCallback((entity, data) => {
+    switch (entity) {
+      case 'okrs': setOkrs(data); return true;
+      case 'customers': setCustomers(data); return true;
+      case 'points': setPoints(data); return true;
+      case 'meetingEntries': setMeetingEntries(data); return true;
+      case 'tasks': setTasks(data); return true;
+      case 'milestones': setMilestones(data); return true;
+      case 'aiOutputs': setAiOutputs(data); return true;
+      case 'aiSettings': setAiSettings(data); return true;
+      case 'annotations': setAnnotations(data); return true;
+      case 'weeklyReports': setWeeklyReports(data); return true;
+      case 'weeklyUpdateLogs': setWeeklyUpdateLogs(data); return true;
+      case 'timeBudgets': setTimeBudgets(data); return true;
+      case 'timeLogs': setTimeLogs(data); return true;
+      case 'stressLogs': setStressLogs(data); return true;
+      case 'workTypeTargets': setWorkTypeTargets(data); return true;
+      default:
+        console.warn(`[store] updateEntity called with unknown entity: ${entity}`);
+        return false;
+    }
+  }, []);
+
   // ─── Export / Import ───
   const exportData = useCallback(() => {
     const data = {
@@ -925,6 +951,7 @@ export function useStore() {
     upsertStressLog, deleteStressLog,
     getWorkTypeTargets, upsertWorkTypeTargets,
     addAiOutput, getTaskAiOutputs, updateAiOutput,
+    updateEntity,
     aiSettings, updateAiSettings,
     exportData, importData,
     syncStatus,
