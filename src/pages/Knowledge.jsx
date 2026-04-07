@@ -546,7 +546,7 @@ export default function Knowledge({ onNavigate }) {
   const {
     customers, annotations, addAnnotation, updateAnnotation, deleteAnnotation,
     deleteTask, deleteMeetingEntry, deleteMilestone, deletePoint, deleteWeeklyUpdateLog,
-    aiSettings,
+    aiSettings, updateAiSettings,
   } = store;
 
   // ── State ──
@@ -709,8 +709,10 @@ export default function Knowledge({ onNavigate }) {
       filters.entity_types = [...new Set(entityTypes)];
     }
 
-    // Pass the user's preferred Claude model — synthesis now happens server-side
-    const result = await ragSearch(query, filters, apiSecret, aiSettings?.claudeModel);
+    // Pass provider + model from AI settings — routes to /api/claude or /api/openai
+    const knowledgeProvider = aiSettings?.providers?.knowledge || 'claude';
+    const model = knowledgeProvider === 'openai' ? aiSettings?.openaiModel : aiSettings?.claudeModel;
+    const result = await ragSearch(query, filters, apiSecret, { provider: knowledgeProvider, model });
 
     setRagSearching(false);
 
@@ -944,6 +946,17 @@ export default function Knowledge({ onNavigate }) {
               : <Sparkles size={13} />
             }
             {ragMode ? 'AI on' : 'AI'}
+          </button>
+          {/* Provider toggle chip */}
+          <button
+            onClick={() => {
+              const next = (aiSettings?.providers?.knowledge || 'openai') === 'openai' ? 'claude' : 'openai';
+              updateAiSettings({ providers: { knowledge: next } });
+            }}
+            title={`Using ${(aiSettings?.providers?.knowledge || 'openai') === 'openai' ? 'OpenAI' : 'Claude'} — click to switch`}
+            className="px-2 py-1.5 rounded-xl border border-border text-[10px] font-semibold text-muted-foreground hover:text-foreground hover:border-foreground/20 transition-all tabular-nums"
+          >
+            {(aiSettings?.providers?.knowledge || 'openai') === 'openai' ? 'GPT' : 'Claude'}
           </button>
         </div>
       </div>

@@ -12,10 +12,13 @@ import { RAG_SYSTEM_PROMPT } from '../constants';
  * @param {string} query              Natural language question
  * @param {object} filters            Optional: { customer_id, entity_types, date_after }
  * @param {string} apiSecret          VITE_API_SECRET for /api/embeddings + /api/claude
- * @param {string} [model]            Optional Claude model override (from aiSettings.claudeModel)
+ * @param {object} [options]          Optional: { provider, model }
+ * @param {string} [options.provider] 'claude' or 'openai' (defaults to 'claude')
+ * @param {string} [options.model]    Model override for the chosen provider
  * @returns {Promise<{ answer: string|null, chunks: object[], query: string, error?: string }>}
  */
-export async function ragSearch(query, filters, apiSecret, model) {
+export async function ragSearch(query, filters, apiSecret, options = {}) {
+  const { provider = 'claude', model } = options;
   const authHeaders = {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${apiSecret}`,
@@ -47,7 +50,8 @@ export async function ragSearch(query, filters, apiSecret, model) {
       )
       .join('\n\n');
 
-    const claudeRes = await fetch('/api/claude', {
+    const apiEndpoint = provider === 'openai' ? '/api/openai' : '/api/claude';
+    const synthesisRes = await fetch(apiEndpoint, {
       method: 'POST',
       headers: authHeaders,
       body: JSON.stringify({
@@ -61,12 +65,12 @@ export async function ragSearch(query, filters, apiSecret, model) {
       }),
     });
 
-    if (!claudeRes.ok) {
-      const err = await claudeRes.json().catch(() => ({}));
-      throw new Error(err.error || `Synthesis failed (${claudeRes.status})`);
+    if (!synthesisRes.ok) {
+      const err = await synthesisRes.json().catch(() => ({}));
+      throw new Error(err.error || `Synthesis failed (${synthesisRes.status})`);
     }
 
-    const { text: answer } = await claudeRes.json();
+    const { text: answer } = await synthesisRes.json();
 
     return { answer, chunks, query };
   } catch (err) {

@@ -522,7 +522,7 @@ export default function CalendarEmailImport({ customers, addWeeklyUpdateLog, aiS
                                   rows={2}
                                   value={state.summary}
                                   onChange={e => updateItem(item.id, { summary: e.target.value })}
-                                  className="flex-1 rounded-lg border border-border bg-input px-2 py-1.5 text-xs resize-none text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+                                  className="flex-1 rounded-lg border border-border bg-input-bg px-2 py-1.5 text-xs resize-none text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
                                   maxLength={300}
                                 />
                                 <button

@@ -194,7 +194,7 @@ export default function WeeklyUpdateLog({ weekStart, weekEnd } = {}) {
           value={logForm.text}
           onChange={e => setLogForm(p => ({ ...p, text: e.target.value }))}
           placeholder="What happened?"
-          className="w-full rounded-xl border border-border bg-input px-3 py-2 text-sm resize-none text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+          className="w-full rounded-xl border border-border bg-input-bg px-3 py-2 text-sm resize-none text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
         />
 
         <div className="flex gap-2">

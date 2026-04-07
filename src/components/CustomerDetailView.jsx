@@ -167,7 +167,7 @@ function TasksTab({ tasks, addTask, customerId, okrs }) {
               value={taskForm.description}
               onChange={e => setTaskForm(p => ({ ...p, description: e.target.value }))}
               placeholder="Task description *"
-              className="w-full rounded-lg border border-border bg-input px-2.5 py-1.5 text-xs resize-none text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+              className="w-full rounded-lg border border-border bg-input-bg px-2.5 py-1.5 text-xs resize-none text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
               autoFocus
               required
             />
@@ -175,7 +175,7 @@ function TasksTab({ tasks, addTask, customerId, okrs }) {
               <select
                 value={taskForm.workType}
                 onChange={e => setTaskForm(p => ({ ...p, workType: e.target.value }))}
-                className="rounded-lg border border-border bg-input px-2 py-1.5 text-xs text-foreground focus:outline-none focus:border-ring"
+                className="rounded-lg border border-border bg-input-bg px-2 py-1.5 text-xs text-foreground focus:outline-none focus:border-ring"
               >
                 {WORK_TYPES.map(wt => (
                   <option key={wt} value={wt}>{WORK_TYPE_LABELS[wt]}</option>
@@ -184,7 +184,7 @@ function TasksTab({ tasks, addTask, customerId, okrs }) {
               <select
                 value={taskForm.status}
                 onChange={e => setTaskForm(p => ({ ...p, status: e.target.value }))}
-                className="rounded-lg border border-border bg-input px-2 py-1.5 text-xs text-foreground focus:outline-none focus:border-ring"
+                className="rounded-lg border border-border bg-input-bg px-2 py-1.5 text-xs text-foreground focus:outline-none focus:border-ring"
               >
                 {TASK_STATUS_ENTRIES.map(([v, l]) => (
                   <option key={v} value={v}>{l}</option>
@@ -194,7 +194,7 @@ function TasksTab({ tasks, addTask, customerId, okrs }) {
             <select
               value={taskForm.okrId}
               onChange={e => setTaskForm(p => ({ ...p, okrId: e.target.value }))}
-              className="w-full rounded-lg border border-border bg-input px-2 py-1.5 text-xs text-foreground focus:outline-none focus:border-ring"
+              className="w-full rounded-lg border border-border bg-input-bg px-2 py-1.5 text-xs text-foreground focus:outline-none focus:border-ring"
             >
               <option value="">No OKR linked</option>
               {(okrs || []).map(o => <option key={o.id} value={o.id}>{o.title}</option>)}

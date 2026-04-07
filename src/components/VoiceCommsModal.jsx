@@ -10,7 +10,7 @@ import {
 import Modal from './Modal';
 import { Button } from './ui/button';
 import { useAppStore } from '../context/StoreContext';
-import { callClaude } from '../lib/api';
+import { callOpenAI } from '../lib/api';
 
 // ── System prompt (as specified) ─────────────────────────────────────────────
 const VOICE_COMMS_PROMPT = `You are a professional communications assistant for a Solutions Engineer at a B2B SaaS company called Talkpush.
@@ -186,13 +186,13 @@ export default function VoiceCommsModal({ onClose }) {
       : VOICE_COMMS_PROMPT;
 
     try {
-      const draftText = (await callClaude({
-        model:      aiSettings?.claudeModel,
+      const draftText = (await callOpenAI({
+        model:      aiSettings?.openaiModel || 'gpt-4o',
         system:     systemPrompt,
         messages:   [{ role: 'user', content: text }],
         max_tokens: 800,
       })).trim();
-      if (!draftText) throw new Error('No draft received from Claude.');
+      if (!draftText) throw new Error('No draft received.');
 
       editor?.commands.setContent(markdownToHtml(draftText));
       setStep('editing');
