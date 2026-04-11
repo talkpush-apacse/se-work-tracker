@@ -1,6 +1,17 @@
 {
   "versions": [
     {
+      "version": "2.21.0",
+      "codename": "Flow Grand",
+      "date": "2026-04-11",
+      "summary": "MCP server can now add and list notes",
+      "changes": [
+        { "type": "feature", "description": "New MCP tool add_note — create a note with optional client, tag, and date from Claude" },
+        { "type": "feature", "description": "New MCP tool list_notes — filter notes by tag and/or client, newest first" },
+        { "type": "feature", "description": "MCP-created notes are auto-indexed into Knowledge RAG search" }
+      ]
+    },
+    {
       "version": "2.20.1",
       "codename": "Flow Grand",
       "date": "2026-04-07",

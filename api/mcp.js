@@ -37,6 +37,71 @@ async function putEntity(entityName, data) {
   `;
 }
 
+// ── Embedding helper: indexes a single annotation into memory_chunks ──────────
+// Mirrors the flow in src/context/StoreContext.jsx + src/utils/chunker.js so
+// notes added via MCP show up in Knowledge RAG search just like UI-created notes.
+// Silent on failure — never block the note save.
+async function indexAnnotationForSearch(annotation, customers) {
+  try {
+    if (!process.env.OPENAI_API_KEY) {
+      console.warn('[mcp/indexAnnotation] OPENAI_API_KEY not set — skipping index');
+      return;
+    }
+    const text = (annotation.text || '').trim();
+    if (!text) return;
+
+    const customer = annotation.customerId
+      ? customers.find(c => c.id === annotation.customerId)
+      : null;
+    const customerName = customer?.name || null;
+
+    // Build chunk text the same way src/utils/chunker.js does:
+    //   [text, subtext, customerName, label].filter(Boolean).join(' | ')
+    const chunkText = [text, customerName, 'Note'].filter(Boolean).join(' | ');
+    const chunkId = `annotation_${annotation.id}_0`;
+
+    const embedRes = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'text-embedding-3-small',
+        input: [chunkText],
+      }),
+    });
+    if (!embedRes.ok) {
+      console.warn('[mcp/indexAnnotation] OpenAI embed failed:', embedRes.status);
+      return;
+    }
+    const { data } = await embedRes.json();
+    const embedding = `[${data[0].embedding.join(',')}]`;
+    const metadata = JSON.stringify({ customerName, label: 'Note', subtext: null });
+
+    await sql`
+      INSERT INTO memory_chunks (id, entity_type, entity_id, customer_id, date, text, embedding, metadata)
+      VALUES (
+        ${chunkId},
+        ${'annotation'},
+        ${annotation.id},
+        ${annotation.customerId ?? null},
+        ${annotation.date ?? null},
+        ${chunkText},
+        ${embedding}::vector,
+        ${metadata}::jsonb
+      )
+      ON CONFLICT (id) DO UPDATE SET
+        text       = EXCLUDED.text,
+        embedding  = EXCLUDED.embedding,
+        metadata   = EXCLUDED.metadata,
+        created_at = now()
+    `;
+  } catch (err) {
+    console.warn('[mcp/indexAnnotation] indexing failed silently:', err.message);
+  }
+}
+
 // ── Format a task for output (resolve customer name) ─────────────────────────
 function formatTask(task, customers) {
   const customer = customers.find(c => c.id === task.customerId);
@@ -296,6 +361,169 @@ export default async function handler(req, res) {
         content: [{
           type: 'text',
           text: `Weekly log added:\n${JSON.stringify(log, null, 2)}`,
+        }],
+      };
+    }
+  );
+
+  // ── Tool: add_note ────────────────────────────────────────────────────────────
+  server.tool(
+    'add_note',
+    'Add a note (annotation) to the Work Tracker. Can be tagged as good, bad, learning, or product and optionally linked to a client. Notes are indexed for Knowledge RAG search.',
+    {
+      text: z
+        .string()
+        .describe('The note text. Must be non-empty.'),
+      customer_name: z
+        .string()
+        .optional()
+        .describe('Optional: link this note to a client by name (fuzzy match). Omit for "No client".'),
+      tag: z
+        .enum(['good', 'bad', 'learning', 'product'])
+        .optional()
+        .describe('Optional tag. Omit for "No tag".'),
+      date: z
+        .string()
+        .optional()
+        .describe('Optional: date in YYYY-MM-DD format. Defaults to today.'),
+    },
+    async ({ text, customer_name, tag, date }) => {
+      const trimmed = (text || '').trim();
+      if (!trimmed) {
+        return { content: [{ type: 'text', text: 'Note text cannot be empty.' }] };
+      }
+
+      const customers = await getEntity('customers');
+
+      // Resolve optional customer (fuzzy match — same pattern as add_task / add_weekly_log)
+      let customerId = null;
+      if (customer_name) {
+        const lower = customer_name.toLowerCase();
+        const customer = customers.find(c => c.name.toLowerCase().includes(lower));
+        if (!customer) {
+          return {
+            content: [{
+              type: 'text',
+              text: `Customer "${customer_name}" not found. Available: ${customers.map(c => c.name).join(', ')}`,
+            }],
+          };
+        }
+        customerId = customer.id;
+      }
+
+      const resolvedDate = date && /^\d{4}-\d{2}-\d{2}$/.test(date)
+        ? date
+        : new Date().toISOString().slice(0, 10);
+
+      const annotation = {
+        id:          randomUUID(),
+        createdAt:   new Date().toISOString(),
+        date:        resolvedDate,
+        text:        trimmed,
+        customerId:  customerId,
+        tag:         tag ?? null,
+        attachments: [],
+      };
+
+      const annotations = await getEntity('annotations');
+      annotations.push(annotation);
+      await putEntity('annotations', annotations);
+
+      // Index into memory_chunks so the note surfaces in Knowledge RAG search.
+      // Fire-and-await so it completes before the serverless function exits.
+      await indexAnnotationForSearch(annotation, customers);
+
+      const customer = customerId ? customers.find(c => c.id === customerId) : null;
+      return {
+        content: [{
+          type: 'text',
+          text: `Note added:\n${JSON.stringify({
+            id:           annotation.id,
+            date:         annotation.date,
+            text:         annotation.text,
+            tag:          annotation.tag,
+            customerName: customer?.name ?? null,
+          }, null, 2)}`,
+        }],
+      };
+    }
+  );
+
+  // ── Tool: list_notes ──────────────────────────────────────────────────────────
+  server.tool(
+    'list_notes',
+    'List notes (annotations) from the Work Tracker. Optionally filter by tag and/or customer. Returns newest first.',
+    {
+      tag: z
+        .enum(['good', 'bad', 'learning', 'product'])
+        .optional()
+        .describe('Filter by tag.'),
+      customer_name: z
+        .string()
+        .optional()
+        .describe('Filter by client name (fuzzy match).'),
+      limit: z
+        .number()
+        .int()
+        .positive()
+        .max(100)
+        .optional()
+        .describe('Max number of notes to return. Defaults to 25.'),
+    },
+    async ({ tag, customer_name, limit }) => {
+      const [annotations, customers] = await Promise.all([
+        getEntity('annotations'),
+        getEntity('customers'),
+      ]);
+
+      // Resolve optional customer filter to a set of IDs (fuzzy match)
+      let customerIdFilter = null;
+      if (customer_name) {
+        const lower = customer_name.toLowerCase();
+        const matched = customers.filter(c => c.name.toLowerCase().includes(lower));
+        if (matched.length === 0) {
+          return {
+            content: [{
+              type: 'text',
+              text: `No customer found matching "${customer_name}".`,
+            }],
+          };
+        }
+        customerIdFilter = new Set(matched.map(c => c.id));
+      }
+
+      let filtered = annotations;
+      if (tag) filtered = filtered.filter(a => a.tag === tag);
+      if (customerIdFilter) filtered = filtered.filter(a => customerIdFilter.has(a.customerId));
+
+      // Newest first by createdAt (fallback to date)
+      filtered = [...filtered].sort((a, b) => {
+        const ad = new Date(a.createdAt || a.date || 0).getTime();
+        const bd = new Date(b.createdAt || b.date || 0).getTime();
+        return bd - ad;
+      });
+
+      const max = limit ?? 25;
+      const trimmed = filtered.slice(0, max);
+
+      if (trimmed.length === 0) {
+        return { content: [{ type: 'text', text: 'No notes found.' }] };
+      }
+
+      const customerMap = new Map(customers.map(c => [c.id, c.name]));
+      const formatted = trimmed.map(a => ({
+        id:           a.id,
+        date:         a.date,
+        text:         a.text,
+        tag:          a.tag ?? null,
+        customerName: a.customerId ? (customerMap.get(a.customerId) ?? null) : null,
+        createdAt:    a.createdAt,
+      }));
+
+      return {
+        content: [{
+          type: 'text',
+          text: `Found ${trimmed.length} note(s)${filtered.length > trimmed.length ? ` (of ${filtered.length})` : ''}:\n${JSON.stringify(formatted, null, 2)}`,
         }],
       };
     }
