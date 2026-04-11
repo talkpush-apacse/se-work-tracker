@@ -302,7 +302,7 @@ export default async function handler(req, res) {
   // ── Tool: add_weekly_log ──────────────────────────────────────────────────────
   server.tool(
     'add_weekly_log',
-    'Add a weekly update log entry — highlight, lowlight, learning, shoutout, next-week-priority, or neutral.',
+    'Add an entry to the WEEKLY UPDATE REPORT (the Friday email to manager). Use this ONLY for items that should appear in the weekly report: wins, blockers, shoutouts, next-week priorities. Do NOT use this for general notes, insights, or freeform observations — use add_note for those. If the user says "add a note" or "remember this", use add_note instead.',
     {
       type: z
         .enum(['highlight', 'lowlight', 'learning', 'shoutout', 'next-week-priority', 'neutral', 'annotation'])
@@ -366,10 +366,143 @@ export default async function handler(req, res) {
     }
   );
 
+  // ── Tool: list_weekly_logs ────────────────────────────────────────────────────
+  server.tool(
+    'list_weekly_logs',
+    'List entries from the weekly update report. Optionally filter by type and/or customer. Returns newest first.',
+    {
+      type: z
+        .enum(['highlight', 'lowlight', 'learning', 'shoutout', 'next-week-priority', 'neutral', 'annotation'])
+        .optional()
+        .describe('Filter by log type.'),
+      customer_name: z
+        .string()
+        .optional()
+        .describe('Filter by client name (fuzzy match).'),
+      limit: z
+        .number()
+        .int()
+        .positive()
+        .max(100)
+        .optional()
+        .describe('Max number of entries to return. Defaults to 25.'),
+    },
+    async ({ type, customer_name, limit }) => {
+      const [logs, customers] = await Promise.all([
+        getEntity('weeklyUpdateLogs'),
+        getEntity('customers'),
+      ]);
+
+      let customerIdFilter = null;
+      if (customer_name) {
+        const lower = customer_name.toLowerCase();
+        const matched = customers.filter(c => c.name.toLowerCase().includes(lower));
+        if (matched.length === 0) {
+          return {
+            content: [{ type: 'text', text: `No customer found matching "${customer_name}".` }],
+          };
+        }
+        customerIdFilter = new Set(matched.map(c => c.id));
+      }
+
+      let filtered = logs;
+      if (type) filtered = filtered.filter(l => l.type === type);
+      if (customerIdFilter) filtered = filtered.filter(l => customerIdFilter.has(l.customerId));
+
+      filtered = [...filtered].sort((a, b) => {
+        const ad = new Date(a.createdAt || a.date || 0).getTime();
+        const bd = new Date(b.createdAt || b.date || 0).getTime();
+        return bd - ad;
+      });
+
+      const max = limit ?? 25;
+      const trimmed = filtered.slice(0, max);
+
+      if (trimmed.length === 0) {
+        return { content: [{ type: 'text', text: 'No weekly log entries found.' }] };
+      }
+
+      const customerMap = new Map(customers.map(c => [c.id, c.name]));
+      const formatted = trimmed.map(l => ({
+        id:           l.id,
+        date:         l.date,
+        type:         l.type,
+        text:         l.text,
+        customerName: l.customerId ? (customerMap.get(l.customerId) ?? null) : null,
+        createdAt:    l.createdAt,
+      }));
+
+      return {
+        content: [{
+          type: 'text',
+          text: `Found ${trimmed.length} entry(ies)${filtered.length > trimmed.length ? ` (of ${filtered.length})` : ''}:\n${JSON.stringify(formatted, null, 2)}`,
+        }],
+      };
+    }
+  );
+
+  // ── Tool: delete_weekly_log ───────────────────────────────────────────────────
+  server.tool(
+    'delete_weekly_log',
+    'Delete a weekly update log entry by its ID. Use list_weekly_logs first to find the ID.',
+    {
+      log_id: z.string().describe('The UUID of the weekly log entry to delete.'),
+    },
+    async ({ log_id }) => {
+      const logs = await getEntity('weeklyUpdateLogs');
+      const idx = logs.findIndex(l => l.id === log_id);
+      if (idx === -1) {
+        return { content: [{ type: 'text', text: `Weekly log "${log_id}" not found.` }] };
+      }
+      const removed = logs[idx];
+      logs.splice(idx, 1);
+      await putEntity('weeklyUpdateLogs', logs);
+      return {
+        content: [{
+          type: 'text',
+          text: `Deleted weekly log:\n${JSON.stringify(removed, null, 2)}`,
+        }],
+      };
+    }
+  );
+
+  // ── Tool: delete_note ─────────────────────────────────────────────────────────
+  server.tool(
+    'delete_note',
+    'Delete a note (annotation) by its ID. Use list_notes first to find the ID. Also removes the note from the Knowledge RAG search index.',
+    {
+      note_id: z.string().describe('The UUID of the note to delete.'),
+    },
+    async ({ note_id }) => {
+      const annotations = await getEntity('annotations');
+      const idx = annotations.findIndex(a => a.id === note_id);
+      if (idx === -1) {
+        return { content: [{ type: 'text', text: `Note "${note_id}" not found.` }] };
+      }
+      const removed = annotations[idx];
+      annotations.splice(idx, 1);
+      await putEntity('annotations', annotations);
+
+      // Clean up the corresponding memory_chunks row so it stops appearing in RAG search.
+      try {
+        await sql`DELETE FROM memory_chunks WHERE entity_type = 'annotation' AND entity_id = ${note_id}`;
+      } catch (err) {
+        console.warn('[mcp/delete_note] failed to remove memory_chunks row:', err.message);
+      }
+
+      return {
+        content: [{
+          type: 'text',
+          text: `Deleted note:\n${JSON.stringify(removed, null, 2)}`,
+        }],
+      };
+    }
+  );
+
   // ── Tool: add_note ────────────────────────────────────────────────────────────
   server.tool(
     'add_note',
-    'Add a note (annotation) to the Work Tracker. Can be tagged as good, bad, learning, or product and optionally linked to a client. Notes are indexed for Knowledge RAG search.',
+    'Add a note to the Knowledge/Notes tab. This is the DEFAULT tool whenever the user says "add a note", "save this", "remember this", or captures a learning / insight / observation. Notes are freeform text, indexed for RAG search, and can be tagged as good / bad / learning / product and optionally linked to a client. Do NOT use this for weekly report items — use add_weekly_log for those.',
     {
       text: z
         .string()

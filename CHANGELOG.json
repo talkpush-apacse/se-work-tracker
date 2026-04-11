@@ -1,6 +1,18 @@
 {
   "versions": [
     {
+      "version": "2.21.1",
+      "codename": "Flow Grand",
+      "date": "2026-04-11",
+      "summary": "Expand and disambiguate MCP notes + weekly log tools",
+      "changes": [
+        { "type": "feature", "description": "New MCP tool list_weekly_logs — filter weekly entries by type and/or client" },
+        { "type": "feature", "description": "New MCP tool delete_weekly_log — delete a weekly entry by ID" },
+        { "type": "feature", "description": "New MCP tool delete_note — delete a note by ID and clean up its RAG index row" },
+        { "type": "fix", "description": "Sharpened add_note and add_weekly_log descriptions so Claude stops confusing the two" }
+      ]
+    },
+    {
       "version": "2.21.0",
       "codename": "Flow Grand",
       "date": "2026-04-11",
