@@ -2,7 +2,7 @@
  * ragSearch.js
  * RAG (Retrieval-Augmented Generation) search over the vector memory store.
  * Replaces aiMemorySearch — retrieves relevant chunks via pgvector, then
- * synthesizes an answer via /api/claude (server-side — ANTHROPIC_API_KEY never
+ * synthesizes an answer via /api/openai (server-side — OPENAI_API_KEY never
  * leaves the server).
  */
 
@@ -11,14 +11,13 @@ import { RAG_SYSTEM_PROMPT } from '../constants';
 /**
  * @param {string} query              Natural language question
  * @param {object} filters            Optional: { customer_id, entity_types, date_after }
- * @param {string} apiSecret          VITE_API_SECRET for /api/embeddings + /api/claude
- * @param {object} [options]          Optional: { provider, model }
- * @param {string} [options.provider] 'claude' or 'openai' (defaults to 'claude')
- * @param {string} [options.model]    Model override for the chosen provider
+ * @param {string} apiSecret          VITE_API_SECRET for /api/embeddings + /api/openai
+ * @param {object} [options]          Optional: { model }
+ * @param {string} [options.model]    OpenAI model override
  * @returns {Promise<{ answer: string|null, chunks: object[], query: string, error?: string }>}
  */
 export async function ragSearch(query, filters, apiSecret, options = {}) {
-  const { provider = 'claude', model } = options;
+  const { model } = options;
   const authHeaders = {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${apiSecret}`,
@@ -43,15 +42,14 @@ export async function ragSearch(query, filters, apiSecret, options = {}) {
       return { answer: null, chunks: [], query };
     }
 
-    // ── Step 2: Synthesize answer via server-side Claude proxy ────────────────
+    // ── Step 2: Synthesize answer via server-side OpenAI proxy ────────────────
     const contextBlock = chunks
       .map((c, i) =>
         `[${i + 1}] ${c.metadata?.label ?? 'Entry'} | ${c.metadata?.customerName ?? 'No customer'} | ${c.date ?? 'Unknown date'}\n${c.text}`
       )
       .join('\n\n');
 
-    const apiEndpoint = provider === 'openai' ? '/api/openai' : '/api/claude';
-    const synthesisRes = await fetch(apiEndpoint, {
+    const synthesisRes = await fetch('/api/openai', {
       method: 'POST',
       headers: authHeaders,
       body: JSON.stringify({

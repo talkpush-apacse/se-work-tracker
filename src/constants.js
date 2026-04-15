@@ -255,7 +255,7 @@ export const MILESTONE_STATUS_COLORS = {
 
 // ─── RAG Memory Search ────────────────────────────────────────────────────────
 // System prompt used by Knowledge page's AI semantic search (RAG mode).
-// Instructs Claude on how to interpret and rank entries from the memory index.
+// Instructs OpenAI on how to interpret and rank entries from the memory index.
 export const RAG_SYSTEM_PROMPT = `You are a personal work memory assistant for a Solutions Engineer.
 You have access to excerpts from their work log. Answer their query using ONLY the provided context.
 Be concise. If the context doesn't contain enough information, say so honestly.

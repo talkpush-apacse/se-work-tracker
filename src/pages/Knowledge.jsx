@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import {
   Brain, Search, Sparkles, StickyNote, X, Loader2, ChevronDown, ChevronLeft, ChevronRight, Plus, AlertCircle, PencilLine, Trash2,
   CheckSquare, Square, CheckCheck, Database, Paperclip,
@@ -544,9 +544,9 @@ function buildIdMap(entries) {
 export default function Knowledge({ onNavigate }) {
   const store = useAppStore();
   const {
-    customers, annotations, addAnnotation, updateAnnotation, deleteAnnotation,
+    customers, addAnnotation, updateAnnotation, deleteAnnotation,
     deleteTask, deleteMeetingEntry, deleteMilestone, deletePoint, deleteWeeklyUpdateLog,
-    aiSettings, updateAiSettings,
+    aiSettings,
   } = store;
 
   // ── State ──
@@ -709,10 +709,8 @@ export default function Knowledge({ onNavigate }) {
       filters.entity_types = [...new Set(entityTypes)];
     }
 
-    // Pass provider + model from AI settings — routes to /api/claude or /api/openai
-    const knowledgeProvider = aiSettings?.providers?.knowledge || 'claude';
-    const model = knowledgeProvider === 'openai' ? aiSettings?.openaiModel : aiSettings?.claudeModel;
-    const result = await ragSearch(query, filters, apiSecret, { provider: knowledgeProvider, model });
+    // Knowledge search uses OpenAI so stale Claude preferences cannot route to Anthropic.
+    const result = await ragSearch(query, filters, apiSecret, { model: aiSettings?.openaiModel || 'gpt-4o' });
 
     setRagSearching(false);
 
@@ -724,7 +722,7 @@ export default function Knowledge({ onNavigate }) {
     setRagAnswer(result.answer);
     setRagChunks(result.chunks);
     setRagMode(true);
-  }, [query, ragMode, selectedCustomer, selectedTypes]);
+  }, [query, ragMode, selectedCustomer, selectedTypes, aiSettings?.openaiModel]);
 
   // ── Rebuild Memory Index (backfill) ──
   const handleRebuild = useCallback(async () => {
@@ -947,17 +945,13 @@ export default function Knowledge({ onNavigate }) {
             }
             {ragMode ? 'AI on' : 'AI'}
           </button>
-          {/* Provider toggle chip */}
-          <button
-            onClick={() => {
-              const next = (aiSettings?.providers?.knowledge || 'openai') === 'openai' ? 'claude' : 'openai';
-              updateAiSettings({ providers: { knowledge: next } });
-            }}
-            title={`Using ${(aiSettings?.providers?.knowledge || 'openai') === 'openai' ? 'OpenAI' : 'Claude'} — click to switch`}
-            className="px-2 py-1.5 rounded-xl border border-border text-[10px] font-semibold text-muted-foreground hover:text-foreground hover:border-foreground/20 transition-all tabular-nums"
+          {/* Provider chip */}
+          <span
+            title="Using OpenAI for AI search"
+            className="px-2 py-1.5 rounded-xl border border-border text-[10px] font-semibold text-muted-foreground tabular-nums"
           >
-            {(aiSettings?.providers?.knowledge || 'openai') === 'openai' ? 'GPT' : 'Claude'}
-          </button>
+            GPT
+          </span>
         </div>
       </div>
 
