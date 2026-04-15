@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   Brain, Search, Sparkles, StickyNote, X, Loader2, ChevronDown, ChevronLeft, ChevronRight, Plus, AlertCircle, PencilLine, Trash2,
   CheckSquare, Square, CheckCheck, Database, Paperclip,
