@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Plus, Pencil, Trash2, Target, ChevronDown, ChevronUp, ListPlus, X, ToggleLeft, Hash } from 'lucide-react';
 import { useAppStore } from '../context/StoreContext';
 import Modal from '../components/Modal';
@@ -27,6 +27,16 @@ function generateQuarters() {
 }
 const QUARTERS = generateQuarters();
 const CURRENT_QUARTER = QUARTERS[3]; // index 3 = "current" (offset 0)
+const ALL_QUARTERS = 'all';
+
+function quarterSortValue(quarter) {
+  const match = quarter.match(/Q([1-4])\s+(\d{4})/);
+  return match ? Number(match[2]) * 10 + Number(match[1]) : Number.NEGATIVE_INFINITY;
+}
+
+function sortQuartersDesc(quarters) {
+  return [...quarters].sort((a, b) => quarterSortValue(b) - quarterSortValue(a));
+}
 
 // ─── KR uid helper ────────────────────────────────────────────────────────────
 function krUid() {
@@ -34,11 +44,11 @@ function krUid() {
 }
 
 // ─── OKR Form (create / edit) ─────────────────────────────────────────────────
-function OkrForm({ initial = {}, onSubmit, onCancel }) {
+function OkrForm({ initial = {}, defaultQuarter = CURRENT_QUARTER, onSubmit, onCancel }) {
   const [form, setForm] = useState({
     title: initial.title || '',
     description: initial.description || '',
-    quarter: initial.quarter || CURRENT_QUARTER,
+    quarter: initial.quarter || defaultQuarter,
     keyResults: initial.keyResults || [],
     targetPoints: initial.targetPoints ?? null,
   });
@@ -300,6 +310,7 @@ export default function OKRs() {
   const [editTarget, setEditTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [expanded, setExpanded] = useState({});
+  const [quarterFilter, setQuarterFilter] = useState(ALL_QUARTERS);
 
   const toggle = (id) => setExpanded(p => ({ ...p, [id]: !p[id] }));
 
@@ -313,25 +324,30 @@ export default function OKRs() {
   };
 
   // Build a customer lookup map for displaying customer names on tasks
-  const customerMap = new Map(customers.map(c => [c.id, c]));
+  const customerMap = useMemo(() => new Map(customers.map(c => [c.id, c])), [customers]);
 
   // Group OKRs by quarter
-  const byQuarter = okrs.reduce((acc, okr) => {
+  const byQuarter = useMemo(() => okrs.reduce((acc, okr) => {
     const q = okr.quarter || 'No Quarter';
     if (!acc[q]) acc[q] = [];
     acc[q].push(okr);
     return acc;
-  }, {});
+  }, {}), [okrs]);
 
   // Sort quarter groups: most recent first
-  const sortedQuarters = Object.keys(byQuarter).sort((a, b) => {
-    // Parse "Q1 2026" → sortable number
-    const parse = (s) => {
-      const m = s.match(/Q(\d)\s+(\d+)/);
-      return m ? Number(m[2]) * 10 + Number(m[1]) : 0;
-    };
-    return parse(b) - parse(a);
-  });
+  const sortedQuarters = useMemo(() => sortQuartersDesc(Object.keys(byQuarter)), [byQuarter]);
+
+  const quarterOptions = useMemo(
+    () => sortQuartersDesc(Array.from(new Set([...QUARTERS, ...sortedQuarters]))),
+    [sortedQuarters],
+  );
+  const visibleQuarters = quarterFilter === ALL_QUARTERS
+    ? sortedQuarters
+    : sortedQuarters.filter(quarter => quarter === quarterFilter);
+  const visibleOkrCount = visibleQuarters.reduce((sum, quarter) => sum + (byQuarter[quarter]?.length || 0), 0);
+  const newOkrQuarter = quarterFilter !== ALL_QUARTERS && quarterFilter !== 'No Quarter'
+    ? quarterFilter
+    : CURRENT_QUARTER;
 
   return (
     <div className="space-y-5">
@@ -364,7 +380,47 @@ export default function OKRs() {
         </div>
       ) : (
         <div className="space-y-6">
-          {sortedQuarters.map(quarter => (
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-card border border-border rounded-2xl px-4 py-3">
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Quarter Filter</p>
+              <p className="text-sm text-foreground mt-0.5">
+                {quarterFilter === ALL_QUARTERS
+                  ? `${okrs.length} objective${okrs.length !== 1 ? 's' : ''} across ${sortedQuarters.length} quarter${sortedQuarters.length !== 1 ? 's' : ''}`
+                  : `${visibleOkrCount} objective${visibleOkrCount !== 1 ? 's' : ''} in ${quarterFilter}`}
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+              <select
+                value={quarterFilter}
+                onChange={e => setQuarterFilter(e.target.value)}
+                className="h-10 w-full sm:w-auto bg-secondary border border-border rounded-xl px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+              >
+                <option value={ALL_QUARTERS}>All quarters</option>
+                {quarterOptions.map(quarter => (
+                  <option key={quarter} value={quarter}>
+                    {quarter}{quarter === CURRENT_QUARTER ? ' (current)' : ''}{byQuarter[quarter] ? ` — ${byQuarter[quarter].length}` : ''}
+                  </option>
+                ))}
+              </select>
+              {quarterFilter !== ALL_QUARTERS && (
+                <button
+                  onClick={() => setQuarterFilter(ALL_QUARTERS)}
+                  className="h-10 w-full sm:w-auto px-3 rounded-xl border border-border bg-card hover:bg-card-hover text-xs font-semibold text-foreground transition-colors"
+                >
+                  Show All
+                </button>
+              )}
+            </div>
+          </div>
+
+          {visibleQuarters.length === 0 ? (
+            <div className="bg-card border border-border rounded-2xl py-12 text-center">
+              <Target size={28} className="text-muted-foreground/50 mx-auto mb-3" />
+              <p className="text-sm font-semibold text-foreground">No OKRs in {quarterFilter} yet.</p>
+              <p className="text-xs text-muted-foreground mt-1">Create one here or switch back to all quarters.</p>
+              <button onClick={() => setCreateModal(true)} className="mt-3 text-sm text-brand-lavender hover:text-brand-lavender/80">Create OKR for {newOkrQuarter} →</button>
+            </div>
+          ) : visibleQuarters.map(quarter => (
             <div key={quarter}>
               {/* Quarter header */}
               <div className="flex items-center gap-2 mb-3">
@@ -537,7 +593,7 @@ export default function OKRs() {
 
       {createModal && (
         <Modal title="New OKR" onClose={() => setCreateModal(false)} size="lg">
-          <OkrForm onSubmit={(data) => { addOkr(data); setCreateModal(false); }} onCancel={() => setCreateModal(false)} />
+          <OkrForm defaultQuarter={newOkrQuarter} onSubmit={(data) => { addOkr(data); setCreateModal(false); }} onCancel={() => setCreateModal(false)} />
         </Modal>
       )}
       {editTarget && (
@@ -553,7 +609,7 @@ export default function OKRs() {
           onCancel={() => setDeleteTarget(null)}
         />
       )}
-      {bulkModal && <BulkAddOKRsModal onClose={() => setBulkModal(false)} />}
+      {bulkModal && <BulkAddOKRsModal initialQuarter={newOkrQuarter} onClose={() => setBulkModal(false)} />}
     </div>
   );
 }

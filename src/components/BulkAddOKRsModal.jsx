@@ -46,10 +46,10 @@ function parseOkrText(text) {
   return objectives;
 }
 
-export default function BulkAddOKRsModal({ onClose }) {
+export default function BulkAddOKRsModal({ initialQuarter = CURRENT_QUARTER, onClose }) {
   const { okrs, addOkr } = useAppStore();
   const [text, setText] = useState('');
-  const [quarter, setQuarter] = useState(CURRENT_QUARTER);
+  const [quarter, setQuarter] = useState(initialQuarter);
   const [result, setResult] = useState(null);
 
   const existingTitles = useMemo(
