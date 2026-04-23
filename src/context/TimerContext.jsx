@@ -31,27 +31,92 @@ export function TimerProvider({ children }) {
     }
   }, [customers, timer.isRunning, timer.clientIds]);
 
+  useEffect(() => {
+    if (!import.meta.env.DEV || typeof window === 'undefined') return undefined;
+
+    window.setMode = timer.setMode;
+    window.startPomodoro = timer.startPomodoro;
+    window.stopPomodoro = timer.stopPomodoro;
+    window.pausePomodoro = timer.pausePomodoro;
+    window.resumePomodoro = timer.resumePomodoro;
+    window.skipPomodoroInterval = timer.skipInterval;
+    window.getTimerState = () => ({
+      mode: timer.mode,
+      isRunning: timer.isRunning,
+      isPaused: timer.isPaused,
+      workType: timer.workType,
+      clientIds: timer.clientIds,
+      taskId: timer.taskId,
+      pendingTasks: timer.pendingTasks,
+      startedAt: timer.startedAt,
+      pomodoroInterval: timer.pomodoroInterval,
+      pomodoroIntervalEndsAt: timer.pomodoroIntervalEndsAt,
+      pomodoroCompletedCycles: timer.pomodoroCompletedCycles,
+      pomodoroAccumulatedWorkSeconds: timer.pomodoroAccumulatedWorkSeconds,
+      pomodoroStartedAt: timer.pomodoroStartedAt,
+      pomodoroPausedAt: timer.pomodoroPausedAt,
+      elapsedSeconds: timer.elapsedSeconds,
+      stoppedSession: timer.stoppedSession,
+    });
+
+    return () => {
+      delete window.setMode;
+      delete window.startPomodoro;
+      delete window.stopPomodoro;
+      delete window.pausePomodoro;
+      delete window.resumePomodoro;
+      delete window.skipPomodoroInterval;
+      delete window.getTimerState;
+    };
+  }, [
+    timer.mode, timer.isRunning, timer.isPaused, timer.workType, timer.clientIds, timer.taskId,
+    timer.pendingTasks, timer.startedAt, timer.pomodoroInterval, timer.pomodoroIntervalEndsAt,
+    timer.pomodoroCompletedCycles, timer.pomodoroAccumulatedWorkSeconds, timer.pomodoroStartedAt,
+    timer.pomodoroPausedAt, timer.elapsedSeconds, timer.stoppedSession, timer.setMode,
+    timer.startPomodoro, timer.stopPomodoro, timer.pausePomodoro, timer.resumePomodoro,
+    timer.skipInterval,
+  ]);
+
   // Memoised control value — reference stays stable between every 1-second tick,
   // so components that only need start/stop/state don't re-render every second.
   const controlValue = useMemo(
     () => ({
+      mode: timer.mode,
       isRunning: timer.isRunning,
+      isPaused: timer.isPaused,
       workType: timer.workType,
       clientIds: timer.clientIds,
       taskId: timer.taskId,
       pendingTasks: timer.pendingTasks,
       startedAt: timer.startedAt,
       stoppedSession: timer.stoppedSession,
+      pomodoroInterval: timer.pomodoroInterval,
+      pomodoroIntervalEndsAt: timer.pomodoroIntervalEndsAt,
+      pomodoroCompletedCycles: timer.pomodoroCompletedCycles,
+      pomodoroAccumulatedWorkSeconds: timer.pomodoroAccumulatedWorkSeconds,
+      pomodoroStartedAt: timer.pomodoroStartedAt,
+      pomodoroPausedAt: timer.pomodoroPausedAt,
       clearStoppedSession: timer.clearStoppedSession,
+      setMode: timer.setMode,
+      setOnIntervalEnd: timer.setOnIntervalEnd,
       startTimer: timer.startTimer,
       stopTimer: timer.stopTimer,
       addPendingTask: timer.addPendingTask,
+      startPomodoro: timer.startPomodoro,
+      stopPomodoro: timer.stopPomodoro,
+      pausePomodoro: timer.pausePomodoro,
+      resumePomodoro: timer.resumePomodoro,
+      skipInterval: timer.skipInterval,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
-      timer.isRunning, timer.workType, timer.clientIds, timer.taskId, timer.pendingTasks,
-      timer.startedAt, timer.stoppedSession, timer.clearStoppedSession,
-      timer.startTimer, timer.stopTimer, timer.addPendingTask,
+      timer.mode, timer.isRunning, timer.isPaused, timer.workType, timer.clientIds, timer.taskId,
+      timer.pendingTasks, timer.startedAt, timer.stoppedSession, timer.pomodoroInterval,
+      timer.pomodoroIntervalEndsAt, timer.pomodoroCompletedCycles, timer.pomodoroAccumulatedWorkSeconds,
+      timer.pomodoroStartedAt, timer.pomodoroPausedAt, timer.clearStoppedSession, timer.setMode,
+      timer.setOnIntervalEnd, timer.startTimer, timer.stopTimer, timer.addPendingTask,
+      timer.startPomodoro, timer.stopPomodoro, timer.pausePomodoro, timer.resumePomodoro,
+      timer.skipInterval,
     ]
   );
 
@@ -65,8 +130,7 @@ export function TimerProvider({ children }) {
 }
 
 /**
- * Returns stable control values (isRunning, workType, clientIds, taskId, startedAt,
- * stoppedSession, clearStoppedSession, startTimer, stopTimer).
+ * Returns stable control values and actions for stopwatch + pomodoro state.
  * Does NOT re-render on every timer tick — only on start/stop/session events.
  */
 export function useTimerContext() {

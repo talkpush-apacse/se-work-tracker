@@ -25,7 +25,7 @@ export default defineConfig({
       injectRegister: false,
 
       injectManifest: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,mp3,woff,woff2}'],
       },
 
       // Web App Manifest

@@ -185,6 +185,24 @@ export const STRESS_LEVELS = [
 export const AUTO_TRACK_RATE = 2150 / 160; // 13.4375
 export const AUTO_TRACK_MIN_SECONDS = 30;  // Ignore sessions shorter than 30s
 
+export const TIMER_MODES = {
+  STOPWATCH: 'stopwatch',
+  POMODORO: 'pomodoro',
+};
+
+export const POMODORO_INTERVALS = {
+  WORK: 'work',
+  SHORT_BREAK: 'short_break',
+  LONG_BREAK: 'long_break',
+};
+
+export const POMODORO_CONFIG = {
+  WORK_MINUTES: 25,
+  SHORT_BREAK_MINUTES: 5,
+  LONG_BREAK_MINUTES: 15,
+  CYCLES_BEFORE_LONG_BREAK: 4,
+};
+
 // Annotation tags
 export const ANNOTATION_TAGS = ['good', 'bad', 'learning', 'product'];
 export const ANNOTATION_TAG_LABELS = { good: 'Good', bad: 'Bad', learning: 'Learning', product: 'Product' };

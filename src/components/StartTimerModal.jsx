@@ -6,7 +6,15 @@ import { useAppStore } from '../context/StoreContext';
 import { useTimerContext } from '../context/TimerContext';
 import { Button } from './ui/button';
 
-export default function StartTimerModal({ onClose, preselectedClientIds = [], preselectedWorkType = null }) {
+export default function StartTimerModal({
+  onClose,
+  preselectedClientIds = [],
+  preselectedWorkType = null,
+  title = 'Start Timer',
+  submitLabel = 'Start Timer',
+  helperText = 'Timer runs until you click Stop (max 12 hours). Survives page refresh. You can edit before saving.',
+  onStart = null,
+}) {
   const { customers, okrs } = useAppStore();
   const { startTimer } = useTimerContext();
   const [workType, setWorkType] = useState(preselectedWorkType || '');
@@ -44,15 +52,27 @@ export default function StartTimerModal({ onClose, preselectedClientIds = [], pr
       setError('Select a work type to start');
       return;
     }
-    startTimer(workType, {
+
+    const payload = {
+      workType,
       clientIds: [...selectedClientIds],
       okrId: okrId || null,
-    });
+    };
+
+    if (onStart) {
+      onStart(payload);
+    } else {
+      startTimer(workType, {
+        clientIds: payload.clientIds,
+        okrId: payload.okrId,
+      });
+    }
+
     onClose();
   };
 
   return (
-    <Modal title="Start Timer" onClose={onClose} size="sm">
+    <Modal title={title} onClose={onClose} size="sm">
       <div className="space-y-4">
         {/* Work Type — required */}
         <div>
@@ -137,7 +157,7 @@ export default function StartTimerModal({ onClose, preselectedClientIds = [], pr
 
         <div className="rounded-xl bg-secondary/50 border border-border/50 px-3 py-2.5">
           <p className="text-xs text-muted-foreground leading-relaxed">
-            Timer runs until you click Stop (max 12 hours). Survives page refresh. You can edit before saving.
+            {helperText}
           </p>
         </div>
 
@@ -158,7 +178,7 @@ export default function StartTimerModal({ onClose, preselectedClientIds = [], pr
             className="flex-1 flex items-center justify-center gap-2"
           >
             <Timer size={15} />
-            Start Timer
+            {submitLabel}
           </Button>
         </div>
       </div>

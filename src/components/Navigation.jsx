@@ -270,6 +270,10 @@ export default function Navigation({ activeTab, onTabChange }) {
           )}
         </div>
 
+        <div className="hidden lg:block px-3 py-3 border-b border-sidebar-border bg-sidebar-accent/10">
+          <div id="sidebar-timer-slot" />
+        </div>
+
         <div className="p-2 lg:p-3 border-t border-sidebar-border space-y-1">
           {/* Utilities label — lg only */}
           <p className="hidden lg:block text-[10px] font-semibold text-sidebar-muted uppercase tracking-wider px-3 pt-1 pb-0.5 font-nav">Utilities</p>
