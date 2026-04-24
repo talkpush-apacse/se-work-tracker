@@ -662,6 +662,374 @@ export default async function handler(req, res) {
     }
   );
 
+  // ── OKR helpers ───────────────────────────────────────────────────────────────
+  // The OKR entity already lives in app_data as JSONB. KRs are nested inside each
+  // OKR as `keyResults[]`. Existing KR shape is `{ id, text, type, value }`; we
+  // extend it with optional `accountName`, `status`, `sortOrder` without changing
+  // what the frontend reads. The "progress" the MCP spec talks about maps to
+  // `kr.value` (numeric) or `kr.value === true ? 100 : 0` (boolean) — same formula
+  // the OKRs page uses to render progress bars.
+  function currentQuarter() {
+    const d = new Date();
+    const q = Math.ceil((d.getMonth() + 1) / 3);
+    return `Q${q} ${d.getFullYear()}`;
+  }
+
+  function krProgressValue(kr) {
+    if (kr.type === 'boolean') return kr.value === true ? 100 : 0;
+    return typeof kr.value === 'number' ? kr.value : 0;
+  }
+
+  function formatKr(kr) {
+    return {
+      id:           kr.id,
+      title:        kr.text ?? '',
+      account_name: kr.accountName ?? null,
+      progress:     krProgressValue(kr),
+      status:       kr.status ?? 'not_started',
+    };
+  }
+
+  function formatOkrWithKrs(okr) {
+    const krs = [...(okr.keyResults || [])].sort(
+      (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0),
+    );
+    return {
+      id:           okr.id,
+      title:        okr.title,
+      quarter:      okr.quarter,
+      description:  okr.description ?? '',
+      key_results:  krs.map(formatKr),
+    };
+  }
+
+  // Find a KR and its parent OKR in the okrs array. Returns { okr, kr, okrIdx, krIdx } or null.
+  function locateKr(okrs, krId) {
+    for (let i = 0; i < okrs.length; i++) {
+      const krs = okrs[i].keyResults || [];
+      const j = krs.findIndex(kr => kr.id === krId);
+      if (j !== -1) return { okr: okrs[i], kr: krs[j], okrIdx: i, krIdx: j };
+    }
+    return null;
+  }
+
+  // ── Tool: list_okrs ───────────────────────────────────────────────────────────
+  server.tool(
+    'list_okrs',
+    'List all OKRs and their key results for a quarter. Returns objectives with nested key results including progress and status.',
+    {
+      quarter: z
+        .string()
+        .optional()
+        .describe('Quarter filter, e.g. "Q2 2026". Defaults to the current quarter.'),
+    },
+    async ({ quarter }) => {
+      const okrs = await getEntity('okrs');
+      const q = quarter || currentQuarter();
+      const filtered = okrs.filter(o => o.quarter === q);
+      if (filtered.length === 0) {
+        return { content: [{ type: 'text', text: `No OKRs found for ${q}.` }] };
+      }
+      const sorted = [...filtered].sort(
+        (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0),
+      );
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify(sorted.map(formatOkrWithKrs), null, 2),
+        }],
+      };
+    }
+  );
+
+  // ── Tool: get_okr_progress ────────────────────────────────────────────────────
+  server.tool(
+    'get_okr_progress',
+    'Get a progress summary for all OKRs in a quarter — overall progress percentage, completion counts, and at-risk flags.',
+    {
+      quarter: z
+        .string()
+        .optional()
+        .describe('Quarter filter, e.g. "Q2 2026". Defaults to the current quarter.'),
+    },
+    async ({ quarter }) => {
+      const okrs = await getEntity('okrs');
+      const q = quarter || currentQuarter();
+      const filtered = okrs.filter(o => o.quarter === q);
+      if (filtered.length === 0) {
+        return { content: [{ type: 'text', text: `No OKRs found for ${q}.` }] };
+      }
+      const summary = filtered.map(okr => {
+        const krs = okr.keyResults || [];
+        const scores = krs.map(krProgressValue);
+        const avg = scores.length > 0
+          ? Math.round(scores.reduce((s, v) => s + v, 0) / scores.length)
+          : 0;
+        return {
+          okr_id:             okr.id,
+          okr_title:          okr.title,
+          overall_progress:   avg,
+          key_results_count:  krs.length,
+          completed_count:    krs.filter(k => k.status === 'done').length,
+          at_risk_count:      krs.filter(k => k.status === 'at_risk').length,
+        };
+      });
+      return {
+        content: [{ type: 'text', text: JSON.stringify(summary, null, 2) }],
+      };
+    }
+  );
+
+  // ── Tool: update_key_result ───────────────────────────────────────────────────
+  server.tool(
+    'update_key_result',
+    'Update the progress (0-100) or status (not_started, in_progress, done, at_risk) of a specific key result.',
+    {
+      key_result_id: z.string().describe('The ID of the key result to update.'),
+      progress: z
+        .number()
+        .int()
+        .min(0)
+        .max(100)
+        .optional()
+        .describe('New progress percentage (0-100). Writes to the KR value; auto-promotes boolean KRs to numeric.'),
+      status: z
+        .enum(['not_started', 'in_progress', 'done', 'at_risk'])
+        .optional()
+        .describe('New status.'),
+    },
+    async ({ key_result_id, progress, status }) => {
+      if (progress === undefined && status === undefined) {
+        return { content: [{ type: 'text', text: 'Provide at least one of `progress` or `status`.' }] };
+      }
+      const okrs = await getEntity('okrs');
+      const found = locateKr(okrs, key_result_id);
+      if (!found) {
+        return { content: [{ type: 'text', text: `Key result "${key_result_id}" not found.` }] };
+      }
+      const kr = { ...found.kr };
+      if (progress !== undefined) {
+        kr.type = 'numeric';
+        kr.value = progress;
+      }
+      if (status !== undefined) {
+        kr.status = status;
+      }
+      okrs[found.okrIdx].keyResults[found.krIdx] = kr;
+      await putEntity('okrs', okrs);
+      return {
+        content: [{
+          type: 'text',
+          text: `Key result updated:\n${JSON.stringify({ okr_id: found.okr.id, okr_title: found.okr.title, ...formatKr(kr) }, null, 2)}`,
+        }],
+      };
+    }
+  );
+
+  // ── Tool: link_task_to_okr ────────────────────────────────────────────────────
+  server.tool(
+    'link_task_to_okr',
+    'Link an existing task to a key result, establishing a connection between daily work and quarterly objectives.',
+    {
+      task_id:       z.string().describe('The UUID of the task to link.'),
+      key_result_id: z.string().describe('The ID of the key result to link the task to.'),
+    },
+    async ({ task_id, key_result_id }) => {
+      const [tasks, okrs] = await Promise.all([
+        getEntity('tasks'),
+        getEntity('okrs'),
+      ]);
+      const taskIdx = tasks.findIndex(t => t.id === task_id);
+      if (taskIdx === -1) {
+        return { content: [{ type: 'text', text: `Task "${task_id}" not found.` }] };
+      }
+      const found = locateKr(okrs, key_result_id);
+      if (!found) {
+        return { content: [{ type: 'text', text: `Key result "${key_result_id}" not found.` }] };
+      }
+      // Set both the KR link and the parent OKR link, so the existing OKRs page
+      // (which filters tasks via task.okrId) keeps showing this task under the OKR.
+      tasks[taskIdx] = {
+        ...tasks[taskIdx],
+        keyResultId: key_result_id,
+        okrId:       found.okr.id,
+      };
+      await putEntity('tasks', tasks);
+      return {
+        content: [{
+          type: 'text',
+          text: `Task linked:\n${JSON.stringify({
+            task_id:          tasks[taskIdx].id,
+            task_description: tasks[taskIdx].description,
+            key_result_id:    found.kr.id,
+            key_result_title: found.kr.text ?? '',
+            okr_id:           found.okr.id,
+            okr_title:        found.okr.title,
+          }, null, 2)}`,
+        }],
+      };
+    }
+  );
+
+  // ── Tool: get_tasks_by_okr ────────────────────────────────────────────────────
+  server.tool(
+    'get_tasks_by_okr',
+    'Get all tasks linked to a specific OKR or all OKR-linked tasks. Useful for seeing what work is contributing to which objectives.',
+    {
+      okr_id: z
+        .string()
+        .optional()
+        .describe('Optional OKR ID. Omit to get tasks linked to any OKR.'),
+      quarter: z
+        .string()
+        .optional()
+        .describe('Optional quarter filter, e.g. "Q2 2026". Combined with okr_id if both provided.'),
+    },
+    async ({ okr_id, quarter }) => {
+      const [tasks, okrs, customers] = await Promise.all([
+        getEntity('tasks'),
+        getEntity('okrs'),
+        getEntity('customers'),
+      ]);
+
+      // Decide which OKR IDs are in scope.
+      let scopeOkrIds;
+      if (okr_id) {
+        scopeOkrIds = new Set([okr_id]);
+        if (!okrs.some(o => o.id === okr_id)) {
+          return { content: [{ type: 'text', text: `OKR "${okr_id}" not found.` }] };
+        }
+      } else if (quarter) {
+        scopeOkrIds = new Set(okrs.filter(o => o.quarter === quarter).map(o => o.id));
+        if (scopeOkrIds.size === 0) {
+          return { content: [{ type: 'text', text: `No OKRs found for ${quarter}.` }] };
+        }
+      } else {
+        scopeOkrIds = new Set(okrs.map(o => o.id));
+      }
+
+      // Build a KR-id → { okr, kr } lookup for quick lookup when a task is linked
+      // via keyResultId but the older okrId field is missing.
+      const krIndex = new Map();
+      for (const okr of okrs) {
+        for (const kr of (okr.keyResults || [])) {
+          krIndex.set(kr.id, { okr, kr });
+        }
+      }
+
+      const filtered = tasks.filter(t => {
+        if (t.okrId && scopeOkrIds.has(t.okrId)) return true;
+        if (t.keyResultId) {
+          const hit = krIndex.get(t.keyResultId);
+          if (hit && scopeOkrIds.has(hit.okr.id)) return true;
+        }
+        return false;
+      });
+
+      if (filtered.length === 0) {
+        return { content: [{ type: 'text', text: 'No tasks linked to these OKRs.' }] };
+      }
+
+      const okrMap = new Map(okrs.map(o => [o.id, o]));
+      const formatted = filtered.map(t => {
+        const krHit = t.keyResultId ? krIndex.get(t.keyResultId) : null;
+        const okr = okrMap.get(t.okrId) ?? krHit?.okr ?? null;
+        return {
+          ...formatTask(t, customers),
+          key_result_id:    t.keyResultId ?? null,
+          key_result_title: krHit?.kr.text ?? null,
+          okr_id:           okr?.id ?? null,
+          okr_title:        okr?.title ?? null,
+        };
+      });
+
+      return {
+        content: [{ type: 'text', text: JSON.stringify(formatted, null, 2) }],
+      };
+    }
+  );
+
+  // ── Tool: add_okr ─────────────────────────────────────────────────────────────
+  server.tool(
+    'add_okr',
+    'Create a new OKR objective for a specific quarter.',
+    {
+      title:   z.string().describe('The OKR title.'),
+      quarter: z.string().describe('The quarter this OKR belongs to, e.g. "Q2 2026".'),
+    },
+    async ({ title, quarter }) => {
+      const trimmed = (title || '').trim();
+      if (!trimmed) {
+        return { content: [{ type: 'text', text: 'OKR title cannot be empty.' }] };
+      }
+      const okrs = await getEntity('okrs');
+      const maxSort = okrs
+        .filter(o => o.quarter === quarter)
+        .reduce((m, o) => Math.max(m, o.sortOrder ?? 0), 0);
+      const okr = {
+        id:          randomUUID(),
+        title:       trimmed,
+        quarter,
+        description: '',
+        keyResults:  [],
+        sortOrder:   maxSort + 1,
+        createdAt:   new Date().toISOString(),
+      };
+      okrs.push(okr);
+      await putEntity('okrs', okrs);
+      return {
+        content: [{
+          type: 'text',
+          text: `OKR created:\n${JSON.stringify(formatOkrWithKrs(okr), null, 2)}`,
+        }],
+      };
+    }
+  );
+
+  // ── Tool: add_key_result ──────────────────────────────────────────────────────
+  server.tool(
+    'add_key_result',
+    'Add a new key result under an existing OKR objective.',
+    {
+      okr_id:       z.string().describe('The ID of the parent OKR.'),
+      title:        z.string().describe('The key result title.'),
+      account_name: z
+        .string()
+        .optional()
+        .describe('Optional: which client account this key result relates to.'),
+    },
+    async ({ okr_id, title, account_name }) => {
+      const trimmed = (title || '').trim();
+      if (!trimmed) {
+        return { content: [{ type: 'text', text: 'Key result title cannot be empty.' }] };
+      }
+      const okrs = await getEntity('okrs');
+      const idx = okrs.findIndex(o => o.id === okr_id);
+      if (idx === -1) {
+        return { content: [{ type: 'text', text: `OKR "${okr_id}" not found.` }] };
+      }
+      const existing = okrs[idx].keyResults || [];
+      const maxSort = existing.reduce((m, k) => Math.max(m, k.sortOrder ?? 0), 0);
+      const kr = {
+        id:          randomUUID(),
+        text:        trimmed,
+        type:        'numeric',
+        value:       null,
+        accountName: account_name?.trim() || null,
+        status:      'not_started',
+        sortOrder:   maxSort + 1,
+      };
+      okrs[idx] = { ...okrs[idx], keyResults: [...existing, kr] };
+      await putEntity('okrs', okrs);
+      return {
+        content: [{
+          type: 'text',
+          text: `Key result created:\n${JSON.stringify({ okr_id: okrs[idx].id, okr_title: okrs[idx].title, ...formatKr(kr) }, null, 2)}`,
+        }],
+      };
+    }
+  );
+
   // ── Stateless transport (one per request, safe for Vercel serverless) ─────────
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined, // disable sessions — stateless mode

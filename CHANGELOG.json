@@ -1,6 +1,23 @@
 {
   "versions": [
     {
+      "version": "2.22.0",
+      "codename": "Flow Grand",
+      "date": "2026-04-24",
+      "summary": "MCP OKR tools — link daily work to quarterly objectives from Claude",
+      "changes": [
+        { "type": "feature", "description": "New MCP tool list_okrs — list OKRs and KRs for a quarter (defaults to current)" },
+        { "type": "feature", "description": "New MCP tool get_okr_progress — per-OKR progress, completion, and at-risk counts" },
+        { "type": "feature", "description": "New MCP tool update_key_result — set progress (0-100) or status on a KR" },
+        { "type": "feature", "description": "New MCP tool link_task_to_okr — link a task to a KR (and its parent OKR)" },
+        { "type": "feature", "description": "New MCP tool get_tasks_by_okr — list tasks contributing to an OKR or quarter" },
+        { "type": "feature", "description": "New MCP tool add_okr — create a new OKR for a quarter" },
+        { "type": "feature", "description": "New MCP tool add_key_result — add a KR to an OKR with optional account name" },
+        { "type": "feature", "description": "Extended KRs with accountName/status/sortOrder; added keyResultId link on tasks" },
+        { "type": "feature", "description": "Seeded 5 Q2 2026 OKRs with 16 key results across Alfamart, EXL, TaskUs, Afni, Alorica, McDonalds, Inspiro" }
+      ]
+    },
+    {
       "version": "2.21.1",
       "codename": "Flow Grand",
       "date": "2026-04-11",
