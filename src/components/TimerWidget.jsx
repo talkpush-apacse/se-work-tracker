@@ -400,13 +400,15 @@ export default function TimerWidget() {
     stopTimer();
   };
 
-  const renderModeToggle = () => (
-    <div className="grid grid-cols-2 gap-1 rounded-xl bg-secondary/70 p-1">
+  const renderModeToggle = (compact = false) => (
+    <div className={`grid grid-cols-2 gap-1 rounded-xl bg-secondary/70 p-1 ${compact ? 'text-[11px]' : ''}`}>
       <button
         type="button"
         onClick={() => handleModeChange(TIMER_MODES.STOPWATCH)}
         disabled={isRunning}
-        className={`rounded-lg px-3 py-2 text-xs font-semibold transition-all ${
+        className={`rounded-lg font-semibold transition-all ${
+          compact ? 'px-2 py-1.5 text-[11px]' : 'px-3 py-2 text-xs'
+        } ${
           mode === TIMER_MODES.STOPWATCH
             ? 'bg-card text-foreground shadow-sm'
             : 'text-muted-foreground hover:text-foreground'
@@ -418,7 +420,9 @@ export default function TimerWidget() {
         type="button"
         onClick={() => handleModeChange(TIMER_MODES.POMODORO)}
         disabled={isRunning}
-        className={`rounded-lg px-3 py-2 text-xs font-semibold transition-all ${
+        className={`rounded-lg font-semibold transition-all ${
+          compact ? 'px-2 py-1.5 text-[11px]' : 'px-3 py-2 text-xs'
+        } ${
           mode === TIMER_MODES.POMODORO
             ? 'bg-card text-foreground shadow-sm'
             : 'text-muted-foreground hover:text-foreground'
@@ -429,14 +433,14 @@ export default function TimerWidget() {
     </div>
   );
 
-  const renderStopwatchBody = () => {
+  const renderStopwatchBody = (compact = false) => {
     if (!isRunning) {
       return (
-        <div className="space-y-3">
-          <div className="rounded-xl border border-border bg-secondary/35 px-4 py-4">
+        <div className={compact ? 'space-y-2' : 'space-y-3'}>
+          <div className={`rounded-xl border border-border bg-secondary/35 ${compact ? 'px-3 py-3' : 'px-4 py-4'}`}>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Stopwatch</p>
-            <p className="mt-2 font-mono text-3xl font-bold tabular-nums text-foreground">00:00:00</p>
-            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+            <p className={`mt-2 font-mono font-bold tabular-nums text-foreground ${compact ? 'text-2xl' : 'text-3xl'}`}>00:00:00</p>
+            <p className={`mt-2 leading-relaxed text-muted-foreground ${compact ? 'text-[11px]' : 'text-xs'}`}>
               Use the regular timer for open-ended work. You can still start it from task cards, quick start, or here.
             </p>
           </div>
@@ -457,8 +461,8 @@ export default function TimerWidget() {
     }
 
     return (
-      <div className="space-y-3">
-        <div className="rounded-xl border border-border bg-secondary/35 px-4 py-4">
+      <div className={compact ? 'space-y-2' : 'space-y-3'}>
+        <div className={`rounded-xl border border-border bg-secondary/35 ${compact ? 'px-3 py-3' : 'px-4 py-4'}`}>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
@@ -466,18 +470,18 @@ export default function TimerWidget() {
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-status-success opacity-60" />
                   <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-status-success" />
                 </span>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Stopwatch</p>
+                <p className={`font-semibold uppercase tracking-[0.18em] text-muted-foreground ${compact ? 'text-[11px]' : 'text-xs'}`}>Stopwatch</p>
               </div>
-              <p className="mt-2 text-sm font-semibold text-foreground">{stopwatchLabel}</p>
-              {clientLabel && <p className="mt-0.5 text-xs text-muted-foreground">{clientLabel}</p>}
+              <p className={`mt-2 font-semibold text-foreground ${compact ? 'text-[13px]' : 'text-sm'}`}>{stopwatchLabel}</p>
+              {clientLabel && <p className={`mt-0.5 text-muted-foreground ${compact ? 'text-[11px]' : 'text-xs'}`}>{clientLabel}</p>}
             </div>
-            <span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${colors.bg} ${colors.text} ${colors.border}`}>
+            <span className={`rounded-full border font-semibold ${compact ? 'px-2 py-0.5 text-[9px]' : 'px-2.5 py-1 text-[10px]'} ${colors.bg} ${colors.text} ${colors.border}`}>
               Live
             </span>
           </div>
 
-          <div className="mt-4 flex items-end justify-between gap-3">
-            <span className="font-mono text-3xl font-bold tabular-nums text-foreground">
+          <div className={`flex items-end justify-between gap-3 ${compact ? 'mt-3' : 'mt-4'}`}>
+            <span className={`font-mono font-bold tabular-nums text-foreground ${compact ? 'text-[2.25rem]' : 'text-3xl'}`}>
               {formatHMS(elapsedSeconds)}
             </span>
             <Icon size={16} className="text-muted-foreground" />
@@ -584,31 +588,31 @@ export default function TimerWidget() {
     );
   };
 
-  const renderPomodoroBody = () => {
+  const renderPomodoroBody = (compact = false) => {
     if (!isRunning) {
       return (
-        <div className="space-y-3">
-          <div className="rounded-xl border border-brand-lavender/15 bg-brand-lavender/5 px-4 py-4">
+        <div className={compact ? 'space-y-2' : 'space-y-3'}>
+          <div className={`rounded-xl border border-brand-lavender/15 bg-brand-lavender/5 ${compact ? 'px-3 py-3' : 'px-4 py-4'}`}>
             <div className="flex items-center gap-2">
               <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-brand-lavender/12 text-brand-lavender">
                 <Timer size={18} />
               </span>
               <div>
-                <p className="text-sm font-semibold text-foreground">Ready</p>
-                <p className="text-xs text-muted-foreground">Auto-advance is on</p>
+                <p className={`font-semibold text-foreground ${compact ? 'text-[13px]' : 'text-sm'}`}>Ready</p>
+                <p className={`text-muted-foreground ${compact ? 'text-[11px]' : 'text-xs'}`}>Auto-advance is on</p>
               </div>
             </div>
 
-            <div className="mt-4 flex items-end justify-between gap-3">
-              <span className="font-mono text-3xl font-bold tabular-nums text-foreground">
+            <div className={`flex items-end justify-between gap-3 ${compact ? 'mt-3' : 'mt-4'}`}>
+              <span className={`font-mono font-bold tabular-nums text-foreground ${compact ? 'text-2xl' : 'text-3xl'}`}>
                 {formatMMSS(POMODORO_CONFIG.WORK_MINUTES * 60)}
               </span>
-              <span className="rounded-full border border-brand-lavender/20 bg-brand-lavender/10 px-2.5 py-1 text-[10px] font-semibold text-brand-lavender">
+              <span className={`rounded-full border border-brand-lavender/20 bg-brand-lavender/10 font-semibold text-brand-lavender ${compact ? 'px-2 py-0.5 text-[9px]' : 'px-2.5 py-1 text-[10px]'}`}>
                 25 / 5 / 15
               </span>
             </div>
 
-            <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+            <p className={`mt-3 leading-relaxed text-muted-foreground ${compact ? 'text-[11px]' : 'text-xs'}`}>
               Work time is logged. Breaks are excluded. Every 4th completed focus block becomes a long break.
             </p>
           </div>
@@ -637,8 +641,8 @@ export default function TimerWidget() {
     const PomodoroIcon = pomodoroMeta.Icon;
 
     return (
-      <div className="space-y-3">
-        <div className={`rounded-xl border px-4 py-4 ${pomodoroMeta.pill}`}>
+      <div className={compact ? 'space-y-2' : 'space-y-3'}>
+        <div className={`rounded-xl border ${compact ? 'px-3 py-3' : 'px-4 py-4'} ${pomodoroMeta.pill}`}>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
@@ -646,31 +650,31 @@ export default function TimerWidget() {
                   <PomodoroIcon size={16} />
                 </span>
                 <div>
-                  <p className="text-sm font-semibold text-foreground">{pomodoroMeta.label}</p>
-                  <p className="text-xs text-muted-foreground">{pomodoroMeta.hint}</p>
+                  <p className={`font-semibold text-foreground ${compact ? 'text-[13px]' : 'text-sm'}`}>{pomodoroMeta.label}</p>
+                  <p className={`text-muted-foreground ${compact ? 'text-[11px]' : 'text-xs'}`}>{pomodoroMeta.hint}</p>
                 </div>
               </div>
-              {clientLabel && <p className="mt-3 text-xs text-muted-foreground">{clientLabel}</p>}
+              {clientLabel && <p className={`mt-3 text-muted-foreground ${compact ? 'text-[11px]' : 'text-xs'}`}>{clientLabel}</p>}
             </div>
-            <span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${pomodoroMeta.pill}`}>
+            <span className={`rounded-full border font-semibold ${compact ? 'px-2 py-0.5 text-[9px]' : 'px-2.5 py-1 text-[10px]'} ${pomodoroMeta.pill}`}>
               {isPaused ? 'Paused' : 'Running'}
             </span>
           </div>
 
-          <div className="mt-4 flex items-end justify-between gap-3">
-            <span className={`font-mono text-4xl font-bold tabular-nums ${pomodoroMeta.accent}`}>
+          <div className={`flex items-end justify-between gap-3 ${compact ? 'mt-3' : 'mt-4'}`}>
+            <span className={`font-mono font-bold tabular-nums ${pomodoroMeta.accent} ${compact ? 'text-[2.3rem]' : 'text-4xl'}`}>
               {formatMMSS(elapsedSeconds)}
             </span>
-            <span className="text-[11px] font-medium text-muted-foreground">
+            <span className={`font-medium text-muted-foreground ${compact ? 'text-[10px]' : 'text-[11px]'}`}>
               Breaks not logged
             </span>
           </div>
         </div>
 
-        <div className="rounded-xl border border-border bg-secondary/35 px-4 py-3">
+        <div className={`rounded-xl border border-border bg-secondary/35 ${compact ? 'px-3 py-2.5' : 'px-4 py-3'}`}>
           <div className="flex items-center justify-between gap-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Cycle</p>
-            <p className="text-[11px] text-muted-foreground">
+            <p className={`font-semibold uppercase tracking-[0.18em] text-muted-foreground ${compact ? 'text-[10px]' : 'text-[11px]'}`}>Cycle</p>
+            <p className={`text-muted-foreground ${compact ? 'text-[10px]' : 'text-[11px]'}`}>
               {pomodoroCompletedCycles} completed
             </p>
           </div>
@@ -687,11 +691,11 @@ export default function TimerWidget() {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-2">
+        <div className={`grid grid-cols-3 ${compact ? 'gap-1.5' : 'gap-2'}`}>
           <Button
             variant="secondary"
             size="sm"
-            className="rounded-xl"
+            className={`rounded-xl ${compact ? 'px-2 text-[11px]' : ''}`}
             onClick={handlePauseResume}
           >
             {isPaused ? <Play size={14} /> : <Pause size={14} />}
@@ -700,7 +704,7 @@ export default function TimerWidget() {
           <Button
             variant="secondary"
             size="sm"
-            className="rounded-xl"
+            className={`rounded-xl ${compact ? 'px-2 text-[11px]' : ''}`}
             onClick={handleSkip}
           >
             <SkipForward size={14} />
@@ -709,7 +713,7 @@ export default function TimerWidget() {
           <Button
             variant="destructive"
             size="sm"
-            className="rounded-xl"
+            className={`rounded-xl ${compact ? 'px-2 text-[11px]' : ''}`}
             onClick={handlePomodoroStop}
           >
             <Square size={14} fill="currentColor" />
@@ -720,29 +724,29 @@ export default function TimerWidget() {
     );
   };
 
-  const renderCard = () => (
-    <div className="space-y-3 rounded-2xl border border-border bg-card p-4 shadow-lg shadow-black/5">
+  const renderCard = (compact = false) => (
+    <div className={`rounded-2xl border border-border bg-card shadow-lg shadow-black/5 ${compact ? 'space-y-2 p-3' : 'space-y-3 p-4'}`}>
       <div className="flex items-center justify-between gap-2">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Focus Timer</p>
-          <p className="mt-0.5 text-sm text-muted-foreground">
+          <p className={`font-semibold uppercase tracking-[0.18em] text-muted-foreground ${compact ? 'text-[10px]' : 'text-xs'}`}>Focus Timer</p>
+          <p className={`mt-0.5 text-muted-foreground ${compact ? 'text-[11px]' : 'text-sm'}`}>
             {mode === TIMER_MODES.POMODORO ? 'Structured focus cycles' : 'Freeform time tracking'}
           </p>
         </div>
         {mode === TIMER_MODES.POMODORO && (
-          <span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${getPomodoroMeta(isRunning ? pomodoroInterval : POMODORO_INTERVALS.WORK).pill}`}>
+          <span className={`rounded-full border font-semibold ${compact ? 'px-2 py-0.5 text-[9px]' : 'px-2.5 py-1 text-[10px]'} ${getPomodoroMeta(isRunning ? pomodoroInterval : POMODORO_INTERVALS.WORK).pill}`}>
             Pomodoro
           </span>
         )}
       </div>
 
-      {renderModeToggle()}
+      {renderModeToggle(compact)}
       {isRunning && (
-        <p className="text-[11px] text-muted-foreground">
+        <p className={`text-muted-foreground ${compact ? 'text-[10px]' : 'text-[11px]'}`}>
           Stop the current timer to switch modes.
         </p>
       )}
-      {mode === TIMER_MODES.POMODORO ? renderPomodoroBody() : renderStopwatchBody()}
+      {mode === TIMER_MODES.POMODORO ? renderPomodoroBody(compact) : renderStopwatchBody(compact)}
     </div>
   );
 
@@ -754,7 +758,7 @@ export default function TimerWidget() {
 
       {sidebarSlot && createPortal(
         <div className="hidden lg:block fixed bottom-4 left-3 z-50 w-[212px]">
-          {renderCard()}
+          {renderCard(true)}
         </div>,
         sidebarSlot
       )}
