@@ -43,6 +43,18 @@ function krUid() {
   return 'kr-' + Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
 
+// ─── KR status ────────────────────────────────────────────────────────────────
+// Stays in sync with the `status` field written by the MCP tools (add_key_result,
+// update_key_result). Defaulted to 'not_started' for any KR that pre-dates the field.
+const KR_STATUSES = [
+  { value: 'not_started', label: 'Not started', chip: 'bg-muted text-muted-foreground border-border' },
+  { value: 'in_progress', label: 'In progress', chip: 'bg-brand-lavender/15 text-brand-lavender border-indigo-500/30' },
+  { value: 'done',        label: 'Done',        chip: 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30' },
+  { value: 'at_risk',     label: 'At risk',     chip: 'bg-rose-500/15 text-rose-400 border-rose-500/30' },
+];
+const KR_STATUS_MAP = Object.fromEntries(KR_STATUSES.map(s => [s.value, s]));
+function krStatusOf(kr) { return KR_STATUS_MAP[kr?.status] ?? KR_STATUSES[0]; }
+
 // ─── OKR Form (create / edit) ─────────────────────────────────────────────────
 function OkrForm({ initial = {}, defaultQuarter = CURRENT_QUARTER, onSubmit, onCancel }) {
   const [form, setForm] = useState({
@@ -57,7 +69,18 @@ function OkrForm({ initial = {}, defaultQuarter = CURRENT_QUARTER, onSubmit, onC
   const addKr = () => {
     setForm(p => ({
       ...p,
-      keyResults: [...p.keyResults, { id: krUid(), text: '', type: 'boolean', value: null }],
+      keyResults: [
+        ...p.keyResults,
+        {
+          id:          krUid(),
+          text:        '',
+          type:        'boolean',
+          value:       null,
+          accountName: null,
+          status:      'not_started',
+          sortOrder:   p.keyResults.length + 1,
+        },
+      ],
     }));
   };
 
@@ -159,40 +182,61 @@ function OkrForm({ initial = {}, defaultQuarter = CURRENT_QUARTER, onSubmit, onC
         ) : (
           <div className="space-y-2">
             {form.keyResults.map((kr, i) => (
-              <div key={kr.id} className="flex items-start gap-2">
-                {/* KR number */}
-                <span className="text-[10px] font-bold text-muted-foreground/70 pt-2.5 w-6 flex-shrink-0">KR{i + 1}</span>
+              <div key={kr.id} className="space-y-1.5 border border-border/60 rounded-xl p-2.5 bg-secondary/40">
+                <div className="flex items-start gap-2">
+                  {/* KR number */}
+                  <span className="text-[10px] font-bold text-muted-foreground/70 pt-2.5 w-6 flex-shrink-0">KR{i + 1}</span>
 
-                {/* KR text */}
-                <input
-                  value={kr.text}
-                  onChange={e => updateKr(kr.id, { text: e.target.value })}
-                  placeholder="Describe this key result..."
-                  className="flex-1 bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
-                />
+                  {/* KR text */}
+                  <input
+                    value={kr.text}
+                    onChange={e => updateKr(kr.id, { text: e.target.value })}
+                    placeholder="Describe this key result..."
+                    className="flex-1 bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+                  />
 
-                {/* Type toggle: boolean ↔ numeric */}
-                <button
-                  type="button"
-                  onClick={() => updateKr(kr.id, { type: kr.type === 'boolean' ? 'numeric' : 'boolean', value: null })}
-                  title={kr.type === 'boolean' ? 'Switch to 0–100 numeric' : 'Switch to Yes/No'}
-                  className={`flex items-center gap-1 px-2 py-2 rounded-xl border text-[10px] font-semibold transition-colors flex-shrink-0 ${
-                    kr.type === 'boolean'
-                      ? 'bg-secondary border-border text-muted-foreground hover:border-border'
-                      : 'bg-brand-lavender/15 border-indigo-500/30 text-brand-lavender'
-                  }`}
-                >
-                  {kr.type === 'boolean' ? <ToggleLeft size={13} /> : <Hash size={13} />}
-                </button>
+                  {/* Type toggle: boolean ↔ numeric */}
+                  <button
+                    type="button"
+                    onClick={() => updateKr(kr.id, { type: kr.type === 'boolean' ? 'numeric' : 'boolean', value: null })}
+                    title={kr.type === 'boolean' ? 'Switch to 0–100 numeric' : 'Switch to Yes/No'}
+                    className={`flex items-center gap-1 px-2 py-2 rounded-xl border text-[10px] font-semibold transition-colors flex-shrink-0 ${
+                      kr.type === 'boolean'
+                        ? 'bg-secondary border-border text-muted-foreground hover:border-border'
+                        : 'bg-brand-lavender/15 border-indigo-500/30 text-brand-lavender'
+                    }`}
+                  >
+                    {kr.type === 'boolean' ? <ToggleLeft size={13} /> : <Hash size={13} />}
+                  </button>
 
-                {/* Remove */}
-                <button
-                  type="button"
-                  onClick={() => removeKr(kr.id)}
-                  className="p-2 rounded-xl text-muted-foreground/70 hover:text-destructive transition-colors flex-shrink-0"
-                >
-                  <X size={13} />
-                </button>
+                  {/* Remove */}
+                  <button
+                    type="button"
+                    onClick={() => removeKr(kr.id)}
+                    className="p-2 rounded-xl text-muted-foreground/70 hover:text-destructive transition-colors flex-shrink-0"
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+
+                {/* Account name + status row */}
+                <div className="flex items-center gap-2 pl-8">
+                  <input
+                    value={kr.accountName ?? ''}
+                    onChange={e => updateKr(kr.id, { accountName: e.target.value ? e.target.value : null })}
+                    placeholder="Account (optional)"
+                    className="flex-1 bg-card border border-border rounded-lg px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+                  />
+                  <select
+                    value={kr.status ?? 'not_started'}
+                    onChange={e => updateKr(kr.id, { status: e.target.value })}
+                    className="bg-card border border-border rounded-lg px-2 py-1.5 text-xs text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
+                  >
+                    {KR_STATUSES.map(s => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
             ))}
           </div>
@@ -501,36 +545,58 @@ export default function OKRs() {
                           {keyResults.length > 0 && (
                             <div className="px-5 py-4 space-y-3">
                               <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Key Results</p>
-                              {keyResults.map((kr, i) => (
-                                <div key={kr.id} className="flex items-center gap-3">
-                                  <span className="text-[10px] font-bold text-muted-foreground/70 w-7 flex-shrink-0">KR{i + 1}</span>
-                                  <span className="flex-1 text-xs text-foreground/80 leading-snug">{kr.text}</span>
-                                  {kr.type === 'boolean' ? (
-                                    <input
-                                      type="checkbox"
-                                      checked={kr.value === true}
-                                      onChange={e => updateKrValue(okr.id, kr.id, { value: e.target.checked })}
-                                      className="w-4 h-4 rounded accent-indigo-500 flex-shrink-0 cursor-pointer"
-                                    />
-                                  ) : (
-                                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                                      <input
-                                        type="number"
-                                        min={0}
-                                        max={100}
-                                        value={kr.value ?? ''}
-                                        onChange={e => {
-                                          const n = e.target.value === '' ? null : Math.min(100, Math.max(0, Number(e.target.value)));
-                                          updateKrValue(okr.id, kr.id, { value: n });
-                                        }}
-                                        placeholder="—"
-                                        className="w-12 bg-secondary border border-border rounded-lg px-2 py-1 text-xs text-foreground text-center focus:outline-none focus:border-ring"
-                                      />
-                                      <span className="text-[10px] text-muted-foreground/70">/ 100</span>
+                              {keyResults.map((kr, i) => {
+                                const krStatus = krStatusOf(kr);
+                                return (
+                                  <div key={kr.id} className="flex items-start gap-3">
+                                    <span className="text-[10px] font-bold text-muted-foreground/70 w-7 flex-shrink-0 pt-0.5">KR{i + 1}</span>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-xs text-foreground/80 leading-snug">{kr.text}</p>
+                                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                        <select
+                                          value={kr.status ?? 'not_started'}
+                                          onChange={e => updateKrValue(okr.id, kr.id, { status: e.target.value })}
+                                          title="Key result status"
+                                          className={`text-[10px] font-semibold rounded-full border px-2 py-0.5 cursor-pointer focus:outline-none focus:ring-1 focus:ring-ring/40 ${krStatus.chip}`}
+                                        >
+                                          {KR_STATUSES.map(s => (
+                                            <option key={s.value} value={s.value}>{s.label}</option>
+                                          ))}
+                                        </select>
+                                        {kr.accountName && (
+                                          <span className="text-[10px] text-muted-foreground bg-card border border-border/70 rounded-full px-2 py-0.5 truncate max-w-[200px]">
+                                            {kr.accountName}
+                                          </span>
+                                        )}
+                                      </div>
                                     </div>
-                                  )}
-                                </div>
-                              ))}
+                                    {kr.type === 'boolean' ? (
+                                      <input
+                                        type="checkbox"
+                                        checked={kr.value === true}
+                                        onChange={e => updateKrValue(okr.id, kr.id, { value: e.target.checked })}
+                                        className="w-4 h-4 mt-0.5 rounded accent-indigo-500 flex-shrink-0 cursor-pointer"
+                                      />
+                                    ) : (
+                                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                                        <input
+                                          type="number"
+                                          min={0}
+                                          max={100}
+                                          value={kr.value ?? ''}
+                                          onChange={e => {
+                                            const n = e.target.value === '' ? null : Math.min(100, Math.max(0, Number(e.target.value)));
+                                            updateKrValue(okr.id, kr.id, { value: n });
+                                          }}
+                                          placeholder="—"
+                                          className="w-12 bg-secondary border border-border rounded-lg px-2 py-1 text-xs text-foreground text-center focus:outline-none focus:border-ring"
+                                        />
+                                        <span className="text-[10px] text-muted-foreground/70">/ 100</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
                           )}
 
