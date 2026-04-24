@@ -270,7 +270,7 @@ export default function Navigation({ activeTab, onTabChange }) {
           )}
         </div>
 
-        <div className="hidden lg:block px-3 py-3 border-b border-sidebar-border bg-sidebar-accent/10">
+        <div className="hidden lg:block h-0">
           <div id="sidebar-timer-slot" />
         </div>
 

@@ -737,6 +737,11 @@ export default function TimerWidget() {
       </div>
 
       {renderModeToggle()}
+      {isRunning && (
+        <p className="text-[11px] text-muted-foreground">
+          Stop the current timer to switch modes.
+        </p>
+      )}
       {mode === TIMER_MODES.POMODORO ? renderPomodoroBody() : renderStopwatchBody()}
     </div>
   );
@@ -747,7 +752,12 @@ export default function TimerWidget() {
         {renderCard()}
       </div>
 
-      {sidebarSlot && createPortal(renderCard(), sidebarSlot)}
+      {sidebarSlot && createPortal(
+        <div className="hidden lg:block fixed bottom-4 left-3 z-50 w-[212px]">
+          {renderCard()}
+        </div>,
+        sidebarSlot
+      )}
 
       {showStopwatchStart && (
         <StartTimerModal
