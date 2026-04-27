@@ -1,4 +1,4 @@
-import { useState, useCallback, lazy, Suspense } from 'react';
+import { useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { StoreProvider } from './context/StoreContext';
 import { TimerProvider } from './context/TimerContext';
@@ -16,6 +16,7 @@ const Dashboard    = lazy(() => import('./pages/Dashboard'));
 const OKRs         = lazy(() => import('./pages/OKRs'));
 const Customers    = lazy(() => import('./pages/Customers'));
 const Triage       = lazy(() => import('./pages/Triage'));
+const Tickets      = lazy(() => import('./pages/Tickets'));
 const Integrations = lazy(() => import('./pages/Integrations'));
 const WeeklyReport = lazy(() => import('./pages/WeeklyReport'));
 const TimeBudget   = lazy(() => import('./pages/TimeBudget'));
@@ -37,11 +38,24 @@ function PageFallback() {
 }
 
 function AppContent() {
-  const [activeTab, setActiveTab] = useState('triage');
+  const [activeTab, setActiveTab] = useState(() => window.location.pathname === '/tickets' ? 'tickets' : 'triage');
   const { needsUpdate, isOffline, applyUpdate, dismissUpdate } = useServiceWorker();
 
   const handleTabChange = useCallback((tab) => {
     setActiveTab(tab);
+    if (tab === 'tickets' && window.location.pathname !== '/tickets') {
+      window.history.pushState({}, '', '/tickets');
+    } else if (tab !== 'tickets' && window.location.pathname === '/tickets') {
+      window.history.pushState({}, '', '/');
+    }
+  }, []);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setActiveTab(window.location.pathname === '/tickets' ? 'tickets' : 'triage');
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
   return (
@@ -68,6 +82,7 @@ function AppContent() {
               >
                 {activeTab === 'dashboard'    && <Dashboard onNavigate={handleTabChange} />}
                 {activeTab === 'triage'       && <Triage />}
+                {activeTab === 'tickets'      && <Tickets />}
                 {activeTab === 'okrs'         && <OKRs />}
                 {activeTab === 'customers'    && <Customers />}
                 {activeTab === 'weekly'       && <WeeklyReport onNavigate={handleTabChange} />}

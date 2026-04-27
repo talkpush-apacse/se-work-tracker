@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { WORK_TYPE_POINTS, TASK_TYPE_TO_WORK_TYPE } from '../constants';
+import { TICKET_PRIORITIES, TICKET_STATUSES, WORK_TYPE_POINTS, TASK_TYPE_TO_WORK_TYPE } from '../constants';
 import { fetchAllData, saveEntity, seedAllData } from '../lib/api';
 import { stripHtml } from '../lib/utils';
 
@@ -19,6 +19,7 @@ const KEYS = {
   timeLogs: 'gpt-time-logs',
   stressLogs: 'gpt-stress-logs',
   workTypeTargets: 'gpt-work-type-targets',
+  tickets: 'gpt-tickets',
 };
 
 const MIGRATION_FLAG = 'gpt-migrated-to-neon';
@@ -324,6 +325,14 @@ function autoIndexAnnotation(setAnnotationsFn, data) {
   });
 }
 
+function normalizeTicketKey(value) {
+  return String(value || '').trim().toUpperCase();
+}
+
+function normalizeOptionalText(value) {
+  return String(value || '').trim();
+}
+
 export function useStore() {
   const [okrs, setOkrs] = useState(() => migrateOkrs(load(KEYS.okrs)));
   const [customers, setCustomers] = useState(() => load(KEYS.customers));
@@ -349,6 +358,7 @@ export function useStore() {
     load(KEYS.stressLogs).filter(l => typeof l.logDate === 'string')
   );
   const [workTypeTargets, setWorkTypeTargets] = useState(() => load(KEYS.workTypeTargets));
+  const [tickets, setTickets] = useState(() => load(KEYS.tickets));
   const [aiSettings, setAiSettings] = useState(() => {
     const stored = load(KEYS.aiSettings, null);
     if (!stored) return DEFAULT_AI_SETTINGS;
@@ -384,6 +394,7 @@ export function useStore() {
   useEffect(() => { save(KEYS.timeLogs, timeLogs); }, [timeLogs]);
   useEffect(() => { save(KEYS.stressLogs, stressLogs); }, [stressLogs]);
   useEffect(() => { save(KEYS.workTypeTargets, workTypeTargets); }, [workTypeTargets]);
+  useEffect(() => { save(KEYS.tickets, tickets); }, [tickets]);
 
   // ─── Neon save effects (debounced, only after mount-fetch) ───
   useEffect(() => { if (mountedRef.current) debouncedSave('okrs', okrs); }, [okrs]);
@@ -401,6 +412,7 @@ export function useStore() {
   useEffect(() => { if (mountedRef.current) debouncedSave('timeLogs', timeLogs); }, [timeLogs]);
   useEffect(() => { if (mountedRef.current) debouncedSave('stressLogs', stressLogs); }, [stressLogs]);
   useEffect(() => { if (mountedRef.current) debouncedSave('workTypeTargets', workTypeTargets); }, [workTypeTargets]);
+  useEffect(() => { if (mountedRef.current) debouncedSave('tickets', tickets); }, [tickets]);
 
   // Flush any pending Neon writes when the user reloads or navigates away.
   // keepalive: true tells the browser to complete the fetch even after the page unloads.
@@ -411,7 +423,7 @@ export function useStore() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (mountedRef.current) setSyncStatus('saving'); }, [okrs, customers, points, meetingEntries, tasks, milestones, aiOutputs, aiSettings, annotations, weeklyReports, weeklyUpdateLogs, timeBudgets, timeLogs, stressLogs, workTypeTargets]);
+  useEffect(() => { if (mountedRef.current) setSyncStatus('saving'); }, [okrs, customers, points, meetingEntries, tasks, milestones, aiOutputs, aiSettings, annotations, weeklyReports, weeklyUpdateLogs, timeBudgets, timeLogs, stressLogs, workTypeTargets, tickets]);
 
   useEffect(() => {
     if (syncStatus === 'saving') {
@@ -441,7 +453,7 @@ export function useStore() {
 
       if (!neonHasData && !alreadyMigrated) {
         console.log('[sync] Neon empty → seeding from localStorage');
-        const localData = { okrs, customers, points, meetingEntries, tasks, milestones, aiOutputs, aiSettings };
+        const localData = { okrs, customers, points, meetingEntries, tasks, milestones, aiOutputs, aiSettings, tickets };
         const result = await seedAllData(localData);
         if (result) {
           try { localStorage.setItem(MIGRATION_FLAG, new Date().toISOString()); } catch { /* quota */ }
@@ -481,6 +493,7 @@ export function useStore() {
         if (remote.timeLogs) setTimeLogs(remote.timeLogs);
         if (remote.stressLogs) setStressLogs(remote.stressLogs);
         if (remote.workTypeTargets) setWorkTypeTargets(remote.workTypeTargets);
+        if (remote.tickets) setTickets(remote.tickets);
         if (remote.aiOutputs) setAiOutputs(remote.aiOutputs);
         if (remote.aiSettings && Object.keys(remote.aiSettings).length > 0) {
           setAiSettings(prev => ({
@@ -544,7 +557,12 @@ export function useStore() {
     setAnnotations(prev => prev.filter(a => a.customerId !== id));
     setWeeklyReports(prev => prev.filter(r => r.customerId !== id));
     setWeeklyUpdateLogs(prev => prev.filter(l => l.customerId !== id));
-  }, [tasks]);
+    setTickets(prev => prev.map(ticket => {
+      if (ticket.customerId !== id) return ticket;
+      const deletedCustomer = customers.find(c => c.id === id);
+      return { ...ticket, customerId: null, clientName: ticket.clientName || deletedCustomer?.name || '' };
+    }));
+  }, [customers, tasks]);
   const reorderCustomers = useCallback((orderedIds) => {
     setCustomers(prev => orderedIds.map(id => prev.find(c => c.id === id)).filter(Boolean));
   }, []);
@@ -794,6 +812,92 @@ export function useStore() {
     });
   }, []);
 
+  // ─── Ticket actions ───
+  // Shape: { id, ticketKey, title, url, notes, status, priority, customerId, clientName, reporter, assignee, createdAt, updatedAt, dueDate, rowCreatedAt }
+  const addTicket = useCallback((data) => {
+    const ticketKey = normalizeTicketKey(data.ticketKey);
+    const title = normalizeOptionalText(data.title);
+    if (!ticketKey) throw new Error('Ticket key is required');
+    if (!title) throw new Error('Title is required');
+    if (tickets.some(t => normalizeTicketKey(t.ticketKey) === ticketKey)) {
+      throw new Error(`Ticket key ${ticketKey} already exists`);
+    }
+
+    const status = data.status || 'Open';
+    const priority = data.priority || 'Medium';
+    if (!TICKET_STATUSES.includes(status)) throw new Error(`Unknown status: ${status}`);
+    if (!TICKET_PRIORITIES.includes(priority)) throw new Error(`Unknown priority: ${priority}`);
+
+    const customer = data.customerId ? customers.find(c => c.id === data.customerId) : null;
+    const now = new Date().toISOString();
+    const ticket = {
+      id: uid(),
+      ticketKey,
+      title,
+      url: normalizeOptionalText(data.url),
+      notes: data.notes || '',
+      status,
+      priority,
+      customerId: customer ? customer.id : null,
+      clientName: customer ? '' : normalizeOptionalText(data.clientName),
+      reporter: normalizeOptionalText(data.reporter),
+      assignee: normalizeOptionalText(data.assignee),
+      createdAt: data.createdAt || '',
+      updatedAt: now,
+      dueDate: data.dueDate || '',
+      rowCreatedAt: now,
+    };
+    setTickets(prev => [...prev, ticket]);
+    return ticket;
+  }, [customers, tickets]);
+
+  const updateTicket = useCallback((id, data) => {
+    const nextKey = data.ticketKey !== undefined ? normalizeTicketKey(data.ticketKey) : null;
+    const current = tickets.find(t => t.id === id);
+    if (!current) throw new Error('Ticket not found');
+
+    const ticketKey = nextKey || normalizeTicketKey(current.ticketKey);
+    const title = data.title !== undefined ? normalizeOptionalText(data.title) : current.title;
+    if (!ticketKey) throw new Error('Ticket key is required');
+    if (!title) throw new Error('Title is required');
+    if (tickets.some(t => t.id !== id && normalizeTicketKey(t.ticketKey) === ticketKey)) {
+      throw new Error(`Ticket key ${ticketKey} already exists`);
+    }
+
+    const status = data.status !== undefined ? data.status : current.status;
+    const priority = data.priority !== undefined ? data.priority : current.priority;
+    if (!TICKET_STATUSES.includes(status)) throw new Error(`Unknown status: ${status}`);
+    if (!TICKET_PRIORITIES.includes(priority)) throw new Error(`Unknown priority: ${priority}`);
+
+    const customer = data.customerId ? customers.find(c => c.id === data.customerId) : null;
+    const updatedTicket = {
+      ...current,
+      ...data,
+      id: current.id,
+      ticketKey,
+      title,
+      status,
+      priority,
+      customerId: customer ? customer.id : null,
+      clientName: customer ? '' : normalizeOptionalText(data.clientName !== undefined ? data.clientName : current.clientName),
+      url: normalizeOptionalText(data.url !== undefined ? data.url : current.url),
+      notes: data.notes !== undefined ? data.notes : current.notes || '',
+      reporter: normalizeOptionalText(data.reporter !== undefined ? data.reporter : current.reporter),
+      assignee: normalizeOptionalText(data.assignee !== undefined ? data.assignee : current.assignee),
+      createdAt: data.createdAt !== undefined ? data.createdAt : current.createdAt || '',
+      dueDate: data.dueDate !== undefined ? data.dueDate : current.dueDate || '',
+      rowCreatedAt: current.rowCreatedAt || current.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    setTickets(prev => prev.map(t => t.id === id ? updatedTicket : t));
+    return updatedTicket;
+  }, [customers, tickets]);
+
+  const deleteTicket = useCallback((id) => {
+    setTickets(prev => prev.filter(t => t.id !== id));
+  }, []);
+
   // ─── One-time migration: Annotations → Weekly Update Logs ───
   // Maps good→highlight, bad→lowlight, learning→learning.
   // Guarded by a localStorage flag so it only runs once ever.
@@ -886,6 +990,7 @@ export function useStore() {
       case 'timeLogs': setTimeLogs(data); return true;
       case 'stressLogs': setStressLogs(data); return true;
       case 'workTypeTargets': setWorkTypeTargets(data); return true;
+      case 'tickets': setTickets(data); return true;
       default:
         console.warn(`[store] updateEntity called with unknown entity: ${entity}`);
         return false;
@@ -896,7 +1001,7 @@ export function useStore() {
   const exportData = useCallback(() => {
     const data = {
       okrs, customers, points, tasks, meetingEntries, milestones, aiOutputs, aiSettings,
-      annotations, weeklyReports, weeklyUpdateLogs, timeBudgets, timeLogs, stressLogs, workTypeTargets,
+      annotations, weeklyReports, weeklyUpdateLogs, timeBudgets, timeLogs, stressLogs, workTypeTargets, tickets,
       exportedAt: new Date().toISOString(), version: 3,
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -906,7 +1011,7 @@ export function useStore() {
     a.download = `work-tracker-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [okrs, customers, points, tasks, meetingEntries, milestones, aiOutputs, aiSettings, annotations, weeklyReports, weeklyUpdateLogs, timeBudgets, timeLogs, stressLogs, workTypeTargets]);
+  }, [okrs, customers, points, tasks, meetingEntries, milestones, aiOutputs, aiSettings, annotations, weeklyReports, weeklyUpdateLogs, timeBudgets, timeLogs, stressLogs, workTypeTargets, tickets]);
 
   const importData = useCallback((file) => {
     const reader = new FileReader();
@@ -927,6 +1032,7 @@ export function useStore() {
         if (data.timeLogs) setTimeLogs(data.timeLogs);
         if (data.stressLogs) setStressLogs(data.stressLogs);
         if (data.workTypeTargets) setWorkTypeTargets(data.workTypeTargets);
+        if (data.tickets) setTickets(data.tickets);
       } catch { alert('Invalid backup file'); }
     };
     reader.readAsText(file);
@@ -935,7 +1041,7 @@ export function useStore() {
   return {
     okrs, customers, points, meetingEntries, tasks, milestones, aiOutputs,
     annotations, weeklyReports, weeklyUpdateLogs, timeBudgets,
-    timeLogs, stressLogs, workTypeTargets,
+    timeLogs, stressLogs, workTypeTargets, tickets,
     addOkr, updateOkr, deleteOkr,
     addCustomer, updateCustomer, deleteCustomer, reorderCustomers,
     addPoint, deletePoint, updatePoint,
@@ -950,6 +1056,7 @@ export function useStore() {
     addTimeLog, updateTimeLog, deleteTimeLog,
     upsertStressLog, deleteStressLog,
     getWorkTypeTargets, upsertWorkTypeTargets,
+    addTicket, updateTicket, deleteTicket,
     addAiOutput, getTaskAiOutputs, updateAiOutput,
     updateEntity,
     aiSettings, updateAiSettings,

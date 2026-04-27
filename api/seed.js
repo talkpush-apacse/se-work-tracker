@@ -16,6 +16,7 @@ const ALLOWED_ENTITIES = new Set([
   'timeLogs',
   'stressLogs',
   'workTypeTargets',
+  'tickets',
 ]);
 
 export default async function handler(req, res) {

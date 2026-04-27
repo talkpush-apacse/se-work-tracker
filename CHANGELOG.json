@@ -1,6 +1,17 @@
 {
   "versions": [
     {
+      "version": "2.23.0",
+      "codename": "Flow Grand",
+      "date": "2026-04-27",
+      "summary": "Add Tickets tracking for Jira requests raised through Claude",
+      "changes": [
+        { "type": "feature", "description": "New Tickets tab with filters, sorting, search, edit, delete, and add flows" },
+        { "type": "feature", "description": "Tickets persist through the existing localStorage-first and Neon app_data sync model" },
+        { "type": "feature", "description": "New MCP ticket tools for listing, creating, updating, and deleting tracked Jira tickets" }
+      ]
+    },
+    {
       "version": "2.22.1",
       "codename": "Flow Grand",
       "date": "2026-04-24",

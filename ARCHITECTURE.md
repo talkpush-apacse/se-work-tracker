@@ -73,7 +73,7 @@ app_data (
 )
 ```
 
-**18 entities:** `tasks`, `customers`, `okrs`, `projects`, `points`, `meetingEntries`, `milestones`, `timeLogs`, `stressLogs`, `weeklyReports`, `weeklyUpdateLogs`, `timeBudgets`, `workTypeTargets`, `aiOutputs`, `aiSettings`, `annotations`
+**19 entities:** `tasks`, `customers`, `okrs`, `projects`, `points`, `meetingEntries`, `milestones`, `timeLogs`, `stressLogs`, `weeklyReports`, `weeklyUpdateLogs`, `timeBudgets`, `workTypeTargets`, `aiOutputs`, `aiSettings`, `annotations`, `tickets`
 
 **Key entity shapes:**
 

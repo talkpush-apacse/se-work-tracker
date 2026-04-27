@@ -1,4 +1,4 @@
-import { LayoutDashboard, Target, Users, Menu, X, Download, Upload, ListTodo, Cloud, CloudOff, Loader2, Plug, Mail, Brain, Clock, GripVertical, Heart } from 'lucide-react';
+import { LayoutDashboard, Target, Users, Menu, X, Download, Upload, ListTodo, Cloud, CloudOff, Loader2, Plug, Mail, Brain, Clock, GripVertical, Heart, Ticket } from 'lucide-react';
 import { useState, useEffect, useRef, useMemo, useCallback, Fragment } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAppStore } from '../context/StoreContext';
@@ -12,6 +12,7 @@ import { CSS } from '@dnd-kit/utilities';
 const DEFAULT_TABS = [
   { id: 'dashboard',    label: 'Dashboard',      icon: LayoutDashboard, group: null,        tooltip: 'Dashboard — overview of your work' },
   { id: 'triage',       label: 'Triage',         icon: ListTodo,        group: null,        tooltip: 'Triage — manage & prioritize tasks' },
+  { id: 'tickets',      label: 'Tickets',        icon: Ticket,          group: null,        tooltip: 'Tickets — track raised Jira tickets' },
   { id: 'timebudget',   label: 'Time Budget',    icon: Clock,           group: 'Work',      tooltip: 'Time Budget — plan weekly time allocation' },
   { id: 'okrs',         label: 'OKRs',           icon: Target,          group: 'Work',      tooltip: 'OKRs — quarterly objectives & key results' },
   { id: 'customers',    label: 'Customers',      icon: Users,           group: 'Work',      tooltip: 'Customers — manage client accounts' },
@@ -34,9 +35,16 @@ function loadTabOrder() {
       const tab = DEFAULT_TABS.find(t => t.id === id);
       if (tab) ordered.push(tab);
     });
-    // Add any tabs not in the saved order (new tabs added since last save)
+    // Add any tabs not in the saved order near their default neighbor.
     DEFAULT_TABS.forEach(t => {
-      if (!ordered.find(o => o.id === t.id)) ordered.push(t);
+      if (ordered.find(o => o.id === t.id)) return;
+      const defaultIndex = DEFAULT_TABS.findIndex(tab => tab.id === t.id);
+      const previousDefault = [...DEFAULT_TABS.slice(0, defaultIndex)].reverse()
+        .find(tab => ordered.some(o => o.id === tab.id));
+      const insertAfter = previousDefault
+        ? ordered.findIndex(o => o.id === previousDefault.id) + 1
+        : ordered.length;
+      ordered.splice(insertAfter, 0, t);
     });
     return ordered;
   } catch {

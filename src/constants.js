@@ -161,6 +161,27 @@ export const TASK_TYPE_TO_WORK_TYPE = {
 // Points awarded per work type when a task is marked 'done'
 export const WORK_TYPE_POINTS = { deep_work: 2, meetings: 1, comms: 1, admin: 1 };
 
+// ─── Tickets ────────────────────────────────────────────────────────────────
+export const TICKET_STATUSES = ['Open', 'In Progress', 'Blocked', 'In Review', 'Done', 'Closed'];
+
+export const TICKET_PRIORITIES = ['Low', 'Medium', 'High', 'Critical'];
+
+export const TICKET_STATUS_COLORS = {
+  Open:          { bg: 'bg-slate-50',   text: 'text-slate-700',   border: 'border-slate-200' },
+  'In Progress': { bg: 'bg-blue-50',    text: 'text-blue-700',    border: 'border-blue-200' },
+  Blocked:       { bg: 'bg-red-50',     text: 'text-red-700',     border: 'border-red-200' },
+  'In Review':   { bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200' },
+  Done:          { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
+  Closed:        { bg: 'bg-gray-100',   text: 'text-gray-600',    border: 'border-gray-200' },
+};
+
+export const TICKET_PRIORITY_COLORS = {
+  Low:      { bg: 'bg-gray-100',   text: 'text-gray-600',   border: 'border-gray-200' },
+  Medium:   { bg: 'bg-blue-50',    text: 'text-blue-700',   border: 'border-blue-200' },
+  High:     { bg: 'bg-orange-50',  text: 'text-orange-700', border: 'border-orange-200' },
+  Critical: { bg: 'bg-red-50',     text: 'text-red-700',    border: 'border-red-200' },
+};
+
 // ─── Pulse: Stress Logging ──────────────────────────────────────────────────
 export const STRESSOR_TYPES = ['workload', 'client_issue', 'unclear_priorities', 'meetings', 'personal', 'other'];
 
