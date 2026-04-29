@@ -15,6 +15,7 @@ import {
   SkipForward,
   Coffee,
   Sparkles,
+  AlertTriangle,
 } from 'lucide-react';
 import { useTimerContext, useTimerDisplay } from '../context/TimerContext';
 import { useAppStore } from '../context/StoreContext';
@@ -37,6 +38,8 @@ const WORK_TYPE_ICONS = {
 };
 
 const NOTIFICATION_PROMPT_KEY = 'gpt-pomodoro-notification-prompted';
+const CHECK_IN_INTERVAL_SECONDS = 2 * 3600; // show check-in modal every 2 hours
+const CHECK_IN_AUTO_STOP_SECONDS = 5 * 60;  // auto-stop after 5 min with no response
 
 function formatHMS(totalSeconds) {
   const h = Math.floor(totalSeconds / 3600);
@@ -129,6 +132,8 @@ export default function TimerWidget() {
     skipInterval,
     pomodoroInterval,
     pomodoroCompletedCycles,
+    startedAt,
+    pomodoroStartedAt,
   } = useTimerContext();
   const elapsedSeconds = useTimerDisplay();
   const { customers } = useAppStore();
@@ -141,6 +146,8 @@ export default function TimerWidget() {
   const [newClientId, setNewClientId] = useState('');
   const [justAdded, setJustAdded] = useState(false);
   const [sidebarSlot, setSidebarSlot] = useState(null);
+  const [showCheckIn, setShowCheckIn] = useState(false);
+  const [checkInCountdown, setCheckInCountdown] = useState(5 * 60);
 
   const inputRef = useRef(null);
   const popoverRef = useRef(null);
@@ -148,6 +155,8 @@ export default function TimerWidget() {
   const audioUnlockedRef = useRef(false);
   const titlePulseRef = useRef(null);
   const originalTitleRef = useRef(typeof document !== 'undefined' ? document.title : 'Personal Work Tracker');
+  const lastCheckInBoundaryRef = useRef(0);
+  const checkInCountdownRef = useRef(null);
 
   const activeWorkType = isRunning ? workType : stoppedSession?.workType;
   const activeClientIds = isRunning ? clientIds : (stoppedSession?.clientIds || []);
@@ -184,6 +193,13 @@ export default function TimerWidget() {
     }
   }, []);
 
+  const clearCheckInCountdown = useCallback(() => {
+    if (checkInCountdownRef.current) {
+      clearInterval(checkInCountdownRef.current);
+      checkInCountdownRef.current = null;
+    }
+  }, []);
+
   const startTitlePulse = useCallback((alertTitle) => {
     if (typeof document === 'undefined') return;
 
@@ -211,6 +227,10 @@ export default function TimerWidget() {
   const unlockAudio = useCallback(async () => {
     if (!audioRef.current || audioUnlockedRef.current) return;
 
+    console.warn('[pomo] unlockAudio: start', {
+      hasAudio: !!audioRef.current,
+      alreadyUnlocked: audioUnlockedRef.current,
+    });
     try {
       audioRef.current.muted = true;
       audioRef.current.currentTime = 0;
@@ -219,24 +239,37 @@ export default function TimerWidget() {
       audioRef.current.currentTime = 0;
       audioRef.current.muted = false;
       audioUnlockedRef.current = true;
-    } catch {
+      console.warn('[pomo] unlockAudio: success');
+    } catch (err) {
       audioRef.current.muted = false;
+      console.warn('[pomo] unlockAudio: caught error', err?.name, err?.message);
     }
   }, []);
 
   const maybeRequestNotificationPermission = useCallback(async () => {
-    if (typeof window === 'undefined' || !('Notification' in window)) return;
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      console.warn('[pomo] maybeRequestNotificationPermission: Notification API not available');
+      return;
+    }
 
+    console.warn('[pomo] maybeRequestNotificationPermission: start', {
+      permission: Notification.permission,
+      alreadyPrompted: !!localStorage.getItem(NOTIFICATION_PROMPT_KEY),
+    });
     const alreadyPrompted = localStorage.getItem(NOTIFICATION_PROMPT_KEY);
-    if (alreadyPrompted) return;
+    if (alreadyPrompted) {
+      console.warn('[pomo] maybeRequestNotificationPermission: skip (already prompted)');
+      return;
+    }
 
     localStorage.setItem(NOTIFICATION_PROMPT_KEY, '1');
 
     if (Notification.permission === 'default') {
       try {
         await Notification.requestPermission();
-      } catch {
-        // Ignore prompt failures.
+        console.warn('[pomo] maybeRequestNotificationPermission: resolved', Notification.permission);
+      } catch (err) {
+        console.warn('[pomo] maybeRequestNotificationPermission: threw', err?.message ?? err);
       }
     }
   }, []);
@@ -256,6 +289,19 @@ export default function TimerWidget() {
     }
   }, []);
 
+  const handleCheckInConfirm = useCallback(() => {
+    clearCheckInCountdown();
+    setShowCheckIn(false);
+    stopTitlePulse();
+  }, [clearCheckInCountdown, stopTitlePulse]);
+
+  const handleCheckInStop = useCallback(() => {
+    clearCheckInCountdown();
+    setShowCheckIn(false);
+    stopTitlePulse();
+    stopTimer();
+  }, [clearCheckInCountdown, stopTitlePulse, stopTimer]);
+
   const handleIntervalEnd = useCallback((prevInterval, nextInterval) => {
     const alertCopy = getPomodoroAlertCopy(prevInterval, nextInterval);
     startTitlePulse(alertCopy.pulseTitle);
@@ -267,6 +313,65 @@ export default function TimerWidget() {
     setOnIntervalEnd(handleIntervalEnd);
     return () => setOnIntervalEnd(null);
   }, [handleIntervalEnd, setOnIntervalEnd]);
+
+  // Reset check-in boundary tracker whenever a new session starts or ends
+  useEffect(() => {
+    lastCheckInBoundaryRef.current = 0;
+    if (showCheckIn) {
+      clearCheckInCountdown();
+      setShowCheckIn(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startedAt, pomodoroStartedAt]);
+
+  // Fire check-in modal at every 2-hour wall-clock boundary (2h, 4h, 6h)
+  useEffect(() => {
+    if (!isRunning || showCheckIn) return;
+
+    let wallClockSeconds = 0;
+    if (mode === TIMER_MODES.POMODORO) {
+      if (pomodoroStartedAt) wallClockSeconds = Math.floor((Date.now() - pomodoroStartedAt) / 1000);
+    } else {
+      if (startedAt) wallClockSeconds = Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000);
+    }
+
+    const boundary = Math.floor(wallClockSeconds / CHECK_IN_INTERVAL_SECONDS);
+    if (boundary < 1 || boundary > 3) return;
+    if (boundary <= lastCheckInBoundaryRef.current) return;
+
+    lastCheckInBoundaryRef.current = boundary;
+    setShowCheckIn(true);
+    setCheckInCountdown(CHECK_IN_AUTO_STOP_SECONDS);
+    startTitlePulse('⏰ Still working?');
+    playBell();
+    showBrowserNotification(
+      'Still working?',
+      `You've been running for ${boundary * 2} hours. Confirm you're still active.`
+    );
+
+    checkInCountdownRef.current = setInterval(() => {
+      setCheckInCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(checkInCountdownRef.current);
+          checkInCountdownRef.current = null;
+          setShowCheckIn(false);
+          stopTitlePulse();
+          stopTimer();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, [
+    isRunning, elapsedSeconds, showCheckIn, mode,
+    startedAt, pomodoroStartedAt,
+    startTitlePulse, playBell, showBrowserNotification, stopTitlePulse, stopTimer,
+  ]);
+
+  // Cleanup check-in countdown on unmount
+  useEffect(() => {
+    return () => clearCheckInCountdown();
+  }, [clearCheckInCountdown]);
 
   useEffect(() => {
     const audio = new Audio('/sounds/pomodoro-bell.mp3');
@@ -285,8 +390,10 @@ export default function TimerWidget() {
       setShowSave(true);
       setShowPopover(false);
       stopTitlePulse();
+      clearCheckInCountdown();
+      setShowCheckIn(false);
     }
-  }, [stopTitlePulse, stoppedSession]);
+  }, [stopTitlePulse, stoppedSession, clearCheckInCountdown]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -359,20 +466,31 @@ export default function TimerWidget() {
     stopTitlePulse();
 
     if (nextMode === TIMER_MODES.POMODORO) {
+      console.warn('[pomo] handleModeChange: requesting notification permission');
       await maybeRequestNotificationPermission();
+      console.warn('[pomo] handleModeChange: notification permission done');
     }
 
     setMode(nextMode);
   };
 
   const handlePomodoroStart = async ({ workType: nextWorkType, clientIds: nextClientIds, okrId }) => {
-    stopTitlePulse();
-    await unlockAudio();
-    startPomodoro({
-      workType: nextWorkType,
-      clientIds: nextClientIds,
-      okrId,
-    });
+    console.warn('[pomo] handlePomodoroStart: called', { workType: nextWorkType, clientIds: nextClientIds, okrId });
+    try {
+      stopTitlePulse();
+      console.warn('[pomo] handlePomodoroStart: stopTitlePulse done');
+      await unlockAudio();
+      console.warn('[pomo] handlePomodoroStart: unlockAudio done');
+      startPomodoro({
+        workType: nextWorkType,
+        clientIds: nextClientIds,
+        okrId,
+      });
+      console.warn('[pomo] handlePomodoroStart: startPomodoro called');
+    } catch (err) {
+      console.error('[pomo] handlePomodoroStart: threw', err?.message ?? err, err?.stack ?? '');
+      throw err;
+    }
   };
 
   const handlePomodoroStop = () => {
@@ -787,6 +905,51 @@ export default function TimerWidget() {
           session={stoppedSession}
           onClose={handleSaveClose}
         />
+      )}
+
+      {showCheckIn && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="checkin-title"
+        >
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-card shadow-2xl p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <span className="inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-brand-amber/15 text-brand-amber-darker">
+                <AlertTriangle size={20} />
+              </span>
+              <div>
+                <h2 id="checkin-title" className="text-base font-semibold text-foreground">
+                  Still working?
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Your timer has been running for a while. Let us know you&apos;re still active.
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-border bg-secondary/40 px-4 py-3 text-center">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground mb-1">
+                Auto-stopping in
+              </p>
+              <p className="font-mono text-2xl font-bold tabular-nums text-foreground">
+                {String(Math.floor(checkInCountdown / 60)).padStart(2, '0')}:
+                {String(checkInCountdown % 60).padStart(2, '0')}
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <Button variant="destructive" size="sm" className="flex-1 rounded-xl" onClick={handleCheckInStop}>
+                <Square size={14} fill="currentColor" />
+                Stop timer
+              </Button>
+              <Button size="sm" className="flex-1 rounded-xl" onClick={handleCheckInConfirm}>
+                Yes, keep going
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

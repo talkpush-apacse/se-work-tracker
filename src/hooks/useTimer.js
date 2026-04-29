@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { POMODORO_CONFIG, POMODORO_INTERVALS, TIMER_MODES } from '../constants';
 
 const TIMER_KEY = 'gpt-active-timer';
-const MAX_SECONDS = 12 * 60 * 60; // 12 hours
+const MAX_SECONDS = 8 * 60 * 60; // 8 hours
 
 const VALID_TIMER_MODES = new Set(Object.values(TIMER_MODES));
 const VALID_POMODORO_INTERVALS = new Set(Object.values(POMODORO_INTERVALS));
@@ -533,8 +533,12 @@ export function useTimer() {
     taskDescription = null,
     okrId = null,
   } = {}) => {
+    console.warn('[pomo] startPomodoro: entered', { workType, clientIds, taskId, okrId });
     const existing = loadTimerState();
-    if (existing.isRunning) return;
+    if (existing.isRunning) {
+      console.warn('[pomo] startPomodoro: bailed — timer already running');
+      return;
+    }
 
     const now = Date.now();
     const nextState = createDefaultTimerState({
@@ -558,6 +562,7 @@ export function useTimer() {
     saveTimerState(nextState);
     syncState(nextState);
     startTick();
+    console.warn('[pomo] startPomodoro: state saved and tick started');
   }, [startTick, syncState]);
 
   const pausePomodoro = useCallback(() => {

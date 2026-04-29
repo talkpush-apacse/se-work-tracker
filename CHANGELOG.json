@@ -1,6 +1,26 @@
 {
   "versions": [
     {
+      "version": "2.24.0",
+      "codename": "Safety Net",
+      "date": "2026-04-29",
+      "summary": "Auto-stop after 8 hours and 2-hour check-in reminder",
+      "changes": [
+        { "type": "feat", "description": "Show 'Still working?' modal at 2h, 4h, and 6h with 5-minute auto-stop countdown" },
+        { "type": "feat", "description": "Reduce hard auto-stop ceiling from 12 hours to 8 hours" }
+      ]
+    },
+    {
+      "version": "2.23.1",
+      "codename": "Flow Grand",
+      "date": "2026-04-29",
+      "summary": "Add temporary PWA debug overlay for Pomodoro start investigation",
+      "changes": [
+        { "type": "chore", "description": "Add DebugOverlay component for on-screen error capture (diagnostic only)" },
+        { "type": "chore", "description": "Instrument Pomodoro start path with console.warn logs" }
+      ]
+    },
+    {
       "version": "2.23.0",
       "codename": "Flow Grand",
       "date": "2026-04-27",
