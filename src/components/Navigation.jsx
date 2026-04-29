@@ -143,6 +143,9 @@ function SortableMobileNavItem({ tab, activeTab, onTabChange, onClose }) {
 
 export default function Navigation({ activeTab, onTabChange }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [debugToast, setDebugToast] = useState(null);
+  const vTapCountRef = useRef(0);
+  const vTapTimerRef = useRef(null);
   const { exportData, importData, syncStatus, points, tasks } = useAppStore();
   const { isRunning, taskId: runningTaskId } = useTimerContext();
   const elapsedSeconds = useTimerDisplay();
@@ -206,6 +209,25 @@ export default function Navigation({ activeTab, onTabChange }) {
     const file = e.target.files[0];
     if (file) importData(file);
     e.target.value = '';
+  };
+
+  const handleVersionTap = () => {
+    vTapCountRef.current += 1;
+    clearTimeout(vTapTimerRef.current);
+    if (vTapCountRef.current >= 7) {
+      vTapCountRef.current = 0;
+      const isOn = localStorage.getItem('debug-overlay') === 'on';
+      if (isOn) {
+        localStorage.removeItem('debug-overlay');
+      } else {
+        localStorage.setItem('debug-overlay', 'on');
+      }
+      const msg = isOn ? 'Debug overlay: OFF' : 'Debug overlay: ON';
+      setDebugToast(msg);
+      setTimeout(() => setDebugToast(null), 2000);
+    } else {
+      vTapTimerRef.current = setTimeout(() => { vTapCountRef.current = 0; }, 5000);
+    }
   };
 
   return (
@@ -320,7 +342,10 @@ export default function Navigation({ activeTab, onTabChange }) {
             <span className="hidden lg:block">Import Data</span>
           </button>
           <input ref={fileRef} type="file" accept=".json" onChange={handleImport} className="hidden" />
-          <p className="text-[11px] text-sidebar-muted/80 text-center lg:text-left lg:px-3 py-1">
+          <p
+            className="text-[11px] text-sidebar-muted/80 text-center lg:text-left lg:px-3 py-1 cursor-pointer select-none"
+            onClick={handleVersionTap}
+          >
             v{__APP_VERSION__}
           </p>
         </div>
@@ -397,13 +422,24 @@ export default function Navigation({ activeTab, onTabChange }) {
                 </button>
               </div>
               <input ref={fileRef} type="file" accept=".json" onChange={handleImport} className="hidden" />
-              <p className="text-[11px] text-sidebar-muted/80 text-center pt-1">
+              <p
+                className="text-[11px] text-sidebar-muted/80 text-center pt-1 cursor-pointer select-none"
+                onClick={handleVersionTap}
+              >
                 v{__APP_VERSION__}
               </p>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
+
+      {debugToast && (
+        <div
+          className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[10000] bg-black/80 text-white text-xs px-3 py-1.5 rounded-full pointer-events-none"
+        >
+          {debugToast}
+        </div>
+      )}
     </>
   );
 }

@@ -9,6 +9,7 @@ import QuickStartFAB from './components/QuickStartFAB';
 import { UpdateBanner, OfflineBanner } from './components/PWABanners';
 import { useServiceWorker } from './hooks/useServiceWorker';
 import ErrorBoundary from './components/ErrorBoundary';
+import DebugOverlay from './components/DebugOverlay';
 
 // Lazy-load each page so the initial bundle only contains Navigation + TimerWidget.
 // Each chunk is downloaded once then cached by the browser / service worker.
@@ -97,6 +98,7 @@ function AppContent() {
       </main>
 
       <QuickStartFAB />
+      <DebugOverlay />
     </div>
   );
 }
