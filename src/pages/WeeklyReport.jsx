@@ -57,9 +57,10 @@ function buildWeekContext({ weekStart, weekEnd, points, tasks, customers, okrs, 
     const weekKey = format(weekStart, 'yyyy-MM-dd');
     const weekTimeLogs = timeLogs.filter(l => l.weekStart === weekKey);
     if (weekTimeLogs.length > 0) {
-      const byType = { deep_work: 0, meetings: 0, comms: 0, admin: 0 };
+      const byType = { deep_work: 0, meetings: 0 };
       weekTimeLogs.forEach(l => {
-        if (byType[l.workType] !== undefined) byType[l.workType] += l.hours || 0;
+        const wt = (l.workType === 'comms' || l.workType === 'admin') ? 'deep_work' : l.workType;
+        if (byType[wt] !== undefined) byType[wt] += l.hours || 0;
       });
       const totalByType = Object.values(byType).reduce((s, v) => s + v, 0);
       if (totalByType > 0) {
@@ -67,7 +68,7 @@ function buildWeekContext({ weekStart, weekEnd, points, tasks, customers, okrs, 
         lines.push(`- Total hours logged: ${Math.round(totalByType * 10) / 10}h`);
         Object.entries(byType).forEach(([wt, hrs]) => {
           if (hrs > 0) {
-            const label = { deep_work: 'Deep Work', meetings: 'Meetings', comms: 'Comms', admin: 'Admin' }[wt] || wt;
+            const label = { deep_work: 'Deep Work', meetings: 'Meetings' }[wt] || wt;
             const pct = Math.round((hrs / totalByType) * 100);
             lines.push(`- ${label}: ${Math.round(hrs * 10) / 10}h (${pct}%)`);
           }

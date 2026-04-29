@@ -119,7 +119,7 @@ function TasksTab({ tasks, addTask, customerId, okrs }) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [expandedTaskId, setExpandedTaskId] = useState(null);
   const [taskForm, setTaskForm] = useState({
-    description: '', workType: 'comms', status: 'open', okrId: '',
+    description: '', workType: 'deep_work', status: 'open', okrId: '',
   });
 
   const activeTasks = useMemo(
@@ -148,7 +148,7 @@ function TasksTab({ tasks, addTask, customerId, okrs }) {
       status:         taskForm.status,
       okrId:          taskForm.okrId || undefined,
     });
-    setTaskForm({ description: '', workType: 'comms', status: 'open', okrId: '' });
+    setTaskForm({ description: '', workType: 'deep_work', status: 'open', okrId: '' });
     setShowAddForm(false);
   };
 
@@ -209,7 +209,7 @@ function TasksTab({ tasks, addTask, customerId, okrs }) {
                 variant="outline"
                 onClick={() => {
                   setShowAddForm(false);
-                  setTaskForm({ description: '', workType: 'comms', status: 'open', okrId: '' });
+                  setTaskForm({ description: '', workType: 'deep_work', status: 'open', okrId: '' });
                 }}
               >
                 Cancel
@@ -1173,7 +1173,7 @@ export default function CustomerDetailView({ customer, onBack }) {
   const closedTasks = customerTasks.filter(t =>  ['done', 'archived'].includes(t.status)).length;
 
   const handleLogHours = (data) => {
-    addPoint({ customerId: customer.id, ...data });
+    addPoint({ customerId: customer.id, ...data, source: 'manual', pomodoroCycles: null });
     setShowLogHoursModal(false);
   };
 
@@ -1189,7 +1189,7 @@ export default function CustomerDetailView({ customer, onBack }) {
     const task = addTask({
       customerId: customerId || customer.id,
       description: item.text,
-      workType: 'comms',
+      workType: 'deep_work',
       status: 'open',
     });
     return task?.id || null;

@@ -206,9 +206,9 @@ export default async function handler(req, res) {
       description:   z.string().describe('The task description.'),
       customer_name: z.string().describe('The customer or account this task is for.'),
       work_type: z
-        .enum(['deep_work', 'meetings', 'comms', 'admin'])
+        .enum(['deep_work', 'meetings'])
         .optional()
-        .describe('Type of work. Defaults to comms.'),
+        .describe('Type of work. Defaults to deep_work.'),
       is_evergreen: z
         .boolean()
         .optional()
@@ -239,7 +239,7 @@ export default async function handler(req, res) {
         okrId:          null,
         meetingEntryId: null,
         description:    description.trim(),
-        workType:       work_type ?? 'comms',
+        workType:       work_type ?? 'deep_work',
         isEvergreen:    is_evergreen ?? false,
         status:         status ?? 'open',
         assigneeOrTeam: null,

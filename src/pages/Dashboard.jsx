@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef } from 'react';
-import { Trophy, Zap, Clock, Flame, Activity, TrendingUp, Star, Plus, Timer, Users, Brain, MessageSquare, ClipboardList } from 'lucide-react';
+import { Trophy, Zap, Clock, Flame, Activity, TrendingUp, Star, Plus, Timer, Users, Brain } from 'lucide-react';
 import { useAppStore } from '../context/StoreContext';
 import { useTimerContext } from '../context/TimerContext';
 import { startOfWeek, format } from 'date-fns';
@@ -11,8 +11,6 @@ import { WORK_TYPES, WORK_TYPE_LABELS, WORK_TYPE_COLORS } from '../constants';
 const WORK_TYPE_ICONS_MAP = {
   deep_work: Brain,
   meetings:  Users,
-  comms:     MessageSquare,
-  admin:     ClipboardList,
 };
 
 function CustomerBadge({ customerId, customers, size = 'sm' }) {
@@ -117,7 +115,7 @@ export default function Dashboard({ onNavigate }) {
   // This week's work type breakdown from timeLogs
   const weekKey = useMemo(() => format(startOfWeek(new Date(), { weekStartsOn: 0 }), 'yyyy-MM-dd'), []);
   const workTypeHours = useMemo(() => {
-    const hours = { deep_work: 0, meetings: 0, comms: 0, admin: 0 };
+    const hours = { deep_work: 0, meetings: 0 };
     timeLogs.forEach(log => {
       if (log.weekStart === weekKey && hours[log.workType] !== undefined) {
         hours[log.workType] += log.hours || 0;
@@ -134,7 +132,7 @@ export default function Dashboard({ onNavigate }) {
 
   const currentTargets = useMemo(() => {
     const saved = getWorkTypeTargets(weekKey);
-    return saved?.targets || { deep_work: 20, meetings: 8, comms: 8, admin: 4 };
+    return saved?.targets || { deep_work: 30, meetings: 10 };
   }, [weekKey, getWorkTypeTargets]);
 
   // Recent activity feed — sort+slice only when points changes
@@ -190,7 +188,7 @@ export default function Dashboard({ onNavigate }) {
 
       {/* This Week by Work Type */}
       {totalWorkTypeHours > 0 ? (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           {WORK_TYPES.map(wt => {
             const Icon = WORK_TYPE_ICONS_MAP[wt];
             const hrs = workTypeHours[wt];

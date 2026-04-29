@@ -3,7 +3,8 @@
  *
  * Body (JSON):
  *   description  (string, required) — task description
- *   workType     (string, optional) — 'deep_work'|'meetings'|'comms'|'admin' (default: 'comms')
+ *   workType     (string, optional) — 'deep_work'|'meetings' (default: 'deep_work')
+ *                                     Legacy values 'comms'/'admin' are silently mapped to 'deep_work'.
  *   taskType     (string, optional) — legacy alias; mapped to workType for backward compat
  *   status       (string, optional) — 'open' | 'in-progress'               (default: 'open')
  *   customerId   (string, optional) — UUID of customer to link             (default: null)
@@ -15,15 +16,17 @@ import { randomUUID } from 'crypto';
 import { sql, authorize } from '../_db.js';
 
 // Current valid work types (matches frontend WORK_TYPES constant)
-const VALID_WORK_TYPES = new Set(['deep_work', 'meetings', 'comms', 'admin']);
+const VALID_WORK_TYPES = new Set(['deep_work', 'meetings']);
 const VALID_STATUSES   = new Set(['open', 'in-progress']);
 
-// Map legacy taskType values (from old Apple Shortcuts) → current workType
+// Map legacy taskType + old workType values → current workType.
+// Existing Apple Shortcuts that POST workType:'comms' will silently map to deep_work.
 const TASK_TYPE_TO_WORK_TYPE = {
-  'comms':      'comms',
+  'comms':      'deep_work',
+  'admin':      'deep_work',
   'focus-time': 'deep_work',
-  'evergreen':  'comms',   // evergreen is a recurrence flag, not a work type
-  'recurring':  'comms',
+  'evergreen':  'deep_work',
+  'recurring':  'deep_work',
 };
 
 export default async function handler(req, res) {
@@ -43,11 +46,11 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing or empty "description"' });
     }
 
-    // Resolve workType: prefer explicit workType, fall back to mapped taskType, then 'comms'
+    // Resolve workType: prefer explicit workType, fall back to mapped taskType, then 'deep_work'
     const rawType = workType || taskType;
     const resolvedWorkType = VALID_WORK_TYPES.has(rawType)
       ? rawType
-      : (TASK_TYPE_TO_WORK_TYPE[rawType] || 'comms');
+      : (TASK_TYPE_TO_WORK_TYPE[rawType] || 'deep_work');
 
     // isEvergreen: explicit flag OR inferred from legacy taskType='evergreen'
     const resolvedIsEvergreen = isEvergreen === true || taskType === 'evergreen';

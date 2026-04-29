@@ -25,6 +25,8 @@ const KEYS = {
 const MIGRATION_FLAG = 'gpt-migrated-to-neon';
 const V2_MIGRATION_FLAG = 'gpt-v2-migrated';
 const V3_MIGRATION_FLAG = 'gpt-v3-migrated';
+const V4_MIGRATION_FLAG = 'gpt-v4-migration-flag';
+const V4_SNAPSHOT_KEY   = 'gpt-v4-migration-snapshot';
 
 // Default AI settings shape — empty string means "use built-in default prompt"
 const DEFAULT_AI_SETTINGS = {
@@ -304,9 +306,86 @@ function runV3Migration() {
   console.log('[v3] Backfilled', timeLogs.length, 'timeLogs from points');
 }
 
+// ─── V4 Migration: Collapse comms + admin → deep_work ─────────────────────
+// Also adds pomo session tagging schema (new fields are written at save-time;
+// historic entries are left as-is with null source/pomodoroCycles — treated as
+// "unknown" by the UI and never backfilled here since we can't know the mode).
+function runV4Migration() {
+  if (localStorage.getItem(V4_MIGRATION_FLAG)) return; // already done
+
+  // ── Snapshot before any writes so data can be restored manually if needed ──
+  try {
+    const snapshot = {
+      timeLogs:        load(KEYS.timeLogs, []),
+      points:          load(KEYS.points, []),
+      tasks:           load(KEYS.tasks, []),
+      workTypeTargets: load(KEYS.workTypeTargets, []),
+    };
+    localStorage.setItem(V4_SNAPSHOT_KEY, JSON.stringify(snapshot));
+  } catch { /* quota — skip snapshot, still proceed with migration */ }
+
+  const fixWt = (wt) => (wt === 'comms' || wt === 'admin') ? 'deep_work' : wt;
+
+  // ── timeLogs ──
+  const timeLogs = load(KEYS.timeLogs, []);
+  let timeLogsRewritten = 0;
+  const migratedTimeLogs = timeLogs.map(l => {
+    if (l.workType !== 'comms' && l.workType !== 'admin') return l;
+    timeLogsRewritten++;
+    return { ...l, workType: 'deep_work' };
+  });
+  save(KEYS.timeLogs, migratedTimeLogs);
+
+  // ── tasks ──
+  const tasks = load(KEYS.tasks, []);
+  let tasksRewritten = 0;
+  const migratedTasks = tasks.map(t => {
+    if (t.workType !== 'comms' && t.workType !== 'admin') return t;
+    tasksRewritten++;
+    return { ...t, workType: 'deep_work' };
+  });
+  save(KEYS.tasks, migratedTasks);
+
+  // ── workTypeTargets ──
+  const workTypeTargets = load(KEYS.workTypeTargets, []);
+  let targetWeeksMigrated = 0;
+  const migratedTargets = workTypeTargets.map(w => {
+    if (!w.targets?.comms && !w.targets?.admin) return w;
+    const { comms = 0, admin = 0, deep_work = 0, ...rest } = w.targets;
+    targetWeeksMigrated++;
+    return { ...w, targets: { ...rest, deep_work: deep_work + comms + admin } };
+  });
+  save(KEYS.workTypeTargets, migratedTargets);
+
+  try { localStorage.setItem(V4_MIGRATION_FLAG, new Date().toISOString()); } catch { /* quota */ }
+  console.log(`[v4] Migrated ${timeLogsRewritten} timeLogs, ${tasksRewritten} tasks, ${targetWeeksMigrated} workTypeTarget weeks — comms+admin collapsed to deep_work`);
+}
+
+// Applies the same V4 rewrite rules to Neon-fetched data before it's set to
+// state, preventing the init fetch from overwriting the localStorage migration.
+// Idempotent: if Neon data is already clean, this is a no-op.
+function migrateRemoteV4(remote) {
+  const fixWt = (wt) => (wt === 'comms' || wt === 'admin') ? 'deep_work' : wt;
+
+  const timeLogs = (remote.timeLogs || []).map(l =>
+    (l.workType === 'comms' || l.workType === 'admin') ? { ...l, workType: 'deep_work' } : l
+  );
+  const tasks = (remote.tasks || []).map(t =>
+    (t.workType === 'comms' || t.workType === 'admin') ? { ...t, workType: fixWt(t.workType) } : t
+  );
+  const workTypeTargets = (remote.workTypeTargets || []).map(w => {
+    if (!w.targets?.comms && !w.targets?.admin) return w;
+    const { comms = 0, admin = 0, deep_work = 0, ...rest } = w.targets;
+    return { ...w, targets: { ...rest, deep_work: deep_work + comms + admin } };
+  });
+
+  return { ...remote, timeLogs, tasks, workTypeTargets };
+}
+
 // ─── Run migrations before any component mounts ────────────────
 runV2Migration();
 runV3Migration();
+runV4Migration();
 resetEvergreenTasks();
 
 // ─── Auto-index helper ──────────────────────────────────────────
@@ -343,7 +422,7 @@ export function useStore() {
     // Migrate taskType → workType + isEvergreen for existing tasks
     return loaded.map(t => {
       if (t.workType) return t;
-      const workType = TASK_TYPE_TO_WORK_TYPE[t.taskType] || 'comms';
+      const workType = TASK_TYPE_TO_WORK_TYPE[t.taskType] || 'deep_work';
       return { ...t, workType, ...(t.taskType === 'evergreen' ? { isEvergreen: true } : {}) };
     });
   });
@@ -460,39 +539,45 @@ export function useStore() {
           console.log('[sync] Seed complete:', result.entitiesSeeded, 'entities');
         }
       } else if (neonHasData) {
-        let rTasks = remote.tasks || [];
-        let rPoints = remote.points || [];
-        let rMeetingEntries = remote.meetingEntries || [];
-        let rMilestones = remote.milestones || [];
+        // Apply V4 rewrite before setting state so the Neon fetch doesn't
+        // overwrite the localStorage migration with stale comms/admin data.
+        // migrateRemoteV4 spreads all of remote, so v4.X === remote.X for
+        // every field not explicitly migrated.
+        const v4 = migrateRemoteV4(remote);
+
+        let rTasks = v4.tasks || [];
+        let rPoints = v4.points || [];
+        let rMeetingEntries = v4.meetingEntries || [];
+        let rMilestones = v4.milestones || [];
 
         // Check if remote data still has projectId (needs v2 migration)
         const remoteNeedsV2 = rTasks.some(t => t.projectId !== undefined && t.customerId === undefined);
         if (remoteNeedsV2) {
-          const migrated = migrateRemoteV2(rTasks, rPoints, rMeetingEntries, rMilestones, remote.projects);
+          const migrated = migrateRemoteV2(rTasks, rPoints, rMeetingEntries, rMilestones, v4.projects);
           rTasks = migrated.tasks;
           rPoints = migrated.points;
           rMeetingEntries = migrated.meetingEntries;
           rMilestones = migrated.milestones;
         }
 
-        if (remote.okrs) setOkrs(migrateOkrs(remote.okrs));
-        if (remote.customers) setCustomers(remote.customers);
+        if (v4.okrs) setOkrs(migrateOkrs(v4.okrs));
+        if (v4.customers) setCustomers(v4.customers);
         setPoints(rPoints);
         setMeetingEntries(rMeetingEntries);
         // Migrate taskType → workType + isEvergreen for remote tasks
         setTasks(rTasks.map(t => {
           if (t.workType) return t;
-          const workType = TASK_TYPE_TO_WORK_TYPE[t.taskType] || 'comms';
+          const workType = TASK_TYPE_TO_WORK_TYPE[t.taskType] || 'deep_work';
           return { ...t, workType, ...(t.taskType === 'evergreen' ? { isEvergreen: true } : {}) };
         }));
         setMilestones(rMilestones);
-        if (remote.annotations) setAnnotations(remote.annotations);
-        if (remote.weeklyReports) setWeeklyReports(remote.weeklyReports);
-        if (remote.weeklyUpdateLogs) setWeeklyUpdateLogs(remote.weeklyUpdateLogs);
-        if (remote.timeBudgets) setTimeBudgets(remote.timeBudgets);
-        if (remote.timeLogs) setTimeLogs(remote.timeLogs);
-        if (remote.stressLogs) setStressLogs(remote.stressLogs);
-        if (remote.workTypeTargets) setWorkTypeTargets(remote.workTypeTargets);
+        if (v4.annotations) setAnnotations(v4.annotations);
+        if (v4.weeklyReports) setWeeklyReports(v4.weeklyReports);
+        if (v4.weeklyUpdateLogs) setWeeklyUpdateLogs(v4.weeklyUpdateLogs);
+        if (v4.timeBudgets) setTimeBudgets(v4.timeBudgets);
+        if (v4.timeLogs) setTimeLogs(v4.timeLogs);
+        if (v4.stressLogs) setStressLogs(v4.stressLogs);
+        if (v4.workTypeTargets) setWorkTypeTargets(v4.workTypeTargets);
         if (remote.tickets) setTickets(remote.tickets);
         if (remote.aiOutputs) setAiOutputs(remote.aiOutputs);
         if (remote.aiSettings && Object.keys(remote.aiSettings).length > 0) {

@@ -7,7 +7,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   Clock, ChevronLeft, ChevronRight, Plus, Trash2, Calendar, Loader2,
   AlertCircle, Settings, X, CheckSquare, Square, Copy,
-  Brain, Users, MessageSquare, ClipboardList, RotateCcw,
+  Brain, Users, RotateCcw,
 } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, parseISO, differenceInMinutes, isThursday, isFriday, isSaturday, isSunday } from 'date-fns';
 import { useAppStore } from '../context/StoreContext';
@@ -21,8 +21,6 @@ import {
 const WORK_TYPE_ICONS = {
   deep_work: Brain,
   meetings:  Users,
-  comms:     MessageSquare,
-  admin:     ClipboardList,
 };
 
 // Default budget hours
@@ -223,7 +221,7 @@ export default function TimeBudget() {
 
   // Time logs for current week, grouped by work type (includes checked meeting hours)
   const workTypeHours = useMemo(() => {
-    const hours = { deep_work: 0, meetings: 0, comms: 0, admin: 0 };
+    const hours = { deep_work: 0, meetings: 0 };
     timeLogs.forEach(log => {
       if (!log.weekStart || log.weekStart !== weekKey) return;
       if (hours[log.workType] !== undefined) {

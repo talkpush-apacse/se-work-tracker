@@ -288,6 +288,8 @@ function buildStoppedSession(state, elapsedSeconds) {
     pendingTasks: state.pendingTasks || [],
     elapsedSeconds,
     startedAt: state.startedAt,
+    mode: state.mode,
+    pomodoroCompletedCycles: state.pomodoroCompletedCycles ?? 0,
   };
 }
 

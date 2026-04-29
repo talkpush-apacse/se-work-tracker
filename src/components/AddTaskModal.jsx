@@ -10,7 +10,7 @@ import { Button } from './ui/button';
 
 const BLANK_FORM = {
   description: '',
-  workType: 'comms',
+  workType: 'deep_work',
   status: 'open',
   okrId: '',
 };

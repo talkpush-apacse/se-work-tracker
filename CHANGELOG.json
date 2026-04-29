@@ -1,6 +1,22 @@
 {
   "versions": [
     {
+      "version": "2.25.0",
+      "codename": "Clear Signal",
+      "date": "2026-04-29",
+      "summary": "Pomo session tagging + Work Type consolidation (Deep Work + Meetings only)",
+      "changes": [
+        { "type": "feature", "description": "Timer sessions now record source (stopwatch/pomodoro/manual) and pomodoroCycles on timeLogs and points entries" },
+        { "type": "change", "description": "Work Types consolidated from 4 to 2 — comms and admin collapsed into Deep Work" },
+        { "type": "migration", "description": "V4 migration rewrites all historic localStorage and Neon comms/admin entries to deep_work" },
+        { "type": "migration", "description": "Pre-migration snapshot saved to gpt-v4-migration-snapshot for manual rollback" },
+        { "type": "change", "description": "Default work type for new tasks changed from comms to deep_work across all forms" },
+        { "type": "change", "description": "WorkTypeSelector renders 2 buttons (Deep Work, Meetings) instead of 4" },
+        { "type": "change", "description": "Apple Shortcuts webhook and MCP tool silently map legacy comms/admin payloads to deep_work" },
+        { "type": "change", "description": "Default weekly targets updated to Deep Work 30h / Meetings 10h" }
+      ]
+    },
+    {
       "version": "2.24.0",
       "codename": "Safety Net",
       "date": "2026-04-29",

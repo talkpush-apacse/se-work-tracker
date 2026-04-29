@@ -1031,7 +1031,7 @@ function QuickAddTaskForm({ customers, onSubmit, onCancel }) {
   const [form, setForm] = useState({
     customerId:      '',
     description:     '',
-    workType:        'comms',
+    workType:        'deep_work',
     status:          'open',
     okrId:           '',
     isEvergreen:     false,
@@ -1614,7 +1614,7 @@ function TaskDetailView({ task, customer, onBack }) {
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-1 block">Work Type</label>
               <select
-                value={task.workType || 'comms'}
+                value={task.workType || 'deep_work'}
                 onChange={e => updateTask(task.id, { workType: e.target.value })}
                 className={selectClass}
               >
@@ -1984,6 +1984,8 @@ export default function Triage() {
           hours: Math.round((hours / clientIds.length) * 100) / 100,
           activityType: 'General Admin',
           comment: `Auto-tracked: ${session.taskDescription || 'Task review'}`,
+          source: 'stopwatch',
+          pomodoroCycles: null,
         });
       });
     } else {
@@ -1993,6 +1995,8 @@ export default function Triage() {
         hours: Math.round(hours * 100) / 100,
         activityType: 'General Admin',
         comment: `Auto-tracked: ${session.taskDescription || 'Task review'}`,
+        source: 'stopwatch',
+        pomodoroCycles: null,
       });
     }
     // Toast feedback so user knows points were captured

@@ -1,18 +1,16 @@
-import { Brain, Users, MessageSquare, ClipboardList } from 'lucide-react';
+import { Brain, Users } from 'lucide-react';
 import { WORK_TYPES, WORK_TYPE_LABELS, WORK_TYPE_COLORS } from '../constants';
 
 const ICONS = {
   deep_work: Brain,
   meetings:  Users,
-  comms:     MessageSquare,
-  admin:     ClipboardList,
 };
 
 export default function WorkTypeSelector({ value, onChange, size = 'md' }) {
   const isSmall = size === 'sm';
 
   return (
-    <div className="grid grid-cols-4 gap-2">
+    <div className="grid grid-cols-2 gap-2">
       {WORK_TYPES.map(wt => {
         const Icon = ICONS[wt];
         const colors = WORK_TYPE_COLORS[wt];

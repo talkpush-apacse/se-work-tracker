@@ -37,6 +37,8 @@ export default function AddPointsModal({ customer, onClose, onSuccess }) {
       activityType:    form.activityType,
       interactionType: form.interactionType,
       comment:         form.comment.trim(),
+      source:          'manual',
+      pomodoroCycles:  null,
     });
     onSuccess?.(entry);
     onClose();

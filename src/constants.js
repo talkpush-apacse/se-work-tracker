@@ -124,42 +124,36 @@ export const TASK_INTERACTION_TYPE_COLORS = {
 };
 
 // ─── Work Types (bandwidth-first tracking) ──────────────────────────────────
-export const WORK_TYPES = ['deep_work', 'meetings', 'comms', 'admin'];
+export const WORK_TYPES = ['deep_work', 'meetings'];
 
 export const WORK_TYPE_LABELS = {
   deep_work: 'Deep Work',
   meetings:  'Meetings',
-  comms:     'Comms',
-  admin:     'Admin',
 };
 
 export const WORK_TYPE_COLORS = {
-  deep_work: { bg: 'bg-teal-50',   text: 'text-teal-700',   border: 'border-teal-200', hex: '#14b8a6' },
-  meetings:  { bg: 'bg-blue-50',   text: 'text-blue-700',   border: 'border-blue-200', hex: '#3b82f6' },
-  comms:     { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', hex: '#8b5cf6' },
-  admin:     { bg: 'bg-amber-50',  text: 'text-amber-700',  border: 'border-amber-200', hex: '#f59e0b' },
+  deep_work: { bg: 'bg-teal-50',  text: 'text-teal-700',  border: 'border-teal-200', hex: '#14b8a6' },
+  meetings:  { bg: 'bg-blue-50',  text: 'text-blue-700',  border: 'border-blue-200', hex: '#3b82f6' },
 };
 
 // Default weekly hour targets per work type (must sum to ≤ 40)
 export const DEFAULT_WORK_TYPE_TARGETS = {
-  deep_work: 20,
-  meetings:  8,
-  comms:     8,
-  admin:     4,
+  deep_work: 30,
+  meetings:  10,
 };
 
 // Map task types → work types for timer auto-fill & migration
 export const TASK_TYPE_TO_WORK_TYPE = {
   'focus-time': 'deep_work',
-  comms:        'comms',
+  comms:        'deep_work',
   evergreen:    'deep_work',
   recurring:    'deep_work',
-  mine:         'comms',
-  coordinate:   'comms',
+  mine:         'deep_work',
+  coordinate:   'deep_work',
 };
 
 // Points awarded per work type when a task is marked 'done'
-export const WORK_TYPE_POINTS = { deep_work: 2, meetings: 1, comms: 1, admin: 1 };
+export const WORK_TYPE_POINTS = { deep_work: 2, meetings: 1 };
 
 // ─── Tickets ────────────────────────────────────────────────────────────────
 export const TICKET_STATUSES = ['Open', 'In Progress', 'Blocked', 'In Review', 'Done', 'Closed'];

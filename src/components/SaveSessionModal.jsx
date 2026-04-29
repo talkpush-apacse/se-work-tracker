@@ -101,6 +101,14 @@ export default function SaveSessionModal({ session, onClose }) {
 
     const workTypeLabel = WORK_TYPE_LABELS[workType] || '';
 
+    // Resolve pomo tagging fields from the session payload
+    const source = session.mode === 'pomodoro' ? 'pomodoro'
+      : session.mode === 'stopwatch' ? 'stopwatch'
+      : null;
+    const pomodoroCycles = session.mode === 'pomodoro'
+      ? (session.pomodoroCompletedCycles ?? null)
+      : null;
+
     // Create one time_log + one point entry per task row
     taskRows.forEach((row, i) => {
       const desc = row.description.trim();
@@ -121,6 +129,8 @@ export default function SaveSessionModal({ session, onClose }) {
         note: desc,
         loggedAt: session.startedAt,
         weekStart,
+        source,
+        pomodoroCycles,
       });
 
       // Points entry (gamification layer)
@@ -134,6 +144,8 @@ export default function SaveSessionModal({ session, onClose }) {
         comment: rowCount > 1
           ? `${desc} (${i + 1}/${rowCount} tasks)`
           : desc,
+        source,
+        pomodoroCycles,
       });
     });
 
