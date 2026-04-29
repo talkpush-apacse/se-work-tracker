@@ -7,6 +7,8 @@ import { getThisWeekRange, filterPointsByRange, formatRelative, formatDateTime, 
 import AddPointsModal from '../components/AddPointsModal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { WORK_TYPES, WORK_TYPE_LABELS, WORK_TYPE_COLORS } from '../constants';
+import { StatCard } from '../components/StatCard';
+import PomosView from '../components/PomosView';
 
 const WORK_TYPE_ICONS_MAP = {
   deep_work: Brain,
@@ -27,29 +29,11 @@ function CustomerBadge({ customerId, customers, size = 'sm' }) {
   );
 }
 
-function StatCard({ icon: Icon, label, value, sub, color = 'indigo' }) {
-  const colors = {
-    indigo: 'text-brand-lavender bg-brand-lavender/10',
-    violet: 'text-purple-700 bg-purple-50',
-    amber: 'text-brand-amber bg-amber-500/10',
-    emerald: 'text-brand-sage bg-brand-sage/10',
-    rose: 'text-red-700 bg-red-50',
-  };
-  return (
-    <div className="bg-card border border-border rounded-2xl p-4">
-      <div className={`inline-flex p-2 rounded-xl mb-3 ${colors[color]}`}>
-        <Icon size={18} className={colors[color].split(' ')[0]} />
-      </div>
-      <p className="text-2xl font-mono font-bold text-foreground">{value}</p>
-      <p className="text-sm font-sans text-muted-foreground mt-0.5">{label}</p>
-      {sub && <p className="text-xs text-muted-foreground/70 mt-0.5">{sub}</p>}
-    </div>
-  );
-}
 
 export default function Dashboard({ onNavigate }) {
   const { customers, okrs, points, tasks, timeLogs, getWorkTypeTargets } = useAppStore();
   const { isRunning, clientIds: runningClientIds, startTimer, stopTimer } = useTimerContext();
+  const [activeTab, setActiveTab] = useState('overview');
   const [addModal, setAddModal] = useState(null); // holds customer object for AddPointsModal
   const [timerConflict, setTimerConflict] = useState(null); // holds the customer to start after conflict
   const [flashId, setFlashId] = useState(null);
@@ -177,8 +161,30 @@ export default function Dashboard({ onNavigate }) {
         )}
       </div>
 
-      {/* Quick stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      {/* Tab bar */}
+      <div className="flex gap-1 border-b border-border -mt-2">
+        {[
+          { id: 'overview', label: 'Overview' },
+          { id: 'pomos',    label: 'Pomos'    },
+        ].map(({ id, label }) => (
+          <button
+            key={id}
+            onClick={() => setActiveTab(id)}
+            className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all -mb-px ${
+              activeTab === id
+                ? 'border-brand-lavender text-foreground'
+                : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'overview' && (
+        <>
+          {/* Quick stats */}
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <StatCard icon={Zap} label="Points this week" value={Number(totalPts).toFixed(1)} color="indigo" />
         <StatCard icon={Clock} label="Hours this week" value={totalHrs.toFixed(1)} color="violet" />
         <StatCard icon={Star} label="Top customer" value={topCustomer?.name || 'None yet'} sub="this week" color="amber" />
@@ -397,6 +403,10 @@ export default function Dashboard({ onNavigate }) {
           onCancel={() => setTimerConflict(null)}
         />
       )}
+        </>
+      )}
+
+      {activeTab === 'pomos' && <PomosView />}
     </div>
   );
 }

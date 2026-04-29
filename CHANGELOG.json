@@ -1,6 +1,23 @@
 {
   "versions": [
     {
+      "version": "2.26.0",
+      "codename": "Focus Lens",
+      "date": "2026-04-29",
+      "summary": "Pomos tab on Dashboard — cycle analytics with charts, period navigation, and session table",
+      "changes": [
+        { "type": "feature", "description": "Dashboard now has Overview and Pomos tabs — existing content untouched in Overview" },
+        { "type": "feature", "description": "Pomos tab: Daily / Weekly / Monthly period filter with prev/next navigation and jump-to-current button" },
+        { "type": "feature", "description": "Stat cards: total cycles, focus hours, avg cycles per active Pomo day, top OKR by cycles" },
+        { "type": "feature", "description": "Primary chart: column chart (weekly/monthly) or chip strip (daily <5 sessions) with teal bars, dashed target line at 8 cycles/day, today highlighted" },
+        { "type": "feature", "description": "Dynamic chart title leads with insight — on pace vs. below pace vs. empty state" },
+        { "type": "feature", "description": "OKR breakdown: horizontal bar chart sorted by cycles, Untagged shown in gray at top" },
+        { "type": "feature", "description": "Recent sessions table: newest-first, 25-row limit with Show all, zebra shading, OKR and customer columns" },
+        { "type": "change", "description": "StatCard extracted to src/components/StatCard.jsx to avoid circular import" },
+        { "type": "note", "description": "Historic source:null timeLogs are intentionally excluded from Pomos view — only confirmed Pomo sessions shown" }
+      ]
+    },
+    {
       "version": "2.25.0",
       "codename": "Clear Signal",
       "date": "2026-04-29",
