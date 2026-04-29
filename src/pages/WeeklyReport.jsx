@@ -93,6 +93,22 @@ function buildWeekContext({ weekStart, weekEnd, points, tasks, customers, okrs, 
           });
           lines.push('');
         }
+
+        // Pomodoro Focus
+        const pomoLogs = weekTimeLogs.filter(l => l.source === 'pomodoro' && l.pomodoroCycles > 0);
+        if (pomoLogs.length > 0) {
+          const totalPomoCycles = pomoLogs.reduce((s, l) => s + (l.pomodoroCycles || 0), 0);
+          const totalPomoHours  = Math.round(pomoLogs.reduce((s, l) => s + (l.hours || 0), 0) * 10) / 10;
+          const taggedPomos     = pomoLogs.filter(l => l.okrId);
+          const untaggedPomos   = pomoLogs.filter(l => !l.okrId);
+          lines.push('### Pomodoro Focus');
+          lines.push(`- Total cycles completed: ${totalPomoCycles} (~${totalPomoHours}h deep focus)`);
+          lines.push(`- OKR-tagged sessions: ${taggedPomos.length} (${taggedPomos.reduce((s, l) => s + (l.pomodoroCycles || 0), 0)} cycles)`);
+          if (untaggedPomos.length > 0) {
+            lines.push(`- Untagged sessions: ${untaggedPomos.length} (${untaggedPomos.reduce((s, l) => s + (l.pomodoroCycles || 0), 0)} cycles) — consider linking to an OKR`);
+          }
+          lines.push('');
+        }
       }
     }
   }

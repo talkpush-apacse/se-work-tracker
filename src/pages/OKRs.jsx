@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Plus, Pencil, Trash2, Target, ChevronDown, ChevronUp, ListPlus, X, ToggleLeft, Hash } from 'lucide-react';
+import { Plus, Pencil, Trash2, Target, ChevronDown, ChevronUp, ListPlus, X, ToggleLeft, Hash, Brain } from 'lucide-react';
 import { useAppStore } from '../context/StoreContext';
 import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -319,7 +319,7 @@ function KrProgress({ keyResults }) {
 }
 
 // ─── Points-based progress bar ────────────────────────────────────────────────
-function PointsProgress({ totalPoints, targetPoints, onSetTarget }) {
+function PointsProgress({ totalPoints, targetPoints, onSetTarget, pomoOnly = false }) {
   if (!targetPoints) {
     return (
       <button
@@ -337,7 +337,7 @@ function PointsProgress({ totalPoints, targetPoints, onSetTarget }) {
     <div className="flex items-center gap-2 mt-1.5">
       <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
         <div
-          className={`h-full rounded-full transition-all ${pct >= 100 ? 'bg-emerald-500' : pct >= 50 ? 'bg-primary' : 'bg-muted-foreground/40'}`}
+          className={`h-full rounded-full transition-all ${pomoOnly ? 'bg-teal-500' : pct >= 100 ? 'bg-emerald-500' : pct >= 50 ? 'bg-primary' : 'bg-muted-foreground/40'}`}
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -355,6 +355,7 @@ export default function OKRs() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [expanded, setExpanded] = useState({});
   const [quarterFilter, setQuarterFilter] = useState(ALL_QUARTERS);
+  const [pomoFilter, setPomoFilter]       = useState('all'); // 'all' | 'pomos'
 
   const toggle = (id) => setExpanded(p => ({ ...p, [id]: !p[id] }));
 
@@ -434,6 +435,26 @@ export default function OKRs() {
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+              {/* Pomos-only toggle */}
+              <div className="flex bg-secondary rounded-xl p-0.5 gap-0.5 self-start sm:self-auto">
+                {[
+                  { id: 'all',   label: 'All sessions' },
+                  { id: 'pomos', label: 'Pomos only'   },
+                ].map(({ id, label }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setPomoFilter(id)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      pomoFilter === id
+                        ? 'bg-card text-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
               <select
                 value={quarterFilter}
                 onChange={e => setQuarterFilter(e.target.value)}
@@ -488,6 +509,16 @@ export default function OKRs() {
                   const timeLogHours = Math.round(timeLogs.filter(l => l.okrId === okr.id).reduce((s, l) => s + (l.hours || 0), 0) * 100) / 100;
                   // Task completion points
                   const taskPts = linkedTasks.reduce((s, t) => s + (t.points || 0), 0);
+
+                  // Pomo-specific metrics (source === 'pomodoro' only)
+                  const pomoLogs   = timeLogs.filter(l => l.okrId === okr.id && l.source === 'pomodoro');
+                  const pomoCycles = pomoLogs.reduce((s, l) => s + (l.pomodoroCycles || 0), 0);
+                  const pomoHours  = Math.round(pomoLogs.reduce((s, l) => s + (l.hours || 0), 0) * 100) / 100;
+                  const pomoPoints = points.filter(pt => pt.okrId === okr.id && pt.source === 'pomodoro')
+                    .reduce((s, e) => s + e.points, 0);
+                  // When pomoFilter === 'pomos', PointsProgress shows only Pomo-sourced points
+                  const displayPoints = pomoFilter === 'pomos' ? pomoPoints : totalPoints;
+
                   const isExpanded = expanded[okr.id];
                   const keyResults = okr.keyResults || [];
 
@@ -505,12 +536,28 @@ export default function OKRs() {
                             {/* KR progress bar */}
                             <KrProgress keyResults={keyResults} />
 
-                            {/* Points-based progress bar */}
+                            {/* Points-based progress bar (switches to Pomo-only when pomoFilter active) */}
                             <PointsProgress
-                              totalPoints={totalPoints}
+                              totalPoints={displayPoints}
                               targetPoints={okr.targetPoints}
                               onSetTarget={() => setEditTarget(okr)}
+                              pomoOnly={pomoFilter === 'pomos'}
                             />
+
+                            {/* Pomo metrics strip — hidden when pomoCycles === 0 */}
+                            {pomoCycles > 0 && (
+                              <div
+                                title="Cycles = completed 25-min Pomodoro intervals. Hours and points reflect only Pomo-tagged sessions, not all work on this OKR."
+                                className="flex items-center gap-1.5 mt-1.5 text-[11px] text-teal-700 cursor-default select-none"
+                              >
+                                <Brain size={11} className="text-teal-600 flex-shrink-0" />
+                                <span>{pomoCycles} cycle{pomoCycles !== 1 ? 's' : ''}</span>
+                                <span className="text-muted-foreground/40">·</span>
+                                <span>{pomoHours}h focus</span>
+                                <span className="text-muted-foreground/40">·</span>
+                                <span>~{Math.round(pomoPoints * 10) / 10} pts from Pomos</span>
+                              </div>
+                            )}
 
                             <div className="flex items-center gap-4 mt-2 flex-wrap">
                               <span className="text-xs text-muted-foreground">{linkedTasks.length} task{linkedTasks.length !== 1 ? 's' : ''}</span>

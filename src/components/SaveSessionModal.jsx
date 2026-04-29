@@ -48,9 +48,12 @@ export default function SaveSessionModal({ session, onClose }) {
     }];
   });
 
-  const [errors, setErrors]           = useState({});
+  const [errors, setErrors]             = useState({});
   const [showDiscard, setShowDiscard]   = useState(false);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState(null);
+  // OKR nudge — soft prompt when saving a Pomo with no OKR tagged
+  const [showOkrNudge, setShowOkrNudge]       = useState(false);
+  const [okrNudgeDismissed, setOkrNudgeDismissed] = useState(false);
   const confirmTimerRef = useRef(null);
 
   // Sort customers: pinned first, then alphabetical
@@ -90,11 +93,8 @@ export default function SaveSessionModal({ session, onClose }) {
     return e;
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const errs = validate();
-    if (Object.keys(errs).length) { setErrors(errs); return; }
-
+  // Extracted save logic — called by handleSubmit and the OKR nudge "Save anyway" path.
+  const performSave = () => {
     // Derive weekStart from session startedAt
     const sessionDate = new Date(session.startedAt);
     const weekStart = format(startOfWeek(sessionDate, { weekStartsOn: 0 }), 'yyyy-MM-dd');
@@ -150,6 +150,24 @@ export default function SaveSessionModal({ session, onClose }) {
     });
 
     onClose();
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const errs = validate();
+    if (Object.keys(errs).length) { setErrors(errs); return; }
+
+    // Soft-nudge: if this is a Pomo session and no task row has an OKR,
+    // show a one-time prompt. "Save anyway" sets okrNudgeDismissed so the
+    // next click (or the nudge's own action) goes straight to performSave.
+    const isPomodoro = session.mode === 'pomodoro';
+    const hasAnyOkr  = taskRows.some(r => r.okrId);
+    if (isPomodoro && !hasAnyOkr && !okrNudgeDismissed) {
+      setShowOkrNudge(true);
+      return;
+    }
+
+    performSave();
   };
 
   const updateRow = (id, field, value) => {
@@ -336,6 +354,37 @@ export default function SaveSessionModal({ session, onClose }) {
           </Button>
         </div>
       </form>
+
+      {/* OKR nudge — soft prompt for Pomo sessions saved without an OKR tag */}
+      {showOkrNudge && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
+          <div className="w-full max-w-sm bg-card border border-border rounded-2xl shadow-2xl p-6">
+            <h3 className="text-base font-semibold text-foreground mb-2">Save Pomo without OKR?</h3>
+            <p className="text-sm text-muted-foreground mb-5">
+              This Pomo isn't tied to an OKR. Tagging it now means it'll count toward your quarterly progress. You can also tag it later by editing the entry.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setShowOkrNudge(false)}
+              >
+                Pick an OKR
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setOkrNudgeDismissed(true);
+                  setShowOkrNudge(false);
+                  performSave();
+                }}
+              >
+                Save anyway
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Discard confirmation — z-60 to sit above this z-50 modal */}
       {showDiscard && (

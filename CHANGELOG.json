@@ -1,6 +1,18 @@
 {
   "versions": [
     {
+      "version": "2.27.0",
+      "codename": "OKR Pulse",
+      "date": "2026-04-29",
+      "summary": "Phase C: OKR linkage for Pomodoro sessions — nudge on save, per-OKR Pomo metrics, Pomos-only filter, and Weekly Report Pomo section",
+      "changes": [
+        { "type": "feature", "description": "SaveSessionModal: soft OKR nudge when saving a Pomo without an OKR tag — one-time prompt with Pick an OKR / Save anyway" },
+        { "type": "feature", "description": "OKRs page: each card now shows a Pomo metrics strip (cycles · focus hours · pts from Pomos) when Pomo work exists" },
+        { "type": "feature", "description": "OKRs page: Pomos-only toggle in filter bar — switches Points bar to show only Pomo-sourced points (bar turns teal)" },
+        { "type": "feature", "description": "Weekly Report: new Pomodoro Focus section in bandwidth context — total cycles, OKR-tagged vs untagged breakdown" }
+      ]
+    },
+    {
       "version": "2.26.0",
       "codename": "Focus Lens",
       "date": "2026-04-29",
