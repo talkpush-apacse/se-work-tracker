@@ -2,11 +2,15 @@ import { useState, useCallback, useMemo, memo } from 'react';
 import { Plus, Pencil, Trash2, Users, ListPlus, Star, ChevronRight, Search } from 'lucide-react';
 import { useAppStore } from '../context/StoreContext';
 import Modal from '../components/Modal';
-import ConfirmDialog from '../components/ConfirmDialog';
+import DeleteTransferDialog from '../components/DeleteTransferDialog';
 import BulkAddCustomersModal from '../components/BulkAddCustomersModal';
 import CustomerDetailView from '../components/CustomerDetailView';
 import { CUSTOMER_COLORS } from '../constants';
 import { formatDate } from '../utils/dateHelpers';
+
+function formatCount(count, singular, plural = `${singular}s`) {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
 
 // ─── Customer form (add/edit) ─────────────────────────────────────────────────
 function CustomerForm({ initial = {}, onSubmit, onCancel }) {
@@ -133,7 +137,21 @@ const CustomerRow = memo(function CustomerRow({ customer, taskCount, totalPoints
 
 // ─── Main Customers page ──────────────────────────────────────────────────────
 export default function Customers() {
-  const { customers, points, tasks, addCustomer, updateCustomer, deleteCustomer } = useAppStore();
+  const {
+    customers,
+    points,
+    tasks,
+    meetingEntries,
+    milestones,
+    annotations,
+    weeklyReports,
+    weeklyUpdateLogs,
+    tickets,
+    timeLogs,
+    addCustomer,
+    updateCustomer,
+    deleteCustomer,
+  } = useAppStore();
   const [createModal, setCreateModal] = useState(false);
   const [bulkModal,   setBulkModal]   = useState(false);
   const [editTarget,   setEditTarget]   = useState(null);
@@ -184,6 +202,40 @@ export default function Customers() {
   const liveSelectedCustomer = selectedCustomer
     ? customers.find(c => c.id === selectedCustomer.id) ?? null
     : null;
+
+  const customerTransferOptions = useMemo(
+    () => customers
+      .filter(customer => customer.id !== deleteTarget?.id)
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map(customer => ({ value: customer.id, label: customer.name })),
+    [customers, deleteTarget]
+  );
+
+  const customerDeleteSummary = useMemo(() => {
+    if (!deleteTarget) return [];
+
+    const taskCount = tasks.filter(task => task.customerId === deleteTarget.id).length;
+    const pointCount = points.filter(point => point.customerId === deleteTarget.id).length;
+    const meetingCount = meetingEntries.filter(meeting => meeting.customerId === deleteTarget.id).length;
+    const milestoneCount = milestones.filter(milestone => milestone.customerId === deleteTarget.id).length;
+    const noteCount = annotations.filter(note => note.customerId === deleteTarget.id).length;
+    const weeklyReportCount = weeklyReports.filter(report => report.customerId === deleteTarget.id).length;
+    const weeklyUpdateCount = weeklyUpdateLogs.filter(log => log.customerId === deleteTarget.id).length;
+    const ticketCount = tickets.filter(ticket => ticket.customerId === deleteTarget.id).length;
+    const timeLogCount = timeLogs.filter(log => (log.clientIds || []).includes(deleteTarget.id)).length;
+
+    return [
+      taskCount > 0 ? formatCount(taskCount, 'task') : null,
+      pointCount > 0 ? formatCount(pointCount, 'points entry', 'points entries') : null,
+      meetingCount > 0 ? formatCount(meetingCount, 'meeting') : null,
+      milestoneCount > 0 ? formatCount(milestoneCount, 'milestone') : null,
+      noteCount > 0 ? formatCount(noteCount, 'note') : null,
+      weeklyReportCount > 0 ? formatCount(weeklyReportCount, 'weekly report') : null,
+      weeklyUpdateCount > 0 ? formatCount(weeklyUpdateCount, 'weekly update') : null,
+      ticketCount > 0 ? formatCount(ticketCount, 'ticket') : null,
+      timeLogCount > 0 ? formatCount(timeLogCount, 'time log') : null,
+    ].filter(Boolean);
+  }, [annotations, deleteTarget, meetingEntries, milestones, points, tasks, tickets, timeLogs, weeklyReports, weeklyUpdateLogs]);
 
   if (liveSelectedCustomer) {
     return (
@@ -314,13 +366,22 @@ export default function Customers() {
         </Modal>
       )}
       {deleteTarget && (
-        <ConfirmDialog
+        <DeleteTransferDialog
           title="Delete Customer"
           message={`Delete "${deleteTarget.name}"? All tasks, points, meetings, and milestones for this customer will also be deleted. This cannot be undone.`}
-          onConfirm={() => {
+          summaryLines={customerDeleteSummary}
+          transferLabel="Transfer linked data to"
+          transferPlaceholder="Choose another customer"
+          transferOptions={customerTransferOptions}
+          onDelete={() => {
             // If we're viewing this customer, go back first
             if (selectedCustomer?.id === deleteTarget.id) setSelectedCustomer(null);
             deleteCustomer(deleteTarget.id);
+            setDeleteTarget(null);
+          }}
+          onTransfer={(transferToId) => {
+            if (selectedCustomer?.id === deleteTarget.id) setSelectedCustomer(null);
+            deleteCustomer(deleteTarget.id, { transferToId });
             setDeleteTarget(null);
           }}
           onCancel={() => setDeleteTarget(null)}

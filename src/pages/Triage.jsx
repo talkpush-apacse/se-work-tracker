@@ -17,6 +17,7 @@ import { useTimerContext, useTimerDisplay } from '../context/TimerContext';
 import { callClaude, callOpenAI } from '../lib/api';
 import { getWeekRangeForOffset, formatWeekLabel, isInRange } from '../utils/dateHelpers';
 import ConfirmDialog from '../components/ConfirmDialog';
+import DeleteTransferDialog from '../components/DeleteTransferDialog';
 import FileAttachments from '../components/FileAttachments';
 import RichTextEditor from '../components/ui/RichTextEditor';
 import {
@@ -1501,8 +1502,21 @@ function fmtHMS(totalSeconds) {
   return [h, m, s].map(n => String(n).padStart(2, '0')).join(':');
 }
 
+function formatCount(count, singular, plural = `${singular}s`) {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
 function TaskDetailView({ task, customer, onBack }) {
-  const { updateTask, deleteTask, customers, addTask } = useAppStore();
+  const {
+    tasks,
+    updateTask,
+    deleteTask,
+    customers,
+    addTask,
+    aiOutputs,
+    timeLogs,
+    meetingEntries,
+  } = useAppStore();
   const { isRunning, taskId: runningTaskId, startTimer, stopTimer } = useTimerContext();
   const elapsedSeconds = useTimerDisplay();
 
@@ -1543,6 +1557,41 @@ function TaskDetailView({ task, customer, onBack }) {
   const ageDays = Math.floor((Date.now() - new Date(task.createdAt)) / 86_400_000);
 
   const selectClass = 'w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground/90 focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40';
+  const customerNameById = useMemo(
+    () => new Map(customers.map(entry => [entry.id, entry.name])),
+    [customers]
+  );
+  const taskTransferOptions = useMemo(
+    () => [...tasks]
+      .filter(entry => entry.id !== task.id)
+      .sort((a, b) => {
+        const customerA = customerNameById.get(a.customerId) || '';
+        const customerB = customerNameById.get(b.customerId) || '';
+        return customerA.localeCompare(customerB) || a.description.localeCompare(b.description);
+      })
+      .map(entry => ({
+        value: entry.id,
+        label: entry.customerId
+          ? `${entry.description} (${customerNameById.get(entry.customerId) || 'Unknown customer'})`
+          : `${entry.description} (No customer)`,
+      })),
+    [customerNameById, task.id, tasks]
+  );
+  const taskDeleteSummary = useMemo(() => {
+    const aiOutputCount = aiOutputs.filter(output => output.taskId === task.id).length;
+    const timeLogCount = timeLogs.filter(log => log.taskId === task.id).length;
+    const actionItemCount = meetingEntries.reduce((total, entry) => total + (entry.actionItems || []).filter(item => (
+      item &&
+      typeof item === 'object' &&
+      (item.convertedToTaskId === task.id || item.taskId === task.id)
+    )).length, 0);
+
+    return [
+      aiOutputCount > 0 ? formatCount(aiOutputCount, 'AI draft') : null,
+      timeLogCount > 0 ? formatCount(timeLogCount, 'time log') : null,
+      actionItemCount > 0 ? formatCount(actionItemCount, 'meeting action item') : null,
+    ].filter(Boolean);
+  }, [aiOutputs, meetingEntries, task.id, timeLogs]);
 
   return (
     <div>
@@ -1776,11 +1825,19 @@ function TaskDetailView({ task, customer, onBack }) {
 
       {/* Delete confirmation dialog */}
       {showConfirmDelete && (
-        <ConfirmDialog
+        <DeleteTransferDialog
           title="Delete Task"
           message={`Permanently delete "${task.description}"? This cannot be undone.`}
-          danger={true}
-          onConfirm={() => { deleteTask(task.id); setShowConfirmDelete(false); onBack(); }}
+          summaryLines={taskDeleteSummary}
+          transferLabel="Transfer linked data to"
+          transferPlaceholder="Choose another task"
+          transferOptions={taskTransferOptions}
+          onDelete={() => { deleteTask(task.id); setShowConfirmDelete(false); onBack(); }}
+          onTransfer={(transferToId) => {
+            deleteTask(task.id, { transferToId });
+            setShowConfirmDelete(false);
+            onBack();
+          }}
           onCancel={() => setShowConfirmDelete(false)}
         />
       )}

@@ -57,6 +57,41 @@ function uid() {
   return crypto.randomUUID();
 }
 
+function replaceClientIds(clientIds, sourceId, targetId) {
+  if (!Array.isArray(clientIds) || !clientIds.includes(sourceId) || !targetId) return clientIds;
+  return [...new Set(clientIds.map(id => (id === sourceId ? targetId : id)).filter(Boolean))];
+}
+
+function remapMeetingActionItems(actionItems, sourceTaskId, targetTaskId) {
+  if (!Array.isArray(actionItems) || !targetTaskId) return actionItems;
+
+  let changed = false;
+  const nextItems = actionItems.map(item => {
+    if (!item || typeof item !== 'object') return item;
+
+    let itemChanged = false;
+    const nextItem = { ...item };
+
+    if (nextItem.convertedToTaskId === sourceTaskId) {
+      nextItem.convertedToTaskId = targetTaskId;
+      itemChanged = true;
+    }
+    if (nextItem.taskId === sourceTaskId) {
+      nextItem.taskId = targetTaskId;
+      itemChanged = true;
+    }
+
+    if (itemChanged) {
+      changed = true;
+      return nextItem;
+    }
+
+    return item;
+  });
+
+  return changed ? nextItems : actionItems;
+}
+
 // Migrate OKRs that predate the keyResults/quarter fields
 function migrateOkrs(okrs) {
   return okrs.map(okr => {
@@ -626,7 +661,31 @@ export function useStore() {
     setCustomers(prev => prev.map(c => c.id === id ? { ...c, ...data } : c));
   }, []);
   // Cascade delete: points, meeting entries, tasks (+ their AI outputs), milestones, annotations, weekly reports + logs
-  const deleteCustomer = useCallback((id) => {
+  const deleteCustomer = useCallback((id, options = {}) => {
+    const transferToId = options?.transferToId || null;
+    const hasTransferTarget = transferToId && transferToId !== id && customers.some(c => c.id === transferToId);
+
+    if (hasTransferTarget) {
+      setCustomers(prev => prev.filter(c => c.id !== id));
+      setPoints(prev => prev.map(pt => pt.customerId === id ? { ...pt, customerId: transferToId } : pt));
+      setMeetingEntries(prev => prev.map(m => m.customerId === id ? { ...m, customerId: transferToId } : m));
+      setTasks(prev => prev.map(t => t.customerId === id ? { ...t, customerId: transferToId } : t));
+      setMilestones(prev => prev.map(m => m.customerId === id ? { ...m, customerId: transferToId } : m));
+      setAnnotations(prev => prev.map(a => a.customerId === id ? { ...a, customerId: transferToId } : a));
+      setWeeklyReports(prev => prev.map(r => r.customerId === id ? { ...r, customerId: transferToId } : r));
+      setWeeklyUpdateLogs(prev => prev.map(l => l.customerId === id ? { ...l, customerId: transferToId } : l));
+      setTickets(prev => prev.map(ticket => (
+        ticket.customerId === id
+          ? { ...ticket, customerId: transferToId, clientName: '' }
+          : ticket
+      )));
+      setTimeLogs(prev => prev.map(log => {
+        const nextClientIds = replaceClientIds(log.clientIds, id, transferToId);
+        return nextClientIds === log.clientIds ? log : { ...log, clientIds: nextClientIds };
+      }));
+      return;
+    }
+
     // Snapshot task IDs that belong to this customer BEFORE mutating tasks state.
     // setAiOutputs must NOT be called inside the setTasks updater — that is a
     // nested-setState anti-pattern that fires twice in React Strict Mode / concurrent
@@ -745,10 +804,24 @@ export function useStore() {
       saveEntity('tasks', updatedTasks).catch(() => {});
     }
   }, []);
-  const deleteTask = useCallback((id) => {
+  const deleteTask = useCallback((id, options = {}) => {
+    const transferToId = options?.transferToId || null;
+    const hasTransferTarget = transferToId && transferToId !== id && tasks.some(t => t.id === transferToId);
+
+    if (hasTransferTarget) {
+      setTasks(prev => prev.filter(t => t.id !== id));
+      setAiOutputs(prev => prev.map(o => o.taskId === id ? { ...o, taskId: transferToId } : o));
+      setTimeLogs(prev => prev.map(log => log.taskId === id ? { ...log, taskId: transferToId } : log));
+      setMeetingEntries(prev => prev.map(entry => {
+        const nextActionItems = remapMeetingActionItems(entry.actionItems, id, transferToId);
+        return nextActionItems === entry.actionItems ? entry : { ...entry, actionItems: nextActionItems };
+      }));
+      return;
+    }
+
     setTasks(prev => prev.filter(t => t.id !== id));
     setAiOutputs(prev => prev.filter(o => o.taskId !== id));
-  }, []);
+  }, [tasks]);
   const getCustomerTasks = useCallback((customerId) => {
     return tasks.filter(t => t.customerId === customerId);
   }, [tasks]);
