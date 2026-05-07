@@ -5,7 +5,7 @@
  *
  * Layout: period filter → stat cards → primary chart → OKR breakdown → session table.
  */
-import { useState, useMemo } from 'react';
+import { Fragment, useState, useMemo } from 'react';
 import { Timer, ChevronLeft, ChevronRight, Clock, Zap, TrendingUp } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, LabelList,
@@ -87,6 +87,10 @@ function BarTooltip({ active, payload }) {
   );
 }
 
+function truncateOkrTitle(title) {
+  return title.length > 30 ? title.slice(0, 29) + '…' : title;
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function PomosView() {
@@ -95,6 +99,7 @@ export default function PomosView() {
   const [rangeMode, setRangeMode] = useState('weekly');
   const [anchor, setAnchor]       = useState(new Date());
   const [showAll, setShowAll]     = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState(() => new Set());
 
   const handleRangeMode = (mode) => { setRangeMode(mode); setAnchor(new Date()); setShowAll(false); };
   const handleNav       = (dir)  => { setAnchor(a => stepAnchor(rangeMode, a, dir)); setShowAll(false); };
@@ -238,7 +243,90 @@ export default function PomosView() {
     () => [...filteredLogs].sort((a, b) => b.loggedAt.localeCompare(a.loggedAt)),
     [filteredLogs],
   );
-  const displayedSessions = showAll ? sortedSessions : sortedSessions.slice(0, 25);
+  const okrTitleById = useMemo(
+    () => new Map(okrs.map(okr => [okr.id, okr.title])),
+    [okrs],
+  );
+  const customerNameById = useMemo(
+    () => new Map(customers.map(customer => [customer.id, customer.name])),
+    [customers],
+  );
+
+  const sessionRows = useMemo(() => {
+    const rows = [];
+    const groupsByLoggedAt = new Map();
+
+    sortedSessions.forEach(log => {
+      if (!log.loggedAt) {
+        rows.push({ type: 'single', key: log.id, log });
+        return;
+      }
+
+      const existing = groupsByLoggedAt.get(log.loggedAt);
+      if (existing) {
+        existing.logs.push(log);
+        return;
+      }
+
+      const nextGroup = { type: 'group', key: log.loggedAt, loggedAt: log.loggedAt, logs: [log] };
+      groupsByLoggedAt.set(log.loggedAt, nextGroup);
+      rows.push(nextGroup);
+    });
+
+    return rows.map((row) => {
+      if (row.type === 'single') return row;
+
+      if (row.logs.length === 1) {
+        return {
+          type: 'single',
+          key: row.logs[0].id,
+          log: row.logs[0],
+        };
+      }
+
+      const { logs } = row;
+      const firstLog = logs[0];
+
+      const okrKeys = [...new Set(logs.map(log => log.okrId ?? null))];
+      const customerKeys = [...new Set(logs.map(log => log.clientIds?.[0] ?? null))];
+      const noteKeys = [...new Set(logs.map(log => log.note?.trim() || ''))];
+
+      const sharedOkrTitle = firstLog.okrId ? okrTitleById.get(firstLog.okrId) : null;
+      const sharedCustomerName = firstLog.clientIds?.[0]
+        ? customerNameById.get(firstLog.clientIds[0]) || '—'
+        : '—';
+      const sharedNote = firstLog.note?.trim() || '';
+
+      return {
+        type: 'group',
+        key: row.key,
+        loggedAt: row.loggedAt,
+        logs,
+        totalHours: logs.reduce((sum, log) => sum + (log.hours ?? 0), 0),
+        pomodoroCycles: firstLog.pomodoroCycles ?? 0,
+        okrLabel: okrKeys.length === 1
+          ? (sharedOkrTitle ? truncateOkrTitle(sharedOkrTitle) : '—')
+          : `${okrKeys.length} OKRs`,
+        customerLabel: customerKeys.length === 1
+          ? sharedCustomerName
+          : `${customerKeys.length} customers`,
+        noteLabel: noteKeys.length === 1
+          ? (sharedNote || '—')
+          : `${logs.length} tasks`,
+      };
+    });
+  }, [customerNameById, okrTitleById, sortedSessions]);
+
+  const displayedSessionRows = showAll ? sessionRows : sessionRows.slice(0, 25);
+
+  const toggleGroup = (loggedAt) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(loggedAt)) next.delete(loggedAt);
+      else next.add(loggedAt);
+      return next;
+    });
+  };
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
@@ -491,45 +579,133 @@ export default function PomosView() {
                   </tr>
                 </thead>
                 <tbody>
-                  {displayedSessions.map((log, i) => {
-                    const d           = parseISO(log.loggedAt);
-                    const okr         = log.okrId ? okrs.find(o => o.id === log.okrId) : null;
-                    const okrLabel    = okr ? (okr.title.length > 30 ? okr.title.slice(0, 29) + '…' : okr.title) : '—';
-                    const customerId  = log.clientIds?.[0];
-                    const customerName = customerId
-                      ? (customers.find(c => c.id === customerId)?.name || '—')
-                      : '—';
+                  {displayedSessionRows.map((row, groupIndex) => {
+                    if (row.type === 'single') {
+                      const log = row.log;
+                      const d = parseISO(log.loggedAt);
+                      const okrTitle = log.okrId ? okrTitleById.get(log.okrId) : null;
+                      const customerId = log.clientIds?.[0];
+                      const customerName = customerId
+                        ? (customerNameById.get(customerId) || '—')
+                        : '—';
+
+                      return (
+                        <tr key={log.id} className={groupIndex % 2 === 1 ? 'bg-secondary/30' : ''}>
+                          <td className="px-4 py-2.5 text-foreground whitespace-nowrap">
+                            {format(d, 'MMM d, EEE')}
+                          </td>
+                          <td className="px-4 py-2.5 text-muted-foreground whitespace-nowrap tabular-nums">
+                            {format(d, 'h:mm a')}
+                          </td>
+                          <td className="px-4 py-2.5 text-right font-mono font-bold text-foreground tabular-nums">
+                            {log.pomodoroCycles ?? 0}
+                          </td>
+                          <td className="px-4 py-2.5 text-right text-muted-foreground tabular-nums">
+                            {(log.hours ?? 0).toFixed(1)}h
+                          </td>
+                          <td className="px-4 py-2.5 text-muted-foreground max-w-[160px] truncate">
+                            {okrTitle ? truncateOkrTitle(okrTitle) : '—'}
+                          </td>
+                          <td className="px-4 py-2.5 text-muted-foreground whitespace-nowrap">
+                            {customerName}
+                          </td>
+                          <td className="px-4 py-2.5 text-muted-foreground max-w-[200px] truncate">
+                            {log.note || '—'}
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    const d = parseISO(row.loggedAt);
+                    const isExpanded = expandedGroups.has(row.loggedAt);
+                    const parentRowClass = groupIndex % 2 === 1 ? 'bg-secondary/30' : '';
+
                     return (
-                      <tr key={log.id} className={i % 2 === 1 ? 'bg-secondary/30' : ''}>
-                        <td className="px-4 py-2.5 text-foreground whitespace-nowrap">
-                          {format(d, 'MMM d, EEE')}
-                        </td>
-                        <td className="px-4 py-2.5 text-muted-foreground whitespace-nowrap tabular-nums">
-                          {format(d, 'h:mm a')}
-                        </td>
-                        <td className="px-4 py-2.5 text-right font-mono font-bold text-foreground tabular-nums">
-                          {log.pomodoroCycles ?? 0}
-                        </td>
-                        <td className="px-4 py-2.5 text-right text-muted-foreground tabular-nums">
-                          {(log.hours ?? 0).toFixed(1)}h
-                        </td>
-                        <td className="px-4 py-2.5 text-muted-foreground max-w-[160px] truncate">
-                          {okrLabel}
-                        </td>
-                        <td className="px-4 py-2.5 text-muted-foreground whitespace-nowrap">
-                          {customerName}
-                        </td>
-                        <td className="px-4 py-2.5 text-muted-foreground max-w-[200px] truncate">
-                          {log.note || '—'}
-                        </td>
-                      </tr>
+                      <Fragment key={row.loggedAt}>
+                        <tr
+                          className={`${parentRowClass} cursor-pointer`}
+                          onClick={() => toggleGroup(row.loggedAt)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              toggleGroup(row.loggedAt);
+                            }
+                          }}
+                          tabIndex={0}
+                        >
+                          <td className="px-4 py-2.5 text-foreground whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              <ChevronRight
+                                size={14}
+                                className={`text-muted-foreground transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                              />
+                              <span>{format(d, 'MMM d, EEE')}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-2.5 text-muted-foreground whitespace-nowrap tabular-nums">
+                            {format(d, 'h:mm a')}
+                          </td>
+                          <td className="px-4 py-2.5 text-right font-mono font-bold text-foreground tabular-nums">
+                            {row.pomodoroCycles}
+                          </td>
+                          <td className="px-4 py-2.5 text-right text-muted-foreground tabular-nums">
+                            {row.totalHours.toFixed(1)}h
+                          </td>
+                          <td className="px-4 py-2.5 text-muted-foreground max-w-[160px] truncate">
+                            {row.okrLabel}
+                          </td>
+                          <td className="px-4 py-2.5 text-muted-foreground whitespace-nowrap">
+                            {row.customerLabel}
+                          </td>
+                          <td className="px-4 py-2.5 text-muted-foreground max-w-[200px] truncate">
+                            {row.noteLabel}
+                          </td>
+                        </tr>
+
+                        {isExpanded && row.logs.map((log) => {
+                          const okrTitle = log.okrId ? okrTitleById.get(log.okrId) : null;
+                          const customerId = log.clientIds?.[0];
+                          const customerName = customerId
+                            ? (customerNameById.get(customerId) || '—')
+                            : '—';
+
+                          return (
+                            <tr key={log.id} className="bg-secondary/15">
+                              <td className="px-4 py-2.5 text-foreground whitespace-nowrap">
+                                <div className="flex items-center gap-2 pl-6">
+                                  <span className="w-3" />
+                                  <span>{format(d, 'MMM d, EEE')}</span>
+                                </div>
+                              </td>
+                              <td className="px-4 py-2.5 text-muted-foreground whitespace-nowrap tabular-nums">
+                                {format(d, 'h:mm a')}
+                              </td>
+                              <td className="px-4 py-2.5 text-right font-mono font-bold text-muted-foreground tabular-nums">
+                                —
+                              </td>
+                              <td className="px-4 py-2.5 text-right text-muted-foreground tabular-nums">
+                                {(log.hours ?? 0).toFixed(1)}h
+                              </td>
+                              <td className="px-4 py-2.5 text-muted-foreground max-w-[160px] truncate">
+                                {okrTitle ? truncateOkrTitle(okrTitle) : '—'}
+                              </td>
+                              <td className="px-4 py-2.5 text-muted-foreground whitespace-nowrap">
+                                {customerName}
+                              </td>
+                              <td className="px-4 py-2.5 text-muted-foreground max-w-[200px] truncate">
+                                {log.note || '—'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </Fragment>
                     );
                   })}
                 </tbody>
               </table>
             </div>
 
-            {sortedSessions.length > 25 && (
+            {sessionRows.length > 25 && (
               <div className="px-5 py-3 border-t border-border">
                 <button
                   onClick={() => setShowAll(s => !s)}
@@ -537,7 +713,7 @@ export default function PomosView() {
                 >
                   {showAll
                     ? 'Show less'
-                    : `Show all ${sortedSessions.length} sessions`}
+                    : `Show all ${sessionRows.length} sessions`}
                 </button>
               </div>
             )}
