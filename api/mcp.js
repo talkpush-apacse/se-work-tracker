@@ -1030,6 +1030,206 @@ export default async function handler(req, res) {
     }
   );
 
+  // ── Tool: search ─────────────────────────────────────────────────────────────
+  // Required by ChatGPT's MCP "Apps" / Deep Research connector spec.
+  // Searches across tasks, notes, weekly logs, OKRs, and customers.
+  server.tool(
+    'search',
+    'Search across all Work Tracker data: tasks, notes, weekly logs, OKRs, and customers. Returns matching records from any entity that contains the query string.',
+    {
+      query: z.string().describe('The search term to look for across all data.'),
+      entity_type: z
+        .enum(['tasks', 'notes', 'weekly_logs', 'okrs', 'customers', 'all'])
+        .optional()
+        .describe('Limit search to a specific entity type. Defaults to "all".'),
+      limit: z
+        .number()
+        .int()
+        .positive()
+        .max(50)
+        .optional()
+        .describe('Max total results to return. Defaults to 20.'),
+    },
+    async ({ query, entity_type, limit }) => {
+      const q = (query || '').toLowerCase().trim();
+      if (!q) {
+        return { content: [{ type: 'text', text: 'Query cannot be empty.' }] };
+      }
+      const max = limit ?? 20;
+      const scope = entity_type ?? 'all';
+      const results = [];
+
+      const [tasks, customers, annotations, logs, okrs] = await Promise.all([
+        (scope === 'all' || scope === 'tasks' || scope === 'customers') ? getEntity('tasks') : Promise.resolve([]),
+        getEntity('customers'),
+        (scope === 'all' || scope === 'notes') ? getEntity('annotations') : Promise.resolve([]),
+        (scope === 'all' || scope === 'weekly_logs') ? getEntity('weeklyUpdateLogs') : Promise.resolve([]),
+        (scope === 'all' || scope === 'okrs') ? getEntity('okrs') : Promise.resolve([]),
+      ]);
+
+      const customerMap = new Map(customers.map(c => [c.id, c.name]));
+
+      if (scope === 'all' || scope === 'tasks') {
+        for (const t of tasks) {
+          if (
+            (t.description || '').toLowerCase().includes(q) ||
+            (customerMap.get(t.customerId) || '').toLowerCase().includes(q)
+          ) {
+            results.push({ entity_type: 'task', ...formatTask(t, customers) });
+          }
+        }
+      }
+
+      if (scope === 'all' || scope === 'notes') {
+        for (const a of annotations) {
+          if ((a.text || '').toLowerCase().includes(q)) {
+            results.push({
+              entity_type:  'note',
+              id:           a.id,
+              date:         a.date,
+              text:         a.text,
+              tag:          a.tag ?? null,
+              customerName: a.customerId ? (customerMap.get(a.customerId) ?? null) : null,
+              createdAt:    a.createdAt,
+            });
+          }
+        }
+      }
+
+      if (scope === 'all' || scope === 'weekly_logs') {
+        for (const l of logs) {
+          if ((l.text || '').toLowerCase().includes(q)) {
+            results.push({
+              entity_type:  'weekly_log',
+              id:           l.id,
+              date:         l.date,
+              type:         l.type,
+              text:         l.text,
+              customerName: l.customerId ? (customerMap.get(l.customerId) ?? null) : null,
+              createdAt:    l.createdAt,
+            });
+          }
+        }
+      }
+
+      if (scope === 'all' || scope === 'okrs') {
+        for (const okr of okrs) {
+          if ((okr.title || '').toLowerCase().includes(q) || (okr.description || '').toLowerCase().includes(q)) {
+            results.push({ entity_type: 'okr', ...formatOkrWithKrs(okr) });
+          } else {
+            for (const kr of (okr.keyResults || [])) {
+              if ((kr.text || '').toLowerCase().includes(q)) {
+                results.push({
+                  entity_type:  'key_result',
+                  okr_id:       okr.id,
+                  okr_title:    okr.title,
+                  ...formatKr(kr),
+                });
+              }
+            }
+          }
+        }
+      }
+
+      if (scope === 'all' || scope === 'customers') {
+        for (const c of customers) {
+          if ((c.name || '').toLowerCase().includes(q)) {
+            results.push({ entity_type: 'customer', id: c.id, name: c.name });
+          }
+        }
+      }
+
+      const trimmed = results.slice(0, max);
+      if (trimmed.length === 0) {
+        return { content: [{ type: 'text', text: `No results found for "${query}".` }] };
+      }
+      return {
+        content: [{
+          type: 'text',
+          text: `Found ${trimmed.length} result(s)${results.length > trimmed.length ? ` (of ${results.length})` : ''} for "${query}":\n${JSON.stringify(trimmed, null, 2)}`,
+        }],
+      };
+    }
+  );
+
+  // ── Tool: fetch ───────────────────────────────────────────────────────────────
+  // Required by ChatGPT's MCP "Apps" / Deep Research connector spec.
+  // Fetches a single record by entity type and ID.
+  server.tool(
+    'fetch',
+    'Fetch a single Work Tracker record by its entity type and ID. Supported entity types: task, note, weekly_log, okr, customer.',
+    {
+      entity_type: z
+        .enum(['task', 'note', 'weekly_log', 'okr', 'customer'])
+        .describe('The type of record to fetch.'),
+      id: z.string().describe('The UUID of the record to fetch.'),
+    },
+    async ({ entity_type, id }) => {
+      const customers = await getEntity('customers');
+      const customerMap = new Map(customers.map(c => [c.id, c.name]));
+
+      if (entity_type === 'task') {
+        const tasks = await getEntity('tasks');
+        const task = tasks.find(t => t.id === id);
+        if (!task) return { content: [{ type: 'text', text: `Task "${id}" not found.` }] };
+        return { content: [{ type: 'text', text: JSON.stringify(formatTask(task, customers), null, 2) }] };
+      }
+
+      if (entity_type === 'note') {
+        const annotations = await getEntity('annotations');
+        const a = annotations.find(a => a.id === id);
+        if (!a) return { content: [{ type: 'text', text: `Note "${id}" not found.` }] };
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              id:           a.id,
+              date:         a.date,
+              text:         a.text,
+              tag:          a.tag ?? null,
+              customerName: a.customerId ? (customerMap.get(a.customerId) ?? null) : null,
+              createdAt:    a.createdAt,
+            }, null, 2),
+          }],
+        };
+      }
+
+      if (entity_type === 'weekly_log') {
+        const logs = await getEntity('weeklyUpdateLogs');
+        const l = logs.find(l => l.id === id);
+        if (!l) return { content: [{ type: 'text', text: `Weekly log "${id}" not found.` }] };
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              id:           l.id,
+              date:         l.date,
+              type:         l.type,
+              text:         l.text,
+              customerName: l.customerId ? (customerMap.get(l.customerId) ?? null) : null,
+              createdAt:    l.createdAt,
+            }, null, 2),
+          }],
+        };
+      }
+
+      if (entity_type === 'okr') {
+        const okrs = await getEntity('okrs');
+        const okr = okrs.find(o => o.id === id);
+        if (!okr) return { content: [{ type: 'text', text: `OKR "${id}" not found.` }] };
+        return { content: [{ type: 'text', text: JSON.stringify(formatOkrWithKrs(okr), null, 2) }] };
+      }
+
+      if (entity_type === 'customer') {
+        const customer = customers.find(c => c.id === id);
+        if (!customer) return { content: [{ type: 'text', text: `Customer "${id}" not found.` }] };
+        return { content: [{ type: 'text', text: JSON.stringify({ id: customer.id, name: customer.name }, null, 2) }] };
+      }
+
+      return { content: [{ type: 'text', text: `Unknown entity type: ${entity_type}` }] };
+    }
+  );
+
   // ── Stateless transport (one per request, safe for Vercel serverless) ─────────
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined, // disable sessions — stateless mode
