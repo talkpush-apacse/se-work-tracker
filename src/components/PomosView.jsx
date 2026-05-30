@@ -5,8 +5,8 @@
  *
  * Layout: period filter → stat cards → primary chart → OKR breakdown → session table.
  */
-import { Fragment, useState, useMemo } from 'react';
-import { Timer, ChevronLeft, ChevronRight, Clock, Zap, TrendingUp, Plus } from 'lucide-react';
+import { Fragment, useState, useMemo, useRef, useCallback } from 'react';
+import { Timer, ChevronLeft, ChevronRight, Clock, Zap, TrendingUp, Plus, Trash2 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, LabelList,
   ReferenceLine, Tooltip,
@@ -136,13 +136,15 @@ function renderNotionTaskLabel(taskName, account) {
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function PomosView() {
-  const { timeLogs, points, okrs, customers } = useAppStore();
+  const { timeLogs, points, okrs, customers, deleteTimeLog, deletePoint } = useAppStore();
 
   const [rangeMode, setRangeMode] = useState('weekly');
   const [anchor, setAnchor]       = useState(new Date());
   const [showAll, setShowAll]     = useState(false);
   const [expandedGroups, setExpandedGroups] = useState(() => new Set());
   const [showManualPomo, setShowManualPomo] = useState(false);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState(null);
+  const confirmDeleteTimeoutRef = useRef(null);
 
   const handleRangeMode = (mode) => { setRangeMode(mode); setAnchor(new Date()); setShowAll(false); };
   const handleNav       = (dir)  => { setAnchor(a => stepAnchor(rangeMode, a, dir)); setShowAll(false); };
@@ -468,6 +470,27 @@ export default function PomosView() {
 
   const displayedSessionRows = showAll ? sessionRows : sessionRows.slice(0, 25);
 
+  // Set of ids that live in timeLogs (vs. points-fallback entries)
+  const timeLogIdSet = useMemo(() => new Set(timeLogs.map(l => l.id)), [timeLogs]);
+
+  const deleteLog = useCallback((logId) => {
+    if (timeLogIdSet.has(logId)) deleteTimeLog(logId);
+    else deletePoint(logId);
+  }, [timeLogIdSet, deleteTimeLog, deletePoint]);
+
+  const handleDeleteRow = useCallback((e, rowKey, logIds) => {
+    e.stopPropagation();
+    if (confirmingDeleteId === rowKey) {
+      clearTimeout(confirmDeleteTimeoutRef.current);
+      logIds.forEach(deleteLog);
+      setConfirmingDeleteId(null);
+    } else {
+      clearTimeout(confirmDeleteTimeoutRef.current);
+      setConfirmingDeleteId(rowKey);
+      confirmDeleteTimeoutRef.current = setTimeout(() => setConfirmingDeleteId(null), 3000);
+    }
+  }, [confirmingDeleteId, deleteLog]);
+
   const toggleGroup = (loggedAt) => {
     setExpandedGroups(prev => {
       const next = new Set(prev);
@@ -738,7 +761,7 @@ export default function PomosView() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border">
-                    {['Date', 'Started', 'Cycles', 'Hours', 'OKR', 'Customer', 'Note'].map((h, i) => (
+                    {['Date', 'Started', 'Cycles', 'Hours', 'OKR', 'Customer', 'Note', ''].map((h, i) => (
                       <th
                         key={h}
                         className={`px-4 py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap ${
@@ -762,7 +785,7 @@ export default function PomosView() {
                         : '—';
 
                       return (
-                        <tr key={log.id} className={groupIndex % 2 === 1 ? 'bg-secondary/30' : ''}>
+                        <tr key={log.id} className={`group ${groupIndex % 2 === 1 ? 'bg-secondary/30' : ''}`}>
                           <td className="px-4 py-2.5 text-foreground whitespace-nowrap">
                             {format(d, 'MMM d, EEE')}
                           </td>
@@ -787,6 +810,19 @@ export default function PomosView() {
                               {renderNotionTaskLabel(log.notionTaskName, log.notionAccount)}
                             </div>
                           </td>
+                          <td className="px-4 py-2.5 w-8">
+                            <button
+                              onClick={(e) => handleDeleteRow(e, log.id, [log.id])}
+                              title={confirmingDeleteId === log.id ? 'Click again to confirm' : 'Delete session'}
+                              className={`transition-all duration-150 ${
+                                confirmingDeleteId === log.id
+                                  ? 'opacity-100 text-red-500 scale-110'
+                                  : 'opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-500'
+                              }`}
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </td>
                         </tr>
                       );
                     }
@@ -798,7 +834,7 @@ export default function PomosView() {
                     return (
                       <Fragment key={row.loggedAt}>
                         <tr
-                          className={`${parentRowClass} cursor-pointer`}
+                          className={`group ${parentRowClass} cursor-pointer`}
                           onClick={() => toggleGroup(row.loggedAt)}
                           onKeyDown={(event) => {
                             if (event.key === 'Enter' || event.key === ' ') {
@@ -838,6 +874,19 @@ export default function PomosView() {
                               {renderNotionTaskLabel(row.notionTaskLabel, row.notionAccountLabel)}
                             </div>
                           </td>
+                          <td className="px-4 py-2.5 w-8">
+                            <button
+                              onClick={(e) => handleDeleteRow(e, row.loggedAt, row.logs.map(l => l.id))}
+                              title={confirmingDeleteId === row.loggedAt ? 'Click again to confirm' : `Delete all ${row.logs.length} sessions`}
+                              className={`transition-all duration-150 ${
+                                confirmingDeleteId === row.loggedAt
+                                  ? 'opacity-100 text-red-500 scale-110'
+                                  : 'opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-500'
+                              }`}
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </td>
                         </tr>
 
                         {isExpanded && row.logs.map((log) => {
@@ -848,7 +897,7 @@ export default function PomosView() {
                             : '—';
 
                           return (
-                            <tr key={log.id} className="bg-secondary/15">
+                            <tr key={log.id} className="group bg-secondary/15">
                               <td className="px-4 py-2.5 text-foreground whitespace-nowrap">
                                 <div className="flex items-center gap-2 pl-6">
                                   <span className="w-3" />
@@ -875,6 +924,19 @@ export default function PomosView() {
                                   <div className="truncate">{log.note || '—'}</div>
                                   {renderNotionTaskLabel(log.notionTaskName, log.notionAccount)}
                                 </div>
+                              </td>
+                              <td className="px-4 py-2.5 w-8">
+                                <button
+                                  onClick={(e) => handleDeleteRow(e, log.id, [log.id])}
+                                  title={confirmingDeleteId === log.id ? 'Click again to confirm' : 'Delete session'}
+                                  className={`transition-all duration-150 ${
+                                    confirmingDeleteId === log.id
+                                      ? 'opacity-100 text-red-500 scale-110'
+                                      : 'opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-500'
+                                  }`}
+                                >
+                                  <Trash2 size={13} />
+                                </button>
                               </td>
                             </tr>
                           );
