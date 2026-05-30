@@ -39,7 +39,7 @@ function PageFallback() {
 }
 
 function AppContent() {
-  const [activeTab, setActiveTab] = useState(() => window.location.pathname === '/tickets' ? 'tickets' : 'triage');
+  const [activeTab, setActiveTab] = useState(() => window.location.pathname === '/tickets' ? 'tickets' : 'dashboard');
   const { needsUpdate, isOffline, applyUpdate, dismissUpdate } = useServiceWorker();
 
   const handleTabChange = useCallback((tab) => {
@@ -53,7 +53,7 @@ function AppContent() {
 
   useEffect(() => {
     const handlePopState = () => {
-      setActiveTab(window.location.pathname === '/tickets' ? 'tickets' : 'triage');
+      setActiveTab(window.location.pathname === '/tickets' ? 'tickets' : 'dashboard');
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);

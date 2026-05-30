@@ -33,7 +33,7 @@ function CustomerBadge({ customerId, customers, size = 'sm' }) {
 export default function Dashboard({ onNavigate }) {
   const { customers, okrs, points, tasks, timeLogs, getWorkTypeTargets } = useAppStore();
   const { isRunning, clientIds: runningClientIds, startTimer, stopTimer } = useTimerContext();
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('pomos');
   const [addModal, setAddModal] = useState(null); // holds customer object for AddPointsModal
   const [timerConflict, setTimerConflict] = useState(null); // holds the customer to start after conflict
   const [flashId, setFlashId] = useState(null);
@@ -164,8 +164,8 @@ export default function Dashboard({ onNavigate }) {
       {/* Tab bar */}
       <div className="flex gap-1 border-b border-border -mt-2">
         {[
-          { id: 'overview', label: 'Overview' },
           { id: 'pomos',    label: 'Pomos'    },
+          { id: 'overview', label: 'Overview' },
         ].map(({ id, label }) => (
           <button
             key={id}

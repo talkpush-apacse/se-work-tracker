@@ -1,10 +1,11 @@
-import { useState, useMemo } from 'react';
-import { Timer, Check, Search, X } from 'lucide-react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { Timer, Check, Search, X, RotateCw } from 'lucide-react';
 import Modal from './Modal';
 import WorkTypeSelector from './WorkTypeSelector';
 import { useAppStore } from '../context/StoreContext';
 import { useTimerContext } from '../context/TimerContext';
 import { Button } from './ui/button';
+import { fetchNotionTasks } from '../lib/api';
 
 export default function StartTimerModal({
   onClose,
@@ -21,7 +22,34 @@ export default function StartTimerModal({
   const [selectedClientIds, setSelectedClientIds] = useState(() => new Set(preselectedClientIds));
   const [okrId, setOkrId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [notionSearchQuery, setNotionSearchQuery] = useState('');
+  const [notionTasks, setNotionTasks] = useState([]);
+  const [selectedNotionTask, setSelectedNotionTask] = useState(null);
+  const [isLoadingNotionTasks, setIsLoadingNotionTasks] = useState(false);
+  const [notionTasksError, setNotionTasksError] = useState('');
   const [error, setError] = useState('');
+  const hasFetchedNotionTasksRef = useRef(false);
+  const isMountedRef = useRef(true);
+
+  const loadNotionTasks = useCallback(async (force = false) => {
+    if (!force && hasFetchedNotionTasksRef.current) return;
+    hasFetchedNotionTasksRef.current = true;
+    setIsLoadingNotionTasks(true);
+    setNotionTasksError('');
+
+    try {
+      const tasks = await fetchNotionTasks({ force });
+      if (!isMountedRef.current) return;
+      setNotionTasks(tasks);
+    } catch (err) {
+      if (!isMountedRef.current) return;
+      setNotionTasksError(err.message || 'Failed to load Notion tasks');
+    } finally {
+      if (isMountedRef.current) {
+        setIsLoadingNotionTasks(false);
+      }
+    }
+  }, []);
 
   const sortedCustomers = useMemo(
     () => [...customers].sort((a, b) => {
@@ -38,6 +66,25 @@ export default function StartTimerModal({
       : sortedCustomers,
     [sortedCustomers, searchQuery]
   );
+
+  const filteredNotionTasks = useMemo(() => {
+    const query = notionSearchQuery.trim().toLowerCase();
+    if (!query) return notionTasks;
+
+    return notionTasks.filter((task) => {
+      const taskName = task.task_name?.toLowerCase() || '';
+      const account = task.account?.toLowerCase() || '';
+      return taskName.includes(query) || account.includes(query);
+    });
+  }, [notionSearchQuery, notionTasks]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    loadNotionTasks().catch(() => {});
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [loadNotionTasks]);
 
   const toggleClient = (id) => {
     setSelectedClientIds(prev => {
@@ -57,6 +104,13 @@ export default function StartTimerModal({
       workType,
       clientIds: [...selectedClientIds],
       okrId: okrId || null,
+      notionTask: selectedNotionTask
+        ? {
+            id: selectedNotionTask.id,
+            task_name: selectedNotionTask.task_name,
+            account: selectedNotionTask.account,
+          }
+        : null,
     };
 
     if (onStart) {
@@ -65,6 +119,9 @@ export default function StartTimerModal({
       startTimer(workType, {
         clientIds: payload.clientIds,
         okrId: payload.okrId,
+        notionTaskId: payload.notionTask?.id ?? null,
+        notionTaskName: payload.notionTask?.task_name ?? null,
+        notionAccount: payload.notionTask?.account ?? null,
       });
     }
 
@@ -137,6 +194,100 @@ export default function StartTimerModal({
             </div>
           </div>
         )}
+
+        <div>
+          <div className="mb-1.5 flex items-center justify-between gap-2">
+            <label className="block text-xs font-medium text-muted-foreground">
+              Notion Task <span className="text-muted-foreground/50">(optional)</span>
+            </label>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => loadNotionTasks(true)}
+              disabled={isLoadingNotionTasks}
+              className="h-7 gap-1.5 px-2 text-[11px] text-muted-foreground"
+            >
+              <RotateCw className={`h-3 w-3 ${isLoadingNotionTasks ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
+
+          <div className="rounded-lg border border-border bg-secondary/30">
+            <div className="relative border-b border-border/50">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search by task or account..."
+                value={notionSearchQuery}
+                onChange={e => setNotionSearchQuery(e.target.value)}
+                className="w-full rounded-t-lg bg-transparent pl-8 pr-7 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none"
+              />
+              {notionSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setNotionSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
+            <div className="max-h-40 overflow-y-auto">
+              <button
+                type="button"
+                onClick={() => setSelectedNotionTask(null)}
+                className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 text-left text-xs border-b border-border/30 transition-all ${
+                  !selectedNotionTask ? 'bg-brand-lavender/10 text-foreground' : 'text-muted-foreground hover:bg-secondary/80'
+                }`}
+              >
+                <span>No task</span>
+                {!selectedNotionTask && <Check className="w-3.5 h-3.5 text-brand-lavender" />}
+              </button>
+
+              {isLoadingNotionTasks && (
+                <div className="px-2.5 py-3 text-xs text-muted-foreground">
+                  Loading Notion tasks...
+                </div>
+              )}
+
+              {!isLoadingNotionTasks && notionTasksError && (
+                <div className="px-2.5 py-3 text-xs text-destructive">
+                  {notionTasksError}
+                </div>
+              )}
+
+              {!isLoadingNotionTasks && !notionTasksError && filteredNotionTasks.length === 0 && (
+                <div className="px-2.5 py-3 text-xs text-muted-foreground">
+                  No matching Notion tasks.
+                </div>
+              )}
+
+              {!isLoadingNotionTasks && !notionTasksError && filteredNotionTasks.map((task) => {
+                const isSelected = selectedNotionTask?.id === task.id;
+                return (
+                  <button
+                    key={task.id}
+                    type="button"
+                    onClick={() => setSelectedNotionTask({ id: task.id, task_name: task.task_name, account: task.account || null })}
+                    className={`w-full flex items-center justify-between gap-3 px-2.5 py-2 text-left border-b border-border/30 last:border-b-0 transition-all ${
+                      isSelected ? 'bg-brand-lavender/10' : 'hover:bg-secondary/80'
+                    }`}
+                  >
+                    <div className="min-w-0 flex items-center gap-2">
+                      <span className="inline-flex shrink-0 rounded-md border border-border bg-card px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                        {task.account || 'No account'}
+                      </span>
+                      <span className="truncate text-xs text-foreground">{task.task_name}</span>
+                    </div>
+                    {isSelected && <Check className="w-3.5 h-3.5 shrink-0 text-brand-lavender" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
 
         {/* OKR — optional */}
         {okrs.length > 0 && (

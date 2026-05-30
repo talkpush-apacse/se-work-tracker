@@ -491,6 +491,79 @@ export function useStore() {
     () => mountedRef.current,
     () => setSyncStatus('error'),
   )).current;
+  const suppressRemoteSaveRef = useRef(false);
+  const remoteRefreshStateRef = useRef({ inFlight: false, lastCompletedAt: 0 });
+
+  const releaseSuppressedRemoteSaves = useCallback(() => {
+    if (typeof window === 'undefined') {
+      suppressRemoteSaveRef.current = false;
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        suppressRemoteSaveRef.current = false;
+      });
+    });
+  }, []);
+
+  const applyRemoteSnapshot = useCallback((remote, { suppressSaves = false, persistMigrationFlag = false } = {}) => {
+    if (suppressSaves) {
+      suppressRemoteSaveRef.current = true;
+    }
+
+    const v4 = migrateRemoteV4(remote);
+
+    let rTasks = v4.tasks || [];
+    let rPoints = v4.points || [];
+    let rMeetingEntries = v4.meetingEntries || [];
+    let rMilestones = v4.milestones || [];
+
+    const remoteNeedsV2 = rTasks.some(t => t.projectId !== undefined && t.customerId === undefined);
+    if (remoteNeedsV2) {
+      const migrated = migrateRemoteV2(rTasks, rPoints, rMeetingEntries, rMilestones, v4.projects);
+      rTasks = migrated.tasks;
+      rPoints = migrated.points;
+      rMeetingEntries = migrated.meetingEntries;
+      rMilestones = migrated.milestones;
+    }
+
+    if (v4.okrs) setOkrs(migrateOkrs(v4.okrs));
+    if (v4.customers) setCustomers(v4.customers);
+    setPoints(rPoints);
+    setMeetingEntries(rMeetingEntries);
+    setTasks(rTasks.map(t => {
+      if (t.workType) return t;
+      const workType = TASK_TYPE_TO_WORK_TYPE[t.taskType] || 'deep_work';
+      return { ...t, workType, ...(t.taskType === 'evergreen' ? { isEvergreen: true } : {}) };
+    }));
+    setMilestones(rMilestones);
+    if (v4.annotations) setAnnotations(v4.annotations);
+    if (v4.weeklyReports) setWeeklyReports(v4.weeklyReports);
+    if (v4.weeklyUpdateLogs) setWeeklyUpdateLogs(v4.weeklyUpdateLogs);
+    if (v4.timeBudgets) setTimeBudgets(v4.timeBudgets);
+    if (v4.timeLogs) setTimeLogs(v4.timeLogs);
+    if (v4.stressLogs) setStressLogs(v4.stressLogs);
+    if (v4.workTypeTargets) setWorkTypeTargets(v4.workTypeTargets);
+    if (remote.tickets) setTickets(remote.tickets);
+    if (remote.aiOutputs) setAiOutputs(remote.aiOutputs);
+    if (remote.aiSettings && Object.keys(remote.aiSettings).length > 0) {
+      setAiSettings(prev => ({
+        prompts: { ...DEFAULT_AI_SETTINGS.prompts, ...remote.aiSettings.prompts },
+        providers: { ...DEFAULT_AI_SETTINGS.providers, ...remote.aiSettings.providers },
+        openaiModel: remote.aiSettings.openaiModel || prev.openaiModel,
+        claudeModel: remote.aiSettings.claudeModel || prev.claudeModel,
+      }));
+    }
+
+    if (persistMigrationFlag) {
+      try { localStorage.setItem(MIGRATION_FLAG, new Date().toISOString()); } catch { /* quota */ }
+    }
+
+    if (suppressSaves) {
+      releaseSuppressedRemoteSaves();
+    }
+  }, [releaseSuppressedRemoteSaves]);
 
   // ─── localStorage save effects ───
   useEffect(() => { save(KEYS.okrs, okrs); }, [okrs]);
@@ -511,22 +584,22 @@ export function useStore() {
   useEffect(() => { save(KEYS.tickets, tickets); }, [tickets]);
 
   // ─── Neon save effects (debounced, only after mount-fetch) ───
-  useEffect(() => { if (mountedRef.current) debouncedSave('okrs', okrs); }, [okrs]);
-  useEffect(() => { if (mountedRef.current) debouncedSave('customers', customers); }, [customers]);
-  useEffect(() => { if (mountedRef.current) debouncedSave('points', points); }, [points]);
-  useEffect(() => { if (mountedRef.current) debouncedSave('meetingEntries', meetingEntries); }, [meetingEntries]);
-  useEffect(() => { if (mountedRef.current) debouncedSave('tasks', tasks); }, [tasks]);
-  useEffect(() => { if (mountedRef.current) debouncedSave('milestones', milestones); }, [milestones]);
-  useEffect(() => { if (mountedRef.current) debouncedSave('aiOutputs', aiOutputs); }, [aiOutputs]);
-  useEffect(() => { if (mountedRef.current) debouncedSave('aiSettings', aiSettings); }, [aiSettings]);
-  useEffect(() => { if (mountedRef.current) debouncedSave('annotations', annotations); }, [annotations]);
-  useEffect(() => { if (mountedRef.current) debouncedSave('weeklyReports', weeklyReports); }, [weeklyReports]);
-  useEffect(() => { if (mountedRef.current) debouncedSave('weeklyUpdateLogs', weeklyUpdateLogs); }, [weeklyUpdateLogs]);
-  useEffect(() => { if (mountedRef.current) debouncedSave('timeBudgets', timeBudgets); }, [timeBudgets]);
-  useEffect(() => { if (mountedRef.current) debouncedSave('timeLogs', timeLogs); }, [timeLogs]);
-  useEffect(() => { if (mountedRef.current) debouncedSave('stressLogs', stressLogs); }, [stressLogs]);
-  useEffect(() => { if (mountedRef.current) debouncedSave('workTypeTargets', workTypeTargets); }, [workTypeTargets]);
-  useEffect(() => { if (mountedRef.current) debouncedSave('tickets', tickets); }, [tickets]);
+  useEffect(() => { if (mountedRef.current && !suppressRemoteSaveRef.current) debouncedSave('okrs', okrs); }, [okrs]);
+  useEffect(() => { if (mountedRef.current && !suppressRemoteSaveRef.current) debouncedSave('customers', customers); }, [customers]);
+  useEffect(() => { if (mountedRef.current && !suppressRemoteSaveRef.current) debouncedSave('points', points); }, [points]);
+  useEffect(() => { if (mountedRef.current && !suppressRemoteSaveRef.current) debouncedSave('meetingEntries', meetingEntries); }, [meetingEntries]);
+  useEffect(() => { if (mountedRef.current && !suppressRemoteSaveRef.current) debouncedSave('tasks', tasks); }, [tasks]);
+  useEffect(() => { if (mountedRef.current && !suppressRemoteSaveRef.current) debouncedSave('milestones', milestones); }, [milestones]);
+  useEffect(() => { if (mountedRef.current && !suppressRemoteSaveRef.current) debouncedSave('aiOutputs', aiOutputs); }, [aiOutputs]);
+  useEffect(() => { if (mountedRef.current && !suppressRemoteSaveRef.current) debouncedSave('aiSettings', aiSettings); }, [aiSettings]);
+  useEffect(() => { if (mountedRef.current && !suppressRemoteSaveRef.current) debouncedSave('annotations', annotations); }, [annotations]);
+  useEffect(() => { if (mountedRef.current && !suppressRemoteSaveRef.current) debouncedSave('weeklyReports', weeklyReports); }, [weeklyReports]);
+  useEffect(() => { if (mountedRef.current && !suppressRemoteSaveRef.current) debouncedSave('weeklyUpdateLogs', weeklyUpdateLogs); }, [weeklyUpdateLogs]);
+  useEffect(() => { if (mountedRef.current && !suppressRemoteSaveRef.current) debouncedSave('timeBudgets', timeBudgets); }, [timeBudgets]);
+  useEffect(() => { if (mountedRef.current && !suppressRemoteSaveRef.current) debouncedSave('timeLogs', timeLogs); }, [timeLogs]);
+  useEffect(() => { if (mountedRef.current && !suppressRemoteSaveRef.current) debouncedSave('stressLogs', stressLogs); }, [stressLogs]);
+  useEffect(() => { if (mountedRef.current && !suppressRemoteSaveRef.current) debouncedSave('workTypeTargets', workTypeTargets); }, [workTypeTargets]);
+  useEffect(() => { if (mountedRef.current && !suppressRemoteSaveRef.current) debouncedSave('tickets', tickets); }, [tickets]);
 
   // Flush any pending Neon writes when the user reloads or navigates away.
   // keepalive: true tells the browser to complete the fetch even after the page unloads.
@@ -537,7 +610,11 @@ export function useStore() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (mountedRef.current) setSyncStatus('saving'); }, [okrs, customers, points, meetingEntries, tasks, milestones, aiOutputs, aiSettings, annotations, weeklyReports, weeklyUpdateLogs, timeBudgets, timeLogs, stressLogs, workTypeTargets, tickets]);
+  useEffect(() => {
+    if (mountedRef.current && !suppressRemoteSaveRef.current) {
+      setSyncStatus('saving');
+    }
+  }, [okrs, customers, points, meetingEntries, tasks, milestones, aiOutputs, aiSettings, annotations, weeklyReports, weeklyUpdateLogs, timeBudgets, timeLogs, stressLogs, workTypeTargets, tickets]);
 
   useEffect(() => {
     if (syncStatus === 'saving') {
@@ -574,56 +651,7 @@ export function useStore() {
           console.log('[sync] Seed complete:', result.entitiesSeeded, 'entities');
         }
       } else if (neonHasData) {
-        // Apply V4 rewrite before setting state so the Neon fetch doesn't
-        // overwrite the localStorage migration with stale comms/admin data.
-        // migrateRemoteV4 spreads all of remote, so v4.X === remote.X for
-        // every field not explicitly migrated.
-        const v4 = migrateRemoteV4(remote);
-
-        let rTasks = v4.tasks || [];
-        let rPoints = v4.points || [];
-        let rMeetingEntries = v4.meetingEntries || [];
-        let rMilestones = v4.milestones || [];
-
-        // Check if remote data still has projectId (needs v2 migration)
-        const remoteNeedsV2 = rTasks.some(t => t.projectId !== undefined && t.customerId === undefined);
-        if (remoteNeedsV2) {
-          const migrated = migrateRemoteV2(rTasks, rPoints, rMeetingEntries, rMilestones, v4.projects);
-          rTasks = migrated.tasks;
-          rPoints = migrated.points;
-          rMeetingEntries = migrated.meetingEntries;
-          rMilestones = migrated.milestones;
-        }
-
-        if (v4.okrs) setOkrs(migrateOkrs(v4.okrs));
-        if (v4.customers) setCustomers(v4.customers);
-        setPoints(rPoints);
-        setMeetingEntries(rMeetingEntries);
-        // Migrate taskType → workType + isEvergreen for remote tasks
-        setTasks(rTasks.map(t => {
-          if (t.workType) return t;
-          const workType = TASK_TYPE_TO_WORK_TYPE[t.taskType] || 'deep_work';
-          return { ...t, workType, ...(t.taskType === 'evergreen' ? { isEvergreen: true } : {}) };
-        }));
-        setMilestones(rMilestones);
-        if (v4.annotations) setAnnotations(v4.annotations);
-        if (v4.weeklyReports) setWeeklyReports(v4.weeklyReports);
-        if (v4.weeklyUpdateLogs) setWeeklyUpdateLogs(v4.weeklyUpdateLogs);
-        if (v4.timeBudgets) setTimeBudgets(v4.timeBudgets);
-        if (v4.timeLogs) setTimeLogs(v4.timeLogs);
-        if (v4.stressLogs) setStressLogs(v4.stressLogs);
-        if (v4.workTypeTargets) setWorkTypeTargets(v4.workTypeTargets);
-        if (remote.tickets) setTickets(remote.tickets);
-        if (remote.aiOutputs) setAiOutputs(remote.aiOutputs);
-        if (remote.aiSettings && Object.keys(remote.aiSettings).length > 0) {
-          setAiSettings(prev => ({
-            prompts: { ...DEFAULT_AI_SETTINGS.prompts, ...remote.aiSettings.prompts },
-            providers: { ...DEFAULT_AI_SETTINGS.providers, ...remote.aiSettings.providers },
-            openaiModel: remote.aiSettings.openaiModel || prev.openaiModel,
-            claudeModel: remote.aiSettings.claudeModel || prev.claudeModel,
-          }));
-        }
-        if (!alreadyMigrated) try { localStorage.setItem(MIGRATION_FLAG, new Date().toISOString()); } catch { /* quota */ }
+        applyRemoteSnapshot(remote, { persistMigrationFlag: !alreadyMigrated });
       }
 
       if (!cancelled) {
@@ -636,7 +664,54 @@ export function useStore() {
 
     init();
     return () => { cancelled = true; };
-  }, []); // run once on mount
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const revalidateFromRemote = useCallback(async () => {
+    if (!mountedRef.current || suppressRemoteSaveRef.current || syncStatus === 'saving') {
+      return false;
+    }
+
+    const refreshState = remoteRefreshStateRef.current;
+    const now = Date.now();
+    if (refreshState.inFlight || now - refreshState.lastCompletedAt < 15_000) {
+      return false;
+    }
+
+    refreshState.inFlight = true;
+    try {
+      const remote = await fetchAllData();
+      if (!remote) return false;
+
+      applyRemoteSnapshot(remote, {
+        suppressSaves: true,
+        persistMigrationFlag: true,
+      });
+      refreshState.lastCompletedAt = Date.now();
+      setSyncStatus('synced');
+      return true;
+    } finally {
+      refreshState.inFlight = false;
+    }
+  }, [applyRemoteSnapshot, syncStatus]);
+
+  useEffect(() => {
+    const handleVisible = () => {
+      if (document.visibilityState === 'visible') {
+        revalidateFromRemote();
+      }
+    };
+    const handleFocus = () => {
+      revalidateFromRemote();
+    };
+
+    document.addEventListener('visibilitychange', handleVisible);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisible);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [revalidateFromRemote]);
 
   // ─── OKR actions ───
   const addOkr = useCallback((data) => {

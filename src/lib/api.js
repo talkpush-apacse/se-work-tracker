@@ -30,6 +30,29 @@ export async function fetchAllData() {
 }
 
 /**
+ * Fetch active Notion tasks through the server-side proxy route.
+ * Returns an array of task objects or throws on failure.
+ */
+export async function fetchNotionTasks({ force = false } = {}) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
+  const url = force ? '/api/notion/tasks?force=1' : '/api/notion/tasks';
+
+  try {
+    const res = await fetch(url, { headers, signal: controller.signal });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `GET /api/notion/tasks → ${res.status}`);
+    }
+
+    const data = await res.json();
+    return Array.isArray(data.tasks) ? data.tasks : [];
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+/**
  * Save a single entity to Neon.
  * @param {string} entity - Entity name (e.g. 'tasks', 'projects')
  * @param {any} data - The full data array/object for this entity

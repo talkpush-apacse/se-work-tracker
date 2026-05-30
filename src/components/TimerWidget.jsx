@@ -474,8 +474,13 @@ export default function TimerWidget() {
     setMode(nextMode);
   };
 
-  const handlePomodoroStart = async ({ workType: nextWorkType, clientIds: nextClientIds, okrId }) => {
-    console.warn('[pomo] handlePomodoroStart: called', { workType: nextWorkType, clientIds: nextClientIds, okrId });
+  const handlePomodoroStart = async ({ workType: nextWorkType, clientIds: nextClientIds, okrId, notionTask }) => {
+    console.warn('[pomo] handlePomodoroStart: called', {
+      workType: nextWorkType,
+      clientIds: nextClientIds,
+      okrId,
+      notionTaskId: notionTask?.id ?? null,
+    });
     try {
       stopTitlePulse();
       console.warn('[pomo] handlePomodoroStart: stopTitlePulse done');
@@ -485,6 +490,9 @@ export default function TimerWidget() {
         workType: nextWorkType,
         clientIds: nextClientIds,
         okrId,
+        notionTaskId: notionTask?.id ?? null,
+        notionTaskName: notionTask?.task_name ?? null,
+        notionAccount: notionTask?.account ?? null,
       });
       console.warn('[pomo] handlePomodoroStart: startPomodoro called');
     } catch (err) {

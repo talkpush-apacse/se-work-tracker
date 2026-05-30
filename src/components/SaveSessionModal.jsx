@@ -131,6 +131,9 @@ export default function SaveSessionModal({ session, onClose }) {
         weekStart,
         source,
         pomodoroCycles,
+        notionTaskId: session.notionTaskId ?? null,
+        notionTaskName: session.notionTaskName ?? null,
+        notionAccount: session.notionAccount ?? null,
       });
 
       // Points entry (gamification layer)
@@ -146,6 +149,7 @@ export default function SaveSessionModal({ session, onClose }) {
           : desc,
         source,
         pomodoroCycles,
+        timestamp: session.startedAt,
       });
     });
 

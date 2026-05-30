@@ -47,6 +47,10 @@ export function TimerProvider({ children }) {
       workType: timer.workType,
       clientIds: timer.clientIds,
       taskId: timer.taskId,
+      okrId: timer.okrId,
+      notionTaskId: timer.notionTaskId,
+      notionTaskName: timer.notionTaskName,
+      notionAccount: timer.notionAccount,
       pendingTasks: timer.pendingTasks,
       startedAt: timer.startedAt,
       pomodoroInterval: timer.pomodoroInterval,
@@ -70,6 +74,7 @@ export function TimerProvider({ children }) {
     };
   }, [
     timer.mode, timer.isRunning, timer.isPaused, timer.workType, timer.clientIds, timer.taskId,
+    timer.okrId, timer.notionTaskId, timer.notionTaskName, timer.notionAccount,
     timer.pendingTasks, timer.startedAt, timer.pomodoroInterval, timer.pomodoroIntervalEndsAt,
     timer.pomodoroCompletedCycles, timer.pomodoroAccumulatedWorkSeconds, timer.pomodoroStartedAt,
     timer.pomodoroPausedAt, timer.elapsedSeconds, timer.stoppedSession, timer.setMode,
@@ -87,6 +92,10 @@ export function TimerProvider({ children }) {
       workType: timer.workType,
       clientIds: timer.clientIds,
       taskId: timer.taskId,
+      okrId: timer.okrId,
+      notionTaskId: timer.notionTaskId,
+      notionTaskName: timer.notionTaskName,
+      notionAccount: timer.notionAccount,
       pendingTasks: timer.pendingTasks,
       startedAt: timer.startedAt,
       stoppedSession: timer.stoppedSession,
@@ -108,9 +117,9 @@ export function TimerProvider({ children }) {
       resumePomodoro: timer.resumePomodoro,
       skipInterval: timer.skipInterval,
     }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       timer.mode, timer.isRunning, timer.isPaused, timer.workType, timer.clientIds, timer.taskId,
+      timer.okrId, timer.notionTaskId, timer.notionTaskName, timer.notionAccount,
       timer.pendingTasks, timer.startedAt, timer.stoppedSession, timer.pomodoroInterval,
       timer.pomodoroIntervalEndsAt, timer.pomodoroCompletedCycles, timer.pomodoroAccumulatedWorkSeconds,
       timer.pomodoroStartedAt, timer.pomodoroPausedAt, timer.clearStoppedSession, timer.setMode,

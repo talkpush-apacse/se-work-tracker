@@ -12,14 +12,11 @@ import { CSS } from '@dnd-kit/utilities';
 const DEFAULT_TABS = [
   { id: 'dashboard',    label: 'Dashboard',      icon: LayoutDashboard, group: null,        tooltip: 'Dashboard — overview of your work' },
   { id: 'triage',       label: 'Triage',         icon: ListTodo,        group: null,        tooltip: 'Triage — manage & prioritize tasks' },
-  { id: 'tickets',      label: 'Tickets',        icon: Ticket,          group: null,        tooltip: 'Tickets — track raised Jira tickets' },
   { id: 'timebudget',   label: 'Time Budget',    icon: Clock,           group: 'Work',      tooltip: 'Time Budget — plan weekly time allocation' },
   { id: 'okrs',         label: 'OKRs',           icon: Target,          group: 'Work',      tooltip: 'OKRs — quarterly objectives & key results' },
   { id: 'customers',    label: 'Customers',      icon: Users,           group: 'Work',      tooltip: 'Customers — manage client accounts' },
-  { id: 'weekly',       label: 'Weekly Report',  icon: Mail,            group: 'Insights',  tooltip: 'Weekly Report — generate weekly status email' },
   { id: 'pulse',        label: 'Pulse',          icon: Heart,           group: 'Insights',  tooltip: 'Pulse — log daily stress & wellness levels' },
   { id: 'knowledge',    label: 'Knowledge',      icon: Brain,           group: 'Insights',  tooltip: 'Knowledge — search & manage work notes' },
-  { id: 'integrations', label: 'Integrations',   icon: Plug,            group: 'Connect',   tooltip: 'Integrations — connect Google Calendar & Gmail' },
 ];
 
 const STORAGE_KEY = 'gpt-sidebar-order';

@@ -1,12 +1,12 @@
 /**
  * PomosView — Pomodoro focus-cycle analytics view shown inside the Dashboard's
- * "Pomos" tab. Reads from timeLogs (source === 'pomodoro') only — historic
- * entries with source === null are intentionally excluded.
+ * "Pomos" tab. Prefers timeLogs, but falls back to points-derived pomodoro
+ * entries when older sessions are missing from remote timeLogs.
  *
  * Layout: period filter → stat cards → primary chart → OKR breakdown → session table.
  */
 import { Fragment, useState, useMemo } from 'react';
-import { Timer, ChevronLeft, ChevronRight, Clock, Zap, TrendingUp } from 'lucide-react';
+import { Timer, ChevronLeft, ChevronRight, Clock, Zap, TrendingUp, Plus } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, LabelList,
   ReferenceLine, Tooltip,
@@ -22,6 +22,8 @@ import {
 import { useAppStore } from '../context/StoreContext';
 import { WORK_TYPE_COLORS } from '../constants';
 import { StatCard } from './StatCard';
+import ManualPomoModal from './ManualPomoModal';
+import { Button } from './ui/button';
 
 // Daily Pomo target (cycles/day). 8 cycles × 25 min ≈ 3.3 h of focused work.
 // Raise this constant when the target changes — only one place to edit.
@@ -91,15 +93,56 @@ function truncateOkrTitle(title) {
   return title.length > 30 ? title.slice(0, 29) + '…' : title;
 }
 
+function normalizePomoNote(note) {
+  return String(note || '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function roundPomoHours(hours) {
+  return Math.round((Number(hours) || 0) * 100) / 100;
+}
+
+function buildPomoDedupKey({ workType, pomodoroCycles, hours, okrId, customerId, note }) {
+  return [
+    workType || '',
+    pomodoroCycles ?? 0,
+    roundPomoHours(hours),
+    okrId || '',
+    customerId || '',
+    normalizePomoNote(note),
+  ].join('|');
+}
+
+function getPomoDuplicateWindowMs(hours) {
+  const durationMs = roundPomoHours(hours) * 60 * 60 * 1000;
+  return Math.max(45 * 60 * 1000, durationMs + (45 * 60 * 1000));
+}
+
+function renderNotionTaskLabel(taskName, account) {
+  if (!taskName) return null;
+
+  return (
+    <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[11px] text-brand-sage">
+      {account && (
+        <span className="inline-flex shrink-0 rounded-md border border-brand-sage/20 bg-brand-sage/10 px-1.5 py-0.5 font-semibold text-brand-sage">
+          {account}
+        </span>
+      )}
+      <span className="truncate">{taskName}</span>
+    </div>
+  );
+}
+
+
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function PomosView() {
-  const { timeLogs, okrs, customers } = useAppStore();
+  const { timeLogs, points, okrs, customers } = useAppStore();
 
   const [rangeMode, setRangeMode] = useState('weekly');
   const [anchor, setAnchor]       = useState(new Date());
   const [showAll, setShowAll]     = useState(false);
   const [expandedGroups, setExpandedGroups] = useState(() => new Set());
+  const [showManualPomo, setShowManualPomo] = useState(false);
 
   const handleRangeMode = (mode) => { setRangeMode(mode); setAnchor(new Date()); setShowAll(false); };
   const handleNav       = (dir)  => { setAnchor(a => stepAnchor(rangeMode, a, dir)); setShowAll(false); };
@@ -117,11 +160,104 @@ export default function PomosView() {
   const rangeWord = rangeMode === 'daily' ? 'day' : rangeMode === 'weekly' ? 'week' : 'month';
   const nowLabel  = rangeMode === 'daily' ? 'Today' : rangeMode === 'weekly' ? 'This Week' : 'This Month';
 
-  // ── Data: confirmed Pomo logs only (source === 'pomodoro' + cycles > 0) ──────
-  const allPomoLogs = useMemo(
-    () => timeLogs.filter(l => l.source === 'pomodoro' && (l.pomodoroCycles ?? 0) > 0),
-    [timeLogs],
-  );
+  // ── Data: confirmed Pomo logs first, then points-only fallback sessions ───────
+  const allPomoLogs = useMemo(() => {
+    const confirmedPomoLogs = timeLogs.filter(
+      log => log.source === 'pomodoro' && (log.pomodoroCycles ?? 0) > 0,
+    );
+
+    const loggedAtWithTimeLogs = new Set(
+      confirmedPomoLogs
+        .map(log => log.loggedAt)
+        .filter(Boolean),
+    );
+
+    const confirmedLogsByDedupKey = confirmedPomoLogs.reduce((map, log) => {
+      const loggedAtMs = Date.parse(log.loggedAt || '');
+      if (!Number.isFinite(loggedAtMs)) return map;
+
+      const dedupKey = buildPomoDedupKey({
+        workType: log.workType,
+        pomodoroCycles: log.pomodoroCycles,
+        hours: log.hours,
+        okrId: log.okrId,
+        customerId: log.clientIds?.[0] || null,
+        note: log.note,
+      });
+
+      const bucket = map.get(dedupKey) || [];
+      bucket.push({
+        id: log.id,
+        loggedAtMs,
+        duplicateWindowMs: getPomoDuplicateWindowMs(log.hours),
+      });
+      map.set(dedupKey, bucket);
+      return map;
+    }, new Map());
+
+    confirmedLogsByDedupKey.forEach(bucket => {
+      bucket.sort((a, b) => a.loggedAtMs - b.loggedAtMs);
+    });
+
+    const matchedConfirmedLogIds = new Set();
+
+    const fallbackPointLogs = points
+      .filter(point => {
+        if (
+          point.source !== 'pomodoro'
+          || (point.pomodoroCycles ?? 0) <= 0
+          || !point.timestamp
+        ) {
+          return false;
+        }
+
+        if (loggedAtWithTimeLogs.has(point.timestamp)) {
+          return false;
+        }
+
+        const pointTimestampMs = Date.parse(point.timestamp);
+        if (!Number.isFinite(pointTimestampMs)) {
+          return false;
+        }
+
+        const dedupKey = buildPomoDedupKey({
+          workType: point.interactionType === 'Meetings' ? 'meetings' : 'deep_work',
+          pomodoroCycles: point.pomodoroCycles,
+          hours: point.hours,
+          okrId: point.okrId,
+          customerId: point.customerId || null,
+          note: point.comment,
+        });
+
+        const candidateLogs = confirmedLogsByDedupKey.get(dedupKey) || [];
+        const duplicateLog = candidateLogs.find(candidate =>
+          !matchedConfirmedLogIds.has(candidate.id)
+          && pointTimestampMs >= candidate.loggedAtMs
+          && pointTimestampMs <= (candidate.loggedAtMs + candidate.duplicateWindowMs),
+        );
+
+        if (duplicateLog) {
+          matchedConfirmedLogIds.add(duplicateLog.id);
+          return false;
+        }
+
+        return true;
+      })
+      .map(point => ({
+        id: point.id,
+        workType: point.interactionType === 'Meetings' ? 'meetings' : 'deep_work',
+        hours: point.hours ?? 0,
+        clientIds: point.customerId ? [point.customerId] : [],
+        okrId: point.okrId || null,
+        taskId: null,
+        note: point.comment || '',
+        loggedAt: point.timestamp,
+        source: 'pomodoro',
+        pomodoroCycles: point.pomodoroCycles ?? 0,
+      }));
+
+    return [...confirmedPomoLogs, ...fallbackPointLogs];
+  }, [timeLogs, points]);
 
   const filteredLogs = useMemo(
     () => filterByPeriod(allPomoLogs, rangeStart, rangeEnd),
@@ -290,12 +426,19 @@ export default function PomosView() {
       const okrKeys = [...new Set(logs.map(log => log.okrId ?? null))];
       const customerKeys = [...new Set(logs.map(log => log.clientIds?.[0] ?? null))];
       const noteKeys = [...new Set(logs.map(log => log.note?.trim() || ''))];
+      const notionKeys = [...new Set(
+        logs
+          .filter(log => log.notionTaskName)
+          .map(log => `${log.notionTaskName}|||${log.notionAccount || ''}`)
+      )];
 
       const sharedOkrTitle = firstLog.okrId ? okrTitleById.get(firstLog.okrId) : null;
       const sharedCustomerName = firstLog.clientIds?.[0]
         ? customerNameById.get(firstLog.clientIds[0]) || '—'
         : '—';
       const sharedNote = firstLog.note?.trim() || '';
+      const sharedNotionTaskName = firstLog.notionTaskName?.trim() || '';
+      const sharedNotionAccount = firstLog.notionAccount?.trim() || '';
 
       return {
         type: 'group',
@@ -303,7 +446,7 @@ export default function PomosView() {
         loggedAt: row.loggedAt,
         logs,
         totalHours: logs.reduce((sum, log) => sum + (log.hours ?? 0), 0),
-        pomodoroCycles: firstLog.pomodoroCycles ?? 0,
+        pomodoroCycles: logs.reduce((sum, log) => sum + (log.pomodoroCycles ?? 0), 0),
         okrLabel: okrKeys.length === 1
           ? (sharedOkrTitle ? truncateOkrTitle(sharedOkrTitle) : '—')
           : `${okrKeys.length} OKRs`,
@@ -313,6 +456,12 @@ export default function PomosView() {
         noteLabel: noteKeys.length === 1
           ? (sharedNote || '—')
           : `${logs.length} tasks`,
+        notionTaskLabel: notionKeys.length === 1
+          ? sharedNotionTaskName
+          : notionKeys.length > 1
+            ? `${notionKeys.length} linked tasks`
+            : '',
+        notionAccountLabel: notionKeys.length === 1 ? sharedNotionAccount : '',
       };
     });
   }, [customerNameById, okrTitleById, sortedSessions]);
@@ -333,51 +482,64 @@ export default function PomosView() {
     <div className="space-y-5">
 
       {/* ── Period filter + navigator ─────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
 
-        {/* Segmented control */}
-        <div className="flex bg-secondary rounded-xl p-0.5 gap-0.5 self-start">
-          {RANGE_OPTIONS.map(mode => (
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          {/* Segmented control */}
+          <div className="flex bg-secondary rounded-xl p-0.5 gap-0.5 self-start">
+            {RANGE_OPTIONS.map(mode => (
+              <button
+                key={mode}
+                onClick={() => handleRangeMode(mode)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${
+                  rangeMode === mode
+                    ? 'bg-card text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {RANGE_LABELS[mode]}
+              </button>
+            ))}
+          </div>
+
+          {/* Prev / label / Next + reset */}
+          <div className="flex items-center gap-1.5">
             <button
-              key={mode}
-              onClick={() => handleRangeMode(mode)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${
-                rangeMode === mode
-                  ? 'bg-card text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
+              onClick={() => handleNav('prev')}
+              className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
             >
-              {RANGE_LABELS[mode]}
+              <ChevronLeft size={16} />
             </button>
-          ))}
+            <span className="text-sm font-medium text-foreground min-w-[200px] text-center tabular-nums">
+              {periodLabel}
+            </span>
+            <button
+              onClick={() => handleNav('next')}
+              className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ChevronRight size={16} />
+            </button>
+            {!isNow && (
+              <button
+                onClick={handleReset}
+                className="ml-1 text-xs font-semibold text-brand-lavender hover:text-brand-lavender/80 transition-colors"
+              >
+                {nowLabel}
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Prev / label / Next + reset */}
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => handleNav('prev')}
-            className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ChevronLeft size={16} />
-          </button>
-          <span className="text-sm font-medium text-foreground min-w-[200px] text-center tabular-nums">
-            {periodLabel}
-          </span>
-          <button
-            onClick={() => handleNav('next')}
-            className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ChevronRight size={16} />
-          </button>
-          {!isNow && (
-            <button
-              onClick={handleReset}
-              className="ml-1 text-xs font-semibold text-brand-lavender hover:text-brand-lavender/80 transition-colors"
-            >
-              {nowLabel}
-            </button>
-          )}
-        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setShowManualPomo(true)}
+          className="self-start lg:self-auto"
+        >
+          <Plus size={14} />
+          Log Pomo
+        </Button>
       </div>
 
       {/* ── Stat cards ───────────────────────────────────────────────────────── */}
@@ -420,6 +582,16 @@ export default function PomosView() {
           <p className="text-xs text-muted-foreground/60 mt-1">
             Start the Pomodoro timer to begin tracking.
           </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setShowManualPomo(true)}
+            className="mt-4"
+          >
+            <Plus size={14} />
+            Log Pomo
+          </Button>
         </div>
       ) : (
         <>
@@ -609,8 +781,11 @@ export default function PomosView() {
                           <td className="px-4 py-2.5 text-muted-foreground whitespace-nowrap">
                             {customerName}
                           </td>
-                          <td className="px-4 py-2.5 text-muted-foreground max-w-[200px] truncate">
-                            {log.note || '—'}
+                          <td className="px-4 py-2.5 text-muted-foreground max-w-[200px]">
+                            <div className="min-w-0">
+                              <div className="truncate">{log.note || '—'}</div>
+                              {renderNotionTaskLabel(log.notionTaskName, log.notionAccount)}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -657,8 +832,11 @@ export default function PomosView() {
                           <td className="px-4 py-2.5 text-muted-foreground whitespace-nowrap">
                             {row.customerLabel}
                           </td>
-                          <td className="px-4 py-2.5 text-muted-foreground max-w-[200px] truncate">
-                            {row.noteLabel}
+                          <td className="px-4 py-2.5 text-muted-foreground max-w-[200px]">
+                            <div className="min-w-0">
+                              <div className="truncate">{row.noteLabel}</div>
+                              {renderNotionTaskLabel(row.notionTaskLabel, row.notionAccountLabel)}
+                            </div>
                           </td>
                         </tr>
 
@@ -692,8 +870,11 @@ export default function PomosView() {
                               <td className="px-4 py-2.5 text-muted-foreground whitespace-nowrap">
                                 {customerName}
                               </td>
-                              <td className="px-4 py-2.5 text-muted-foreground max-w-[200px] truncate">
-                                {log.note || '—'}
+                              <td className="px-4 py-2.5 text-muted-foreground max-w-[200px]">
+                                <div className="min-w-0">
+                                  <div className="truncate">{log.note || '—'}</div>
+                                  {renderNotionTaskLabel(log.notionTaskName, log.notionAccount)}
+                                </div>
                               </td>
                             </tr>
                           );
@@ -719,6 +900,10 @@ export default function PomosView() {
             )}
           </div>
         </>
+      )}
+
+      {showManualPomo && (
+        <ManualPomoModal onClose={() => setShowManualPomo(false)} />
       )}
     </div>
   );
