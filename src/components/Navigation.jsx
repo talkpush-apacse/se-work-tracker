@@ -17,6 +17,7 @@ const DEFAULT_TABS = [
   { id: 'customers',    label: 'Customers',      icon: Users,           group: 'Work',      tooltip: 'Customers — manage client accounts' },
   { id: 'pulse',        label: 'Pulse',          icon: Heart,           group: 'Insights',  tooltip: 'Pulse — log daily stress & wellness levels' },
   { id: 'knowledge',    label: 'Knowledge',      icon: Brain,           group: 'Insights',  tooltip: 'Knowledge — search & manage work notes' },
+  { id: 'integrations', label: 'Integrations',   icon: Plug,            group: 'Connect',   tooltip: 'Integrations — Google Calendar, Notion OKR sync' },
 ];
 
 const STORAGE_KEY = 'gpt-sidebar-order';
