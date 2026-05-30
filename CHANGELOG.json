@@ -1,6 +1,18 @@
 {
   "versions": [
     {
+      "version": "2.27.2",
+      "codename": "Notion Bridge",
+      "date": "2026-05-30",
+      "summary": "Phase A — Notion Account → Customer mapping in Save Session",
+      "changes": [
+        { "type": "feature", "description": "SaveSessionModal: amber prompt for unmapped Notion accounts — select customer once, auto-filled forever" },
+        { "type": "feature", "description": "Saved mappings persisted to localStorage under gpt-notion-customer-map" },
+        { "type": "feature", "description": "Client dropdown auto-fills silently on future sessions when Notion account is already mapped" },
+        { "type": "chore", "description": "New src/lib/notionCustomerMap.js with getNotionCustomerMapping, saveNotionCustomerMapping, resolveNotionAccount helpers" }
+      ]
+    },
+    {
       "version": "2.27.1",
       "codename": "Nav Cleanup",
       "date": "2026-05-30",

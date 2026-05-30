@@ -7,6 +7,7 @@ import { useAppStore } from '../context/StoreContext';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { startOfWeek, format } from 'date-fns';
+import { resolveNotionAccount, saveNotionCustomerMapping } from '../lib/notionCustomerMap';
 
 function formatHMS(totalSeconds) {
   const h = Math.floor(totalSeconds / 3600);
@@ -30,8 +31,10 @@ export default function SaveSessionModal({ session, onClose }) {
   const [points, setPoints]     = useState(String(prefilledPoints));
   const [hours, setHours]       = useState(String(prefilledHours));
 
-  // Task rows — seeded from mid-session task notes if any, otherwise a blank row
+  // Task rows — seeded from mid-session task notes if any, otherwise a blank row.
+  // clientId falls back to the Notion Account mapping when no client was tagged at start.
   const [taskRows, setTaskRows] = useState(() => {
+    const resolvedNotionCustomerId = resolveNotionAccount(session.notionAccount);
     if (session.pendingTasks && session.pendingTasks.length > 0) {
       return session.pendingTasks.map(t => ({
         id: nextRowId(),
@@ -43,7 +46,7 @@ export default function SaveSessionModal({ session, onClose }) {
     return [{
       id: nextRowId(),
       description: session.taskDescription || '',
-      clientId: (session.clientIds || [])[0] || '',
+      clientId: (session.clientIds || [])[0] || resolvedNotionCustomerId || '',
       okrId: session.okrId || '',
     }];
   });
@@ -55,6 +58,13 @@ export default function SaveSessionModal({ session, onClose }) {
   const [showOkrNudge, setShowOkrNudge]       = useState(false);
   const [okrNudgeDismissed, setOkrNudgeDismissed] = useState(false);
   const confirmTimerRef = useRef(null);
+
+  // Notion Account mapping — detect once at mount whether this account needs mapping
+  const [needsMapping] = useState(() =>
+    !!(session.notionAccount && !resolveNotionAccount(session.notionAccount))
+  );
+  const [mappingCustomerId, setMappingCustomerId] = useState('');
+  const [mappingDone, setMappingDone] = useState(false);
 
   // Sort customers: pinned first, then alphabetical
   const sortedCustomers = useMemo(
@@ -91,6 +101,17 @@ export default function SaveSessionModal({ session, onClose }) {
     const hasDesc = taskRows.some(r => r.description.trim());
     if (!hasDesc) e.rows = 'At least one task needs a description';
     return e;
+  };
+
+  // Save the Notion Account → Customer mapping and pre-fill the first task row.
+  const handleSaveMapping = () => {
+    if (!mappingCustomerId) return;
+    saveNotionCustomerMapping(session.notionAccount, mappingCustomerId);
+    // Pre-fill the first task row's clientId if it is still empty
+    setTaskRows(prev => prev.map((row, i) =>
+      i === 0 && !row.clientId ? { ...row, clientId: mappingCustomerId } : row
+    ));
+    setMappingDone(true);
   };
 
   // Extracted save logic — called by handleSubmit and the OKR nudge "Save anyway" path.
@@ -251,6 +272,37 @@ export default function SaveSessionModal({ session, onClose }) {
             {errors.hours && <p className="mt-1 text-xs text-destructive">{errors.hours}</p>}
           </div>
         </div>
+
+        {/* Notion Account mapping prompt — shown once for unmapped accounts */}
+        {session.notionAccount && needsMapping && !mappingDone && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-2">
+            <p className="text-xs font-semibold text-amber-800">
+              ⚡ New Notion Account detected: &ldquo;{session.notionAccount}&rdquo;
+            </p>
+            <p className="text-xs text-amber-700">Which Customer is this in your SE Tracker?</p>
+            <div className="flex gap-2">
+              <select
+                value={mappingCustomerId}
+                onChange={e => setMappingCustomerId(e.target.value)}
+                className="flex-1 h-8 bg-white border border-amber-300 rounded-md px-2 text-xs text-foreground focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-300"
+              >
+                <option value="">Select customer…</option>
+                {sortedCustomers.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+              <Button
+                type="button"
+                size="sm"
+                disabled={!mappingCustomerId}
+                onClick={handleSaveMapping}
+                className="h-8 text-xs px-3 shrink-0"
+              >
+                Save mapping
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Task Rows */}
         <div>
