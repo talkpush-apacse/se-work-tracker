@@ -110,6 +110,7 @@ export default function StartTimerModal({
             task_name: selectedNotionTask.task_name,
             account: selectedNotionTask.account,
             okr: selectedNotionTask.okr ?? null,
+            okrPageId: selectedNotionTask.okrPageId ?? null,
           }
         : null,
     };
@@ -124,6 +125,7 @@ export default function StartTimerModal({
         notionTaskName: payload.notionTask?.task_name ?? null,
         notionAccount: payload.notionTask?.account ?? null,
         notionOkr: payload.notionTask?.okr ?? null,
+        notionOkrPageId: payload.notionTask?.okrPageId ?? null,
       });
     }
 
@@ -272,7 +274,7 @@ export default function StartTimerModal({
                   <button
                     key={task.id}
                     type="button"
-                    onClick={() => setSelectedNotionTask({ id: task.id, task_name: task.task_name, account: task.account || null, okr: task.okr || null })}
+                    onClick={() => setSelectedNotionTask({ id: task.id, task_name: task.task_name, account: task.account || null, okr: task.okr || null, okrPageId: task.okrPageId || null })}
                     className={`w-full flex items-center justify-between gap-3 px-2.5 py-2 text-left border-b border-border/30 last:border-b-0 transition-all ${
                       isSelected ? 'bg-brand-lavender/10' : 'hover:bg-secondary/80'
                     }`}

@@ -37,7 +37,11 @@ export default function SaveSessionModal({ session, onClose }) {
   //          title-matched OKR when a notionOkr string is present on the session.
   const [taskRows, setTaskRows] = useState(() => {
     const resolvedNotionCustomerId = resolveNotionAccount(session.notionAccount);
-    const resolvedNotionOkrId = resolveNotionOkr(session.notionOkr, okrs);
+    // Prefer direct Notion page ID lookup (after OKR sync); fall back to title match
+    const resolvedNotionOkrId =
+      (session.notionOkrPageId && okrs.some(o => o.id === session.notionOkrPageId))
+        ? session.notionOkrPageId
+        : resolveNotionOkr(session.notionOkr, okrs);
     if (session.pendingTasks && session.pendingTasks.length > 0) {
       return session.pendingTasks.map(t => ({
         id: nextRowId(),

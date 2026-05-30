@@ -3,9 +3,10 @@ import { useGoogleLogin } from '@react-oauth/google';
 import { useGoogleAuth } from '../context/GoogleAuthContext';
 import { useAppStore } from '../context/StoreContext';
 import { AUTO_TRACK_RATE } from '../constants';
-import { Calendar, LogIn, LogOut, RefreshCw, Check, Mail } from 'lucide-react';
+import { Calendar, LogIn, LogOut, RefreshCw, Check, Mail, BookOpen } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { format, subDays, parseISO } from 'date-fns';
+import { syncNotionOkrs } from '../lib/api';
 
 function toDateInput(d) {
   return format(d, 'yyyy-MM-dd');
@@ -21,7 +22,27 @@ const HAS_CLIENT_ID = !!import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 export default function Integrations() {
   const { googleToken, setGoogleToken, logout, gmailToken, setGmailToken, gmailLogout } = useGoogleAuth();
-  const { customers, addPoint } = useAppStore();
+  const { customers, okrs, addPoint, updateEntity } = useAppStore();
+
+  // ── Notion OKR sync state ─────────────────────────────────────────────────
+  const [notionSyncing, setNotionSyncing]     = useState(false);
+  const [notionSyncError, setNotionSyncError] = useState('');
+  const [notionSyncCount, setNotionSyncCount] = useState(null);
+
+  const handleNotionOkrSync = useCallback(async () => {
+    setNotionSyncing(true);
+    setNotionSyncError('');
+    setNotionSyncCount(null);
+    try {
+      const synced = await syncNotionOkrs();
+      updateEntity('okrs', synced);
+      setNotionSyncCount(synced.length);
+    } catch (err) {
+      setNotionSyncError(err.message || 'Sync failed — check Notion integration access');
+    } finally {
+      setNotionSyncing(false);
+    }
+  }, [updateEntity]);
 
   const [dateFrom, setDateFrom] = useState(toDateInput(subDays(new Date(), 7)));
   const [dateTo, setDateTo]     = useState(toDateInput(new Date()));
@@ -147,6 +168,50 @@ export default function Integrations() {
       <div>
         <h1 className="text-2xl font-bold text-foreground">Integrations</h1>
         <p className="text-sm text-muted-foreground mt-0.5">Connect external services to auto-log activity.</p>
+      </div>
+
+      {/* Notion OKR Sync card */}
+      <div className="rounded-2xl border border-border bg-card overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-brand-sage/10 flex items-center justify-center flex-shrink-0">
+              <BookOpen size={18} className="text-brand-sage" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-foreground">Notion OKR Tracker</p>
+              <p className="text-xs text-muted-foreground">
+                {okrs.length > 0
+                  ? `${okrs.length} OKR${okrs.length !== 1 ? 's' : ''} in SE Tracker`
+                  : 'No OKRs synced yet'}
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleNotionOkrSync}
+            disabled={notionSyncing}
+            className="gap-1.5"
+          >
+            <RefreshCw size={14} className={notionSyncing ? 'animate-spin' : ''} />
+            {notionSyncing ? 'Syncing…' : 'Sync OKRs'}
+          </Button>
+        </div>
+        <div className="px-5 py-3 text-xs text-muted-foreground">
+          {notionSyncError && (
+            <p className="text-destructive">{notionSyncError}</p>
+          )}
+          {notionSyncCount !== null && !notionSyncError && (
+            <p className="text-brand-sage font-medium">
+              ✓ Synced {notionSyncCount} OKR{notionSyncCount !== 1 ? 's' : ''} from Notion — existing OKRs replaced.
+            </p>
+          )}
+          {!notionSyncError && notionSyncCount === null && (
+            <p>
+              Replaces all SE Tracker OKRs with your Notion OKR Tracker. Pomodoro sessions tagged with a Notion OKR will auto-link after syncing.
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Google Calendar card */}

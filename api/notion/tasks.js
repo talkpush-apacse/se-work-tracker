@@ -163,12 +163,15 @@ export default async function handler(req, res) {
       });
     }
 
-    // 4. Normalize tasks and attach the resolved OKR title (first relation only)
+    // 4. Normalize tasks — attach the resolved OKR title AND the raw page ID.
+    //    okrPageId is used for direct zero-ambiguity matching against SE Tracker
+    //    OKRs that were synced from Notion (where Notion page ID === SE Tracker OKR id).
     const tasks = rawPages
       .map((page) => {
         const task = normalizeTask(page);
         const okrIds = getRelationIds(page.properties, 'OKR');
         task.okr = okrIds.length > 0 ? (okrTitleMap[okrIds[0]] ?? null) : null;
+        task.okrPageId = okrIds[0] ?? null;
         return task;
       })
       .filter((task) => task.task_name);

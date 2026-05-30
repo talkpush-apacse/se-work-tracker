@@ -1,6 +1,19 @@
 {
   "versions": [
     {
+      "version": "2.27.5",
+      "codename": "Notion Bridge",
+      "date": "2026-05-30",
+      "summary": "Notion as OKR source of truth — sync OKRs from Notion OKR Tracker",
+      "changes": [
+        { "type": "feature", "description": "New /api/notion/okrs endpoint fetches all OKRs from Notion OKR Tracker database" },
+        { "type": "feature", "description": "Integrations page: 'Sync OKRs from Notion' button replaces SE Tracker OKRs with Notion-sourced ones in one click" },
+        { "type": "feature", "description": "Notion task OKR relation page ID now threads through timer state as notionOkrPageId" },
+        { "type": "feature", "description": "SaveSessionModal: OKR pre-fill uses direct Notion page ID lookup (zero ambiguity) after sync, with title-match fallback" },
+        { "type": "fix", "description": "Replaces unreliable fuzzy title matching with direct Notion page ID === SE Tracker OKR ID comparison" }
+      ]
+    },
+    {
       "version": "2.27.4",
       "codename": "Notion Bridge",
       "date": "2026-05-30",

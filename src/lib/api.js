@@ -30,6 +30,26 @@ export async function fetchAllData() {
 }
 
 /**
+ * Sync all OKRs from the Notion OKR Tracker database.
+ * Returns an array of OKR objects (Notion page IDs used as OKR IDs) or throws on failure.
+ */
+export async function syncNotionOkrs() {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  try {
+    const res = await fetch('/api/notion/okrs', { headers, signal: controller.signal });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `GET /api/notion/okrs → ${res.status}`);
+    }
+    const data = await res.json();
+    return Array.isArray(data.okrs) ? data.okrs : [];
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+/**
  * Fetch active Notion tasks through the server-side proxy route.
  * Returns an array of task objects or throws on failure.
  */
