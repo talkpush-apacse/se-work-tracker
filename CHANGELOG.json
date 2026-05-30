@@ -1,6 +1,16 @@
 {
   "versions": [
     {
+      "version": "2.27.4",
+      "codename": "Notion Bridge",
+      "date": "2026-05-30",
+      "summary": "Fix Notion OKR Relation property — fetch linked page titles server-side",
+      "changes": [
+        { "type": "fix", "description": "Notion OKR property is a Relation type — now resolves linked page IDs to titles via parallel Notion page fetches" },
+        { "type": "fix", "description": "OKR titles cached alongside tasks (60s TTL) so relation page fetches only happen once per refresh" }
+      ]
+    },
+    {
       "version": "2.27.3",
       "codename": "Notion Bridge",
       "date": "2026-05-30",
