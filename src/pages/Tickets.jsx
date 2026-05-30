@@ -161,7 +161,7 @@ export default function Tickets() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-bold text-foreground">Tickets</h1>
+            <h1 className="text-[28px] font-bold text-foreground">Tickets</h1>
             <span className="rounded-full border border-border bg-card px-2.5 py-1 text-xs font-semibold text-muted-foreground tabular-nums">
               {openCount} open · {blockedCount} blocked
             </span>

@@ -148,7 +148,7 @@ export default function Dashboard({ onNavigate }) {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+          <h1 className="text-[28px] font-bold text-foreground">Dashboard</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             This week: <span className={totalPts > 0 ? 'text-brand-lavender font-semibold' : 'text-muted-foreground'}>{Number(totalPts).toFixed(1)} pts</span> across <span className={weekPoints.length > 0 ? 'text-brand-lavender font-semibold' : 'text-muted-foreground'}>{weekPoints.length}</span> entries
           </p>
@@ -277,7 +277,9 @@ export default function Dashboard({ onNavigate }) {
                             <span className="point-flash absolute -top-1 right-0 text-xs font-bold text-amber-700 whitespace-nowrap">+pts!</span>
                           )}
                         </div>
-                        <p className="text-[11px] text-muted-foreground">{customer.totalHours.toFixed(1)}h</p>
+                        {customer.totalHours >= 0.05 && (
+                          <p className="text-[11px] text-muted-foreground">{customer.totalHours.toFixed(1)}h</p>
+                        )}
                       </div>
                       {/* Timer button */}
                       <button
@@ -290,6 +292,7 @@ export default function Dashboard({ onNavigate }) {
                           }
                           // If already running for THIS customer, widget is visible — no action needed
                         }}
+                        aria-label={runningClientIds.includes(customer.id) ? `Timer running for ${customer.name}` : `Start timer for ${customer.name}`}
                         className={`p-1.5 rounded-lg transition-colors flex-shrink-0 ${
                           runningClientIds.includes(customer.id)
                             ? 'bg-brand-sage/30 text-brand-sage cursor-default'
@@ -302,6 +305,7 @@ export default function Dashboard({ onNavigate }) {
                       {/* Add points button */}
                       <button
                         onClick={(e) => { e.stopPropagation(); setAddModal(customer); }}
+                        aria-label={`Add points for ${customer.name}`}
                         className="p-1.5 rounded-lg bg-brand-lavender/20 hover:bg-brand-lavender/40 text-brand-lavender transition-colors flex-shrink-0"
                         title="Add points"
                       >
@@ -344,7 +348,7 @@ export default function Dashboard({ onNavigate }) {
                     </div>
                     <div className="text-right flex-shrink-0">
                       <span className="text-sm font-bold text-brand-lavender">+{Number(entry.points).toFixed(1)}</span>
-                      <p className="text-[10px] text-muted-foreground/70">{formatRelative(entry.timestamp)}</p>
+                      <p className="text-[10px] text-muted-foreground">{formatRelative(entry.timestamp)}</p>
                     </div>
                   </div>
                 </div>

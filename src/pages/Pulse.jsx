@@ -167,7 +167,7 @@ export default function Pulse() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+        <h1 className="text-[28px] font-bold text-foreground flex items-center gap-2">
           <Heart size={20} className="text-rose-600" /> Pulse
         </h1>
       </div>

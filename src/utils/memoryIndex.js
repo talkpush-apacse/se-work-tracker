@@ -188,11 +188,13 @@ export function buildMemoryIndex(store) {
     const customer = p.customerId ? customerMap.get(p.customerId) : null;
     const subtextParts = [];
     if (p.activityType) subtextParts.push(p.activityType);
-    if (p.hours != null) subtextParts.push(`${p.hours}h`);
+    // Suppress near-zero durations (< 0.05h ≈ 3 min) — they add visual noise without value
+    if (p.hours != null && p.hours >= 0.05) subtextParts.push(`${p.hours}h`);
     entries.push({
       id: p.id,
       entityType: 'activityLog',
-      label: 'Activity',
+      // Use activityType as the badge label (e.g. "Deep Work") instead of the generic "Activity"
+      label: p.activityType || null,
       icon: '⏱️',
       date,
       customerId: p.customerId || null,

@@ -21,12 +21,12 @@
     --secondary:     36 30% 96%;      /* warm off-white */
     --secondary-foreground: 30 30% 13%;
     --muted:         36 20% 94%;      /* #F0E9DF warm neutral */
-    --muted-foreground: 30 15% 55%;   /* #9C8E7E soft taupe */
+    --muted-foreground: 30 15% 40%;   /* darkened for WCAG AA ~5:1 on white */
     --accent:        255 40% 55%;     /* lavender accent */
     --accent-foreground: 0 0% 100%;   /* white on accent */
     --destructive:   0 50% 52%;       /* #C44A4A warm red */
     --destructive-foreground: 0 0% 100%;
-    --border:        33 25% 87%;      /* #E8E0D4 warm sand */
+    --border:        33 25% 78%;      /* strengthened from 87% — card outlines now clearly visible */
     --input:         33 20% 83%;      /* #DDD5C8 input border */
     --input-bg:      34 22% 95%;      /* #F7F3ED input background */
     --ring:          255 40% 55%;     /* lavender focus ring */

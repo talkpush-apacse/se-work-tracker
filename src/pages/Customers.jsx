@@ -251,7 +251,7 @@ export default function Customers() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Customers</h1>
+          <h1 className="text-[28px] font-bold text-foreground">Customers</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Enterprise clients you track work for</p>
         </div>
         <div className="flex items-center gap-2">

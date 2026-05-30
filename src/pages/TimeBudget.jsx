@@ -305,7 +305,7 @@ export default function TimeBudget() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+          <h1 className="text-[28px] font-bold text-foreground flex items-center gap-2">
             <Clock size={20} className="text-brand-lavender" />
             Time Budget
           </h1>

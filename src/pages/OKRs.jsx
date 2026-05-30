@@ -398,7 +398,7 @@ export default function OKRs() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">OKRs</h1>
+          <h1 className="text-[28px] font-bold text-foreground">OKRs</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Objectives that guide your work priorities</p>
         </div>
         <div className="flex items-center gap-2">
@@ -576,11 +576,11 @@ export default function OKRs() {
                             </div>
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
-                            <button onClick={() => toggle(okr.id)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
+                            <button onClick={() => toggle(okr.id)} aria-label={isExpanded ? 'Collapse OKR details' : 'Expand OKR details'} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
                               {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
                             </button>
-                            <button onClick={() => setEditTarget(okr)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"><Pencil size={14} /></button>
-                            <button onClick={() => setDeleteTarget(okr)} className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-secondary transition-colors"><Trash2 size={14} /></button>
+                            <button onClick={() => setEditTarget(okr)} aria-label={`Edit OKR: ${okr.title}`} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"><Pencil size={14} /></button>
+                            <button onClick={() => setDeleteTarget(okr)} aria-label={`Delete OKR: ${okr.title}`} className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-secondary transition-colors"><Trash2 size={14} /></button>
                           </div>
                         </div>
                       </div>

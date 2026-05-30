@@ -1,6 +1,33 @@
 {
   "versions": [
     {
+      "version": "2.28.0",
+      "codename": "Clean Signal",
+      "date": "2026-05-31",
+      "summary": "Full UX audit remediation — accessibility, hierarchy, visual polish, and noise reduction across all views",
+      "changes": [
+        { "type": "fix", "description": "P1: Content no longer clips under fixed update/offline banner on desktop" },
+        { "type": "fix", "description": "P1: Darkened muted-foreground token (L55% → L40%) to meet WCAG AA contrast (~5:1 on white)" },
+        { "type": "fix", "description": "P1: Timestamp and KPI sub-text opacity variants removed to maintain full contrast" },
+        { "type": "fix", "description": "P1: aria-label added to OKR edit/delete/expand, chart nav arrows, timer, and add-points buttons" },
+        { "type": "fix", "description": "P2: TimerWidget hidden on Dashboard tab — PomosView is the timer home; removes mobile duplicate" },
+        { "type": "fix", "description": "P2: Voice FAB restyled to outlined secondary (was primary-filled, visually identical to Start)" },
+        { "type": "fix", "description": "P2: Knowledge AI search toggle now has a visible 'AI:' group label and aria-pressed attribute" },
+        { "type": "fix", "description": "P2: PomosView chart heading split into neutral title + separate amber/green pace callout" },
+        { "type": "fix", "description": "P2: Triage drag handle now reveals on row hover (was dimming on hover — backwards)" },
+        { "type": "fix", "description": "P2: Triage checkbox border made visible with border-2 border-muted-foreground/40" },
+        { "type": "feat", "description": "P3: All page h1 titles bumped from text-2xl to text-[28px] for clear separation from section headers" },
+        { "type": "feat", "description": "P3: PomosView section h2 headings bumped from text-sm to text-base" },
+        { "type": "fix", "description": "P3: StatCard no longer uses font-mono for text values — mono only for numeric values" },
+        { "type": "fix", "description": "P3: Card border token darkened (L87% → L78%) for visible card outlines on parchment background" },
+        { "type": "feat", "description": "P3: OKR breakdown chart gains color legend (teal = linked, gray = untagged)" },
+        { "type": "fix", "description": "P4: Activity log badges now show activityType (e.g. 'Deep Work') instead of generic 'Activity'" },
+        { "type": "fix", "description": "P4: Near-zero durations (< 0.05h) suppressed from Knowledge subtext and Dashboard leaderboard" },
+        { "type": "fix", "description": "P4: Knowledge rows without a customer now show 'No customer' in muted italic (was blank gap)" },
+        { "type": "feat", "description": "P4: OKR chart shows '% untagged' insight inline — amber when >= 30%, muted below" }
+      ]
+    },
+    {
       "version": "2.27.5",
       "codename": "Notion Bridge",
       "date": "2026-05-30",

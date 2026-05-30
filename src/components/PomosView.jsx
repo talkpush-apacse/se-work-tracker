@@ -301,9 +301,11 @@ export default function PomosView() {
     ? topOkr.title.slice(0, 13) + '…'
     : topOkr.title;
 
-  // ── Dynamic chart title ───────────────────────────────────────────────────────
-  const chartTitle = useMemo(() => {
-    if (!filteredLogs.length) return 'No Pomos logged yet — tap the timer to start';
+  // ── Chart section title (neutral) + pace insight (separate callout) ─────────
+  const chartSectionTitle = rangeMode === 'daily' ? 'Daily Activity' : rangeMode === 'weekly' ? 'Weekly Activity' : 'Monthly Activity';
+
+  const chartInsight = useMemo(() => {
+    if (!filteredLogs.length) return null;
     const today = new Date();
     let daysElapsed;
     if (rangeMode === 'daily') {
@@ -317,9 +319,9 @@ export default function PomosView() {
     const targetSoFar = daysElapsed * POMO_DAILY_TARGET;
     const rangeRef = rangeMode === 'daily' ? 'today' : `this ${rangeWord}`;
     if (totalCycles >= targetSoFar) {
-      return `${totalCycles} cycle${totalCycles !== 1 ? 's' : ''} ${rangeRef} — on pace with your ${POMO_DAILY_TARGET}/day target`;
+      return { text: `On pace — ${totalCycles} cycle${totalCycles !== 1 ? 's' : ''} ${rangeRef} (target: ${POMO_DAILY_TARGET}/day)`, ok: true };
     }
-    return `Below pace — ${totalCycles} cycle${totalCycles !== 1 ? 's' : ''} logged ${rangeRef}`;
+    return { text: `Below pace — ${totalCycles} cycle${totalCycles !== 1 ? 's' : ''} logged ${rangeRef} (target: ${POMO_DAILY_TARGET}/day)`, ok: false };
   }, [filteredLogs, totalCycles, rangeMode, rangeWord, rangeStart, rangeEnd]);
 
   // ── Weekly / Monthly column chart data ───────────────────────────────────────
@@ -529,6 +531,7 @@ export default function PomosView() {
           <div className="flex items-center gap-1.5">
             <button
               onClick={() => handleNav('prev')}
+              aria-label="Previous period"
               className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
             >
               <ChevronLeft size={16} />
@@ -538,6 +541,7 @@ export default function PomosView() {
             </span>
             <button
               onClick={() => handleNav('next')}
+              aria-label="Next period"
               className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
             >
               <ChevronRight size={16} />
@@ -620,9 +624,18 @@ export default function PomosView() {
         <>
           {/* ── Primary chart ─────────────────────────────────────────────────── */}
           <div className="bg-card border border-border rounded-2xl p-5">
-            <h2 className="text-sm font-semibold text-foreground leading-snug mb-4">
-              {chartTitle}
+            <h2 className="text-base font-semibold text-foreground leading-snug mb-2">
+              {chartSectionTitle}
             </h2>
+            {chartInsight && (
+              <p className={`text-xs rounded-lg px-3 py-1.5 mb-3 ${
+                chartInsight.ok
+                  ? 'text-emerald-700 bg-emerald-50 border border-emerald-200'
+                  : 'text-amber-700 bg-amber-50 border border-amber-200'
+              }`}>
+                {chartInsight.text}
+              </p>
+            )}
 
             {rangeMode === 'daily' ? (
               dailySessions.length < 5 ? (
@@ -706,12 +719,38 @@ export default function PomosView() {
 
           {/* ── OKR breakdown (horizontal bar chart) ─────────────────────────── */}
           <div className="bg-card border border-border rounded-2xl p-5">
-            <h2 className="text-sm font-semibold text-foreground">
-              Cycles by OKR — {periodLabel}
-            </h2>
-            <p className="text-xs text-muted-foreground mt-0.5 mb-4">
-              Untagged Pomos miss out on OKR progress.
-            </p>
+            {(() => {
+              const totalOkrCycles   = okrChartData.reduce((s, d) => s + d.cycles, 0);
+              const untaggedCycles   = okrChartData.find(d => d.isUntagged)?.cycles || 0;
+              const untaggedPct      = totalOkrCycles > 0 ? Math.round((untaggedCycles / totalOkrCycles) * 100) : 0;
+              return (
+                <div className="flex items-start justify-between gap-3 mb-4">
+                  <div>
+                    <h2 className="text-base font-semibold text-foreground">
+                      Cycles by OKR — {periodLabel}
+                    </h2>
+                    {untaggedPct > 0 && (
+                      <p className={`text-xs mt-0.5 font-medium ${untaggedPct >= 30 ? 'text-amber-700' : 'text-muted-foreground'}`}>
+                        {untaggedPct}% untagged — link sessions to OKRs to track focus
+                      </p>
+                    )}
+                  </div>
+                  {/* Color legend */}
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: TEAL }} />
+                      Linked OKR
+                    </span>
+                    {okrChartData.some(d => d.isUntagged) && (
+                      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: GRAY_MUTED }} />
+                        Untagged
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
 
             {okrChartData.length === 0 ? (
               <p className="text-xs text-muted-foreground py-4 text-center">
@@ -754,7 +793,7 @@ export default function PomosView() {
           {/* ── Recent sessions table ─────────────────────────────────────────── */}
           <div className="bg-card border border-border rounded-2xl overflow-hidden">
             <div className="px-5 py-4 border-b border-border">
-              <h2 className="text-sm font-semibold text-foreground">Recent Sessions</h2>
+              <h2 className="text-base font-semibold text-foreground">Recent Sessions</h2>
             </div>
 
             <div className="overflow-x-auto">

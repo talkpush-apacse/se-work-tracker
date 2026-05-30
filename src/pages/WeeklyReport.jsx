@@ -643,7 +643,7 @@ export default function WeeklyReport({ onNavigate }) {
     <div className="space-y-5 max-w-3xl">
       {/* Page header */}
       <div ref={pageHeaderRef}>
-        <h1 className="text-2xl font-bold text-foreground">Weekly Report</h1>
+        <h1 className="text-[28px] font-bold text-foreground">Weekly Report</h1>
         <p className="text-xs text-muted-foreground mt-1">
           Summarize your week and generate a professional status email.
         </p>

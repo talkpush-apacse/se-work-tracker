@@ -1387,22 +1387,22 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, customer, onOpenDe
           : 'bg-card border-border hover:bg-card-hover hover:border-primary/20'
         }`}
     >
-      {/* Bulk select checkbox */}
+      {/* Bulk select checkbox — border-2 and border-muted-foreground/40 for clear visibility */}
       {onToggleSelect && (
         <input
           type="checkbox"
           checked={!!isSelected}
           onChange={() => onToggleSelect(task.id)}
           onClick={e => e.stopPropagation()}
-          className="w-3.5 h-3.5 mt-[3px] rounded border-border bg-secondary text-primary focus:ring-ring/40 focus:ring-1 flex-shrink-0 cursor-pointer accent-primary"
+          className="w-4 h-4 mt-[2px] rounded border-2 border-muted-foreground/40 bg-secondary text-primary focus:ring-ring/40 focus:ring-1 flex-shrink-0 cursor-pointer accent-primary hover:border-primary/60 transition-colors"
         />
       )}
 
-      {/* Drag handle */}
+      {/* Drag handle — hidden at rest, revealed on row hover */}
       <button
         {...attributes}
         {...listeners}
-        className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-muted-foreground/80 flex-shrink-0 touch-none p-0.5 mt-[2px]"
+        className="cursor-grab active:cursor-grabbing text-muted-foreground/30 group-hover:text-muted-foreground hover:text-foreground flex-shrink-0 touch-none p-0.5 mt-[2px] transition-colors"
         onClick={e => e.stopPropagation()}
         aria-label="Drag to reorder"
       >
@@ -2633,8 +2633,9 @@ export default function Triage() {
     {createPortal(
       <button
         onClick={() => setShowVoiceComms(true)}
-        title="Record a voice note"
-        className="fixed bottom-20 right-6 z-40 flex items-center gap-2 rounded-full text-primary-foreground shadow-lg px-5 py-3.5 transition-all active:scale-95 md:bottom-[5.5rem] md:right-8 bg-primary hover:bg-primary/90 shadow-primary/20"
+        title="Record a voice note for AI-assisted comms"
+        aria-label="Record a voice note"
+        className="fixed bottom-20 right-6 z-40 flex items-center gap-2 rounded-full bg-card border border-primary text-primary shadow-md px-5 py-3.5 transition-all active:scale-95 md:bottom-[5.5rem] md:right-8 hover:bg-brand-lavender/10 hover:shadow-lg"
       >
         <Mic size={18} /><span className="text-sm font-semibold">Voice</span>
       </button>,

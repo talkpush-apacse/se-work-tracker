@@ -67,10 +67,12 @@ function AppContent() {
       <Navigation activeTab={activeTab} onTabChange={handleTabChange} />
 
       {/* Main content — offset matches sidebar: icon-only (md:w-16) at md, full (lg:w-56) at lg */}
-      <main className="md:ml-16 lg:ml-56 pt-16 mt-safe md:pt-0">
+      {/* md:pt-12 compensates for the fixed update/offline banner on desktop (banner ~48px tall) */}
+      <main className={`md:ml-16 lg:ml-56 pt-16 mt-safe md:pt-0 ${(needsUpdate || isOffline) ? 'md:pt-12' : ''}`}>
         <div className="max-w-6xl mx-auto px-4 pt-6 pb-24">
-          {/* TimerWidget is global — inline on smaller screens, docked into the sidebar on lg+ */}
-          <TimerWidget />
+          {/* TimerWidget: inline on smaller screens, docked in sidebar on lg+.
+              Hidden on Dashboard — PomosView is already the timer/analytics home. */}
+          {activeTab !== 'dashboard' && <TimerWidget />}
 
           {/* Suspense catches first-load of each lazy page chunk */}
           <Suspense fallback={<PageFallback />}>

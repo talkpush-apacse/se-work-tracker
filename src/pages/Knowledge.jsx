@@ -401,16 +401,18 @@ function MemoryCard({ entry, highlightRegex, similarityPct, onClick, isSelected,
               ? <StickyNote size={16} className="text-amber-700" />
               : <span className="text-base leading-none">{entry.icon}</span>
           }
-          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md border ${colors.bg} ${colors.text} ${colors.border} whitespace-nowrap`}>
-            {entry.label}
-          </span>
+          {entry.label && (
+            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md border ${colors.bg} ${colors.text} ${colors.border} whitespace-nowrap`}>
+              {entry.label}
+            </span>
+          )}
         </div>
 
         {/* Content */}
         <div className="min-w-0 flex-1">
           {/* Meta: customer + date + similarity */}
           <div className="flex items-center gap-2 mb-1 flex-wrap">
-            {entry.customerName && (
+            {entry.customerName ? (
               <span className="flex items-center gap-1 text-[11px] font-medium text-foreground">
                 <span
                   className="w-2 h-2 rounded-full flex-shrink-0"
@@ -418,6 +420,8 @@ function MemoryCard({ entry, highlightRegex, similarityPct, onClick, isSelected,
                 />
                 {entry.customerName}
               </span>
+            ) : (
+              <span className="text-[11px] text-muted-foreground/50 italic">No customer</span>
             )}
             {dateStr && (
               <span className="text-[10px] text-muted-foreground">
@@ -870,7 +874,7 @@ export default function Knowledge({ onNavigate }) {
         <div>
           <div className="flex items-center gap-2">
             <Brain size={20} className="text-brand-lavender" />
-            <h1 className="text-2xl font-bold text-foreground">Memory</h1>
+            <h1 className="text-[28px] font-bold text-foreground">Memory</h1>
           </div>
           <p className="text-xs text-muted-foreground mt-0.5 ml-7">Everything you've logged, searchable.</p>
         </div>
@@ -929,29 +933,37 @@ export default function Knowledge({ onNavigate }) {
               <X size={14} />
             </button>
           )}
-          <button
-            onClick={handleRagSearch}
-            disabled={!query.trim() || ragSearching}
-            title={ragMode ? 'Clear AI results' : 'AI semantic search (RAG)'}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
-              ragMode
-                ? 'bg-brand-lavender text-foreground hover:bg-brand-lavender/80'
-                : 'bg-brand-lavender/15 text-brand-lavender hover:bg-brand-lavender/25'
-            }`}
-          >
-            {ragSearching
-              ? <Loader2 size={13} className="animate-spin" />
-              : <Sparkles size={13} />
-            }
-            {ragMode ? 'AI on' : 'AI'}
-          </button>
-          {/* Provider chip */}
-          <span
-            title="Using OpenAI for AI search"
-            className="px-2 py-1.5 rounded-xl border border-border text-[10px] font-semibold text-muted-foreground tabular-nums"
-          >
-            GPT
-          </span>
+          {/* AI search toggle + provider indicator — grouped for clarity */}
+          <div className="flex items-center gap-1" role="group" aria-label="AI search options">
+            <span className="text-[11px] text-muted-foreground pr-1.5 border-r border-border">AI:</span>
+            <button
+              onClick={handleRagSearch}
+              disabled={!query.trim() || ragSearching}
+              aria-pressed={ragMode}
+              title={ragMode
+                ? 'AI semantic search is ON — results ranked by meaning. Click to clear.'
+                : 'Enable AI semantic search — finds related content even with different words.'}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                ragMode
+                  ? 'bg-brand-lavender text-foreground hover:bg-brand-lavender/80'
+                  : 'bg-brand-lavender/15 text-brand-lavender hover:bg-brand-lavender/25'
+              }`}
+            >
+              {ragSearching
+                ? <Loader2 size={13} className="animate-spin" />
+                : <Sparkles size={13} />
+              }
+              {ragMode ? 'On' : 'Smart'}
+            </button>
+            {/* Provider indicator — shows which model powers AI search */}
+            <span
+              title="AI search provider: OpenAI GPT-4 embeddings"
+              aria-label="AI provider: OpenAI GPT"
+              className="px-2 py-1.5 rounded-xl border border-border text-[10px] font-semibold text-muted-foreground tabular-nums"
+            >
+              GPT
+            </span>
+          </div>
         </div>
       </div>
 
