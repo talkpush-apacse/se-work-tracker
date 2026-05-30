@@ -1,6 +1,15 @@
 {
   "versions": [
     {
+      "version": "2.27.1",
+      "codename": "Nav Cleanup",
+      "date": "2026-05-30",
+      "summary": "Removed INSIGHTS and WORK section sub-headers from the sidebar navigation",
+      "changes": [
+        { "type": "improvement", "description": "Sidebar: removed INSIGHTS and WORK group sub-headers for a cleaner nav" }
+      ]
+    },
+    {
       "version": "2.27.0",
       "codename": "OKR Pulse",
       "date": "2026-04-29",

@@ -252,15 +252,8 @@ export default function Navigation({ activeTab, onTabChange }) {
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={orderedTabs.map(t => t.id)} strategy={verticalListSortingStrategy}>
               {orderedTabs.map((tab, idx) => {
-                const prevGroup = idx > 0 ? orderedTabs[idx - 1].group : null;
-                const showGroupLabel = tab.group && tab.group !== prevGroup;
                 return (
                   <Fragment key={tab.id}>
-                    {showGroupLabel && (
-                      <p className="hidden lg:block text-[10px] font-semibold text-sidebar-muted/80 uppercase tracking-wider px-3 pt-3 pb-0.5 font-nav select-none">
-                        {tab.group}
-                      </p>
-                    )}
                     <SortableDesktopNavItem
                       tab={tab}
                       activeTab={activeTab}
