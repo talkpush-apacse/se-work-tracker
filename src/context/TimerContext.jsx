@@ -96,6 +96,7 @@ export function TimerProvider({ children }) {
       notionTaskId: timer.notionTaskId,
       notionTaskName: timer.notionTaskName,
       notionAccount: timer.notionAccount,
+      notionOkr: timer.notionOkr,
       pendingTasks: timer.pendingTasks,
       startedAt: timer.startedAt,
       stoppedSession: timer.stoppedSession,
@@ -119,7 +120,7 @@ export function TimerProvider({ children }) {
     }),
     [
       timer.mode, timer.isRunning, timer.isPaused, timer.workType, timer.clientIds, timer.taskId,
-      timer.okrId, timer.notionTaskId, timer.notionTaskName, timer.notionAccount,
+      timer.okrId, timer.notionTaskId, timer.notionTaskName, timer.notionAccount, timer.notionOkr,
       timer.pendingTasks, timer.startedAt, timer.stoppedSession, timer.pomodoroInterval,
       timer.pomodoroIntervalEndsAt, timer.pomodoroCompletedCycles, timer.pomodoroAccumulatedWorkSeconds,
       timer.pomodoroStartedAt, timer.pomodoroPausedAt, timer.clearStoppedSession, timer.setMode,

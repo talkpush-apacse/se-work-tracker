@@ -19,6 +19,7 @@ function createDefaultTimerState(overrides = {}) {
     notionTaskId: null,
     notionTaskName: null,
     notionAccount: null,
+    notionOkr: null,
     pendingTasks: [],
     startedAt: null,
     pomodoroInterval: null,
@@ -108,6 +109,7 @@ function sanitizeTimerState(rawState) {
   next.notionTaskId = legacyState.notionTaskId ?? null;
   next.notionTaskName = legacyState.notionTaskName ?? null;
   next.notionAccount = legacyState.notionAccount ?? null;
+  next.notionOkr = typeof legacyState.notionOkr === 'string' ? legacyState.notionOkr : null;
   next.pendingTasks = Array.isArray(legacyState.pendingTasks) ? legacyState.pendingTasks : [];
   next.startedAt = typeof legacyState.startedAt === 'string' && !Number.isNaN(Date.parse(legacyState.startedAt))
     ? legacyState.startedAt
@@ -294,6 +296,7 @@ function buildStoppedSession(state, elapsedSeconds) {
     notionTaskId: state.notionTaskId ?? null,
     notionTaskName: state.notionTaskName ?? null,
     notionAccount: state.notionAccount ?? null,
+    notionOkr: state.notionOkr ?? null,
     pendingTasks: state.pendingTasks || [],
     elapsedSeconds,
     startedAt: state.startedAt,
@@ -319,6 +322,7 @@ function clearStoppedPomodoroState(state) {
       notionTaskId: null,
       notionTaskName: null,
       notionAccount: null,
+      notionOkr: null,
       pendingTasks: [],
       startedAt: null,
     },
@@ -521,6 +525,7 @@ export function useTimer() {
     notionTaskId = null,
     notionTaskName = null,
     notionAccount = null,
+    notionOkr = null,
   } = {}) => {
     const existing = loadTimerState();
     if (existing.isRunning) return;
@@ -537,6 +542,7 @@ export function useTimer() {
       notionTaskId,
       notionTaskName,
       notionAccount,
+      notionOkr,
       pendingTasks: [],
       startedAt,
     });
@@ -555,6 +561,7 @@ export function useTimer() {
     notionTaskId = null,
     notionTaskName = null,
     notionAccount = null,
+    notionOkr = null,
   } = {}) => {
     console.warn('[pomo] startPomodoro: entered', { workType, clientIds, taskId, okrId, notionTaskId });
     const existing = loadTimerState();
@@ -575,6 +582,7 @@ export function useTimer() {
       notionTaskId,
       notionTaskName,
       notionAccount,
+      notionOkr,
       pendingTasks: [],
       startedAt: new Date(now).toISOString(),
       pomodoroInterval: POMODORO_INTERVALS.WORK,
@@ -675,6 +683,7 @@ export function useTimer() {
     notionTaskId: timerState.notionTaskId ?? null,
     notionTaskName: timerState.notionTaskName ?? null,
     notionAccount: timerState.notionAccount ?? null,
+    notionOkr: timerState.notionOkr ?? null,
     pendingTasks: timerState.pendingTasks ?? [],
     elapsedSeconds,
     startedAt: timerState.startedAt ?? null,

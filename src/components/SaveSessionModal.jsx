@@ -7,7 +7,7 @@ import { useAppStore } from '../context/StoreContext';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { startOfWeek, format } from 'date-fns';
-import { resolveNotionAccount, saveNotionCustomerMapping } from '../lib/notionCustomerMap';
+import { resolveNotionAccount, saveNotionCustomerMapping, resolveNotionOkr } from '../lib/notionCustomerMap';
 
 function formatHMS(totalSeconds) {
   const h = Math.floor(totalSeconds / 3600);
@@ -32,9 +32,12 @@ export default function SaveSessionModal({ session, onClose }) {
   const [hours, setHours]       = useState(String(prefilledHours));
 
   // Task rows — seeded from mid-session task notes if any, otherwise a blank row.
-  // clientId falls back to the Notion Account mapping when no client was tagged at start.
+  // Phase A: clientId falls back to the Notion Account → Customer mapping.
+  // Phase C: description falls back to Notion task title; okrId falls back to
+  //          title-matched OKR when a notionOkr string is present on the session.
   const [taskRows, setTaskRows] = useState(() => {
     const resolvedNotionCustomerId = resolveNotionAccount(session.notionAccount);
+    const resolvedNotionOkrId = resolveNotionOkr(session.notionOkr, okrs);
     if (session.pendingTasks && session.pendingTasks.length > 0) {
       return session.pendingTasks.map(t => ({
         id: nextRowId(),
@@ -45,9 +48,9 @@ export default function SaveSessionModal({ session, onClose }) {
     }
     return [{
       id: nextRowId(),
-      description: session.taskDescription || '',
+      description: session.taskDescription || session.notionTaskName || '',
       clientId: (session.clientIds || [])[0] || resolvedNotionCustomerId || '',
-      okrId: session.okrId || '',
+      okrId: session.okrId || resolvedNotionOkrId || '',
     }];
   });
 
@@ -350,14 +353,21 @@ export default function SaveSessionModal({ session, onClose }) {
                   )}
                 </div>
 
-                {/* Description */}
-                <textarea
-                  rows={2}
-                  value={row.description}
-                  onChange={e => updateRow(row.id, 'description', e.target.value)}
-                  placeholder="What did you work on?"
-                  className="w-full bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40 resize-none"
-                />
+                {/* Description — badge shown on first row when session came from a Notion task */}
+                <div>
+                  {i === 0 && session.notionTaskName && (
+                    <span className="inline-flex items-center mb-1 text-[10px] font-medium text-brand-sage bg-brand-sage/10 border border-brand-sage/20 rounded-full px-2 py-0.5">
+                      ✦ Synced from Notion
+                    </span>
+                  )}
+                  <textarea
+                    rows={2}
+                    value={row.description}
+                    onChange={e => updateRow(row.id, 'description', e.target.value)}
+                    placeholder="What did you work on?"
+                    className="w-full bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40 resize-none"
+                  />
+                </div>
 
                 {/* Client + OKR row */}
                 <div className="grid grid-cols-2 gap-2">

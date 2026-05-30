@@ -1,6 +1,19 @@
 {
   "versions": [
     {
+      "version": "2.27.3",
+      "codename": "Notion Bridge",
+      "date": "2026-05-30",
+      "summary": "Phase B+C — Notion OKR field + smart Save Session pre-population",
+      "changes": [
+        { "type": "feature", "description": "Notion API now fetches the OKR property from each task and threads it through the full timer state lifecycle" },
+        { "type": "feature", "description": "SaveSessionModal: description pre-fills with Notion task title when no manual note was typed mid-session" },
+        { "type": "feature", "description": "SaveSessionModal: OKR dropdown pre-fills via case-insensitive title match against the Notion task's OKR value" },
+        { "type": "feature", "description": "SaveSessionModal: 'Synced from Notion' teal badge on first task row when session came from a Notion task" },
+        { "type": "chore", "description": "notionCustomerMap.js: added resolveNotionOkr helper for OKR title matching" }
+      ]
+    },
+    {
       "version": "2.27.2",
       "codename": "Notion Bridge",
       "date": "2026-05-30",

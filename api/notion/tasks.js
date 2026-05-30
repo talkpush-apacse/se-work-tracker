@@ -35,6 +35,7 @@ function normalizeTask(page) {
     id: page.id,
     task_name: getTitle(page.properties, 'Task name'),
     account: getSelectName(page.properties, 'Account'),
+    okr: getSelectName(page.properties, 'OKR'),
     status: getStatusName(page.properties, 'Status'),
     priority: getSelectName(page.properties, 'Priority'),
     description: getRichText(page.properties, 'Description'),

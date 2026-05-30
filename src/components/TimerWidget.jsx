@@ -493,6 +493,7 @@ export default function TimerWidget() {
         notionTaskId: notionTask?.id ?? null,
         notionTaskName: notionTask?.task_name ?? null,
         notionAccount: notionTask?.account ?? null,
+        notionOkr: notionTask?.okr ?? null,
       });
       console.warn('[pomo] handlePomodoroStart: startPomodoro called');
     } catch (err) {

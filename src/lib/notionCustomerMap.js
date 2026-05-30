@@ -45,3 +45,22 @@ export function resolveNotionAccount(notionAccount) {
   const map = getNotionCustomerMapping();
   return map[notionAccount] ?? null;
 }
+
+/**
+ * Match a Notion OKR string against the app's OKR list using case-insensitive
+ * substring matching (either string contains the other). Returns the first
+ * matching okrId, or null if no match or no OKR was set on the Notion task.
+ *
+ * @param {string|null} notionOkr - raw Notion OKR property value (e.g. "Drive Client Adoption")
+ * @param {Array<{id: string, title: string}>} okrs - app OKR list from store
+ * @returns {string|null}
+ */
+export function resolveNotionOkr(notionOkr, okrs) {
+  if (!notionOkr || !Array.isArray(okrs) || okrs.length === 0) return null;
+  const needle = notionOkr.toLowerCase().trim();
+  const match = okrs.find(okr => {
+    const hay = (okr.title || '').toLowerCase().trim();
+    return hay.includes(needle) || needle.includes(hay);
+  });
+  return match?.id ?? null;
+}
