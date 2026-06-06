@@ -101,6 +101,7 @@ async function handleTasks(req, res, notionToken) {
           and: [
             { property: 'Status', status: { does_not_equal: 'Done' } },
             { property: 'Status', status: { does_not_equal: 'Parked' } },
+            { property: 'Status', status: { does_not_equal: 'Delegated' } },
           ],
         },
       }),
