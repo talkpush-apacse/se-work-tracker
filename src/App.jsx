@@ -5,7 +5,6 @@ import { TimerProvider } from './context/TimerContext';
 import { GoogleAuthProvider } from './context/GoogleAuthContext';
 import Navigation from './components/Navigation';
 import TimerWidget from './components/TimerWidget';
-import QuickStartFAB from './components/QuickStartFAB';
 import { UpdateBanner, OfflineBanner } from './components/PWABanners';
 import { useServiceWorker } from './hooks/useServiceWorker';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -99,7 +98,6 @@ function AppContent() {
         </div>
       </main>
 
-      <QuickStartFAB />
       <DebugOverlay />
     </div>
   );

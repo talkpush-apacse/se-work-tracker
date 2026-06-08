@@ -5,7 +5,7 @@ import {
   Loader2, Sparkles, ChevronLeft, ChevronRight,
   Calendar, User, Tag, AlertCircle, Archive, ArchiveX, Trash2,
   Settings, RotateCcw, Pencil, GripVertical, ExternalLink, Link2, ArrowLeft,
-  Timer, Square, Pin, CheckSquare, Paperclip, Clock,
+  Pin, CheckSquare, Paperclip, Clock,
   Table2, X, RefreshCw, Video,
 } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
@@ -13,7 +13,6 @@ import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } 
 import { CSS } from '@dnd-kit/utilities';
 import { parseISO } from 'date-fns';
 import { useAppStore } from '../context/StoreContext';
-import { useTimerContext, useTimerDisplay } from '../context/TimerContext';
 import { callClaude, callOpenAI } from '../lib/api';
 import { getWeekRangeForOffset, formatWeekLabel, isInRange } from '../utils/dateHelpers';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -25,8 +24,6 @@ import {
   AI_OUTPUT_TYPES, AI_OUTPUT_TYPE_LABELS,
   TASK_RECIPIENTS,
   CUSTOMER_COLORS,
-  AUTO_TRACK_RATE,
-  AUTO_TRACK_MIN_SECONDS,
   WORK_TYPES, WORK_TYPE_LABELS, WORK_TYPE_COLORS,
 } from '../constants';
 import Modal from '../components/Modal';
@@ -958,73 +955,6 @@ const AIWorkspace = memo(function AIWorkspace({ task, customer }) {
   );
 });
 
-// ─── Timer quick task form — minimal form to create a task and start the timer ───
-function TimerQuickTaskForm({ customers, onSubmit, onStartWithoutTask, onCancel }) {
-  const [description, setDescription] = useState('');
-  const [customerId, setCustomerId]   = useState('');
-  const canSubmit = description.trim().length > 0;
-
-  return (
-    <div className="mb-3 bg-secondary/60 border border-status-success/30 rounded-xl p-3 space-y-3">
-      <p className="text-xs font-semibold text-status-success/80 uppercase tracking-wide">Focus Task</p>
-
-      <div>
-        <label className="block text-xs text-muted-foreground mb-1">What are you working on? *</label>
-        <input
-          type="text"
-          autoFocus
-          value={description}
-          onChange={e => setDescription(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && canSubmit && onSubmit(description.trim(), customerId)}
-          placeholder="e.g. Review onboarding deck for Accenture"
-          className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
-        />
-      </div>
-
-      <div>
-        <label className="block text-xs text-muted-foreground mb-1">
-          Customer <span className="opacity-60">(optional)</span>
-        </label>
-        <select
-          value={customerId}
-          onChange={e => setCustomerId(e.target.value)}
-          className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring/40"
-        >
-          <option value="">— No specific client —</option>
-          {[...customers].sort((a, b) => a.name.localeCompare(b.name)).map(c => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </select>
-      </div>
-
-      <div className="flex gap-2 pt-1">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="py-2 px-3 rounded-xl bg-muted hover:bg-muted/80 text-xs font-medium transition-colors"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          onClick={onStartWithoutTask}
-          className="flex-1 py-2 rounded-xl bg-secondary border border-border text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-        >
-          Start without task
-        </button>
-        <button
-          type="button"
-          disabled={!canSubmit}
-          onClick={() => onSubmit(description.trim(), customerId)}
-          className="flex-1 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-emerald-700 border border-emerald-200 transition-colors"
-        >
-          Create &amp; Start Timer
-        </button>
-      </div>
-    </div>
-  );
-}
-
 // ─── Quick add task form (no meeting entry, just description + customer link) ───
 function QuickAddTaskForm({ customers, onSubmit, onCancel }) {
   const { okrs } = useAppStore();
@@ -1354,8 +1284,6 @@ function QuickAddTaskForm({ customers, onSubmit, onCancel }) {
 // ─── Sortable task row (elevated card with drag handle) ───────────────────────
 const SortableTaskRow = memo(function SortableTaskRow({ task, customer, onOpenDetail, isSelected, onToggleSelect, onStatusChange }) {
   const { updateTask } = useAppStore();
-  const { isRunning, taskId: runningTaskId } = useTimerContext();
-  const isTimerActive = isRunning && runningTaskId === task.id;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
 
@@ -1414,12 +1342,9 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, customer, onOpenDe
         className="flex-1 min-w-0 cursor-pointer"
         onClick={() => onOpenDetail(task)}
       >
-        {/* Client tag + timer dot row — above title */}
-        {(isTimerActive || customer) && (
+        {/* Client tag row — above title */}
+        {customer && (
           <div className="flex items-center gap-1.5 mb-1.5">
-            {isTimerActive && (
-              <span className="w-2 h-2 rounded-full bg-status-success animate-pulse flex-shrink-0" title="Timer running" />
-            )}
             {customer && (
               <span
                 className="text-[11px] font-bold px-2 py-[2px] rounded-[4px]"
@@ -1495,13 +1420,6 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, customer, onOpenDe
 
 // ─── Task detail view (full-width page: metadata + notes + AI Workspace) ───────
 // Format seconds → HH:MM:SS
-function fmtHMS(totalSeconds) {
-  const h = Math.floor(totalSeconds / 3600);
-  const m = Math.floor((totalSeconds % 3600) / 60);
-  const s = totalSeconds % 60;
-  return [h, m, s].map(n => String(n).padStart(2, '0')).join(':');
-}
-
 function formatCount(count, singular, plural = `${singular}s`) {
   return `${count} ${count === 1 ? singular : plural}`;
 }
@@ -1517,12 +1435,6 @@ function TaskDetailView({ task, customer, onBack }) {
     timeLogs,
     meetingEntries,
   } = useAppStore();
-  const { isRunning, taskId: runningTaskId, startTimer, stopTimer } = useTimerContext();
-  const elapsedSeconds = useTimerDisplay();
-
-  // Timer computed flags
-  const isRunningForThisTask = isRunning && runningTaskId === task.id;
-  const isRunningElsewhere   = isRunning && !isRunningForThisTask;
 
   // Local draft state — all saved on blur or debounced
   const [descDraft,  setDescDraft]  = useState(task.description);
@@ -1531,7 +1443,6 @@ function TaskDetailView({ task, customer, onBack }) {
   const notesTimerRef = useRef(null);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [showConfirmArchive, setShowConfirmArchive] = useState(false);
-  const [timerConflict, setTimerConflict] = useState(false);
 
   // Sync draft when task prop changes (e.g. status updated from outside)
   useEffect(() => { setDescDraft(task.description); }, [task.description]);
@@ -1746,32 +1657,6 @@ function TaskDetailView({ task, customer, onBack }) {
             </div>
 
             <div className="flex items-center gap-2">
-              {/* Task timer button */}
-              {isRunningForThisTask ? (
-                <button
-                  onClick={stopTimer}
-                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-destructive/20 hover:bg-destructive/40 text-destructive border border-destructive/50 transition-all animate-pulse font-mono tabular-nums"
-                  title="Stop timer"
-                >
-                  <Square size={12} fill="currentColor" />
-                  {fmtHMS(elapsedSeconds)}
-                </button>
-              ) : (
-                <button
-                  onClick={() => {
-                    if (isRunningElsewhere) {
-                      setTimerConflict(true);
-                    } else {
-                      startTimer(task.workType || 'deep_work', { clientIds: task.customerId ? [task.customerId] : [], taskId: task.id, taskDescription: task.description });
-                    }
-                  }}
-                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-brand-sage/20 hover:bg-brand-sage/40 text-brand-sage border border-brand-sage/50 transition-all shadow-sm shadow-status-success/10"
-                  title="Start timer for this task"
-                >
-                  <Timer size={14} /> Start Timer
-                </button>
-              )}
-
               {/* Archive */}
               <button
                 onClick={() => setShowConfirmArchive(true)}
@@ -1800,17 +1685,6 @@ function TaskDetailView({ task, customer, onBack }) {
           <AIWorkspace task={task} customer={customer} />
         </div>
       </div>
-
-      {/* Timer conflict dialog */}
-      {timerConflict && (
-        <ConfirmDialog
-          title="Timer Already Running"
-          message="A timer is running for another task. Stop it first (you'll be prompted to save that session), then start the timer here."
-          danger={false}
-          onConfirm={() => { stopTimer(); setTimerConflict(false); }}
-          onCancel={() => setTimerConflict(false)}
-        />
-      )}
 
       {/* Archive confirmation dialog */}
       {showConfirmArchive && (
@@ -1848,14 +1722,11 @@ function TaskDetailView({ task, customer, onBack }) {
 // ─── Main Triage page ──────────────────────────────────────────────────────────
 export default function Triage() {
   const {
-    tasks, customers, meetingEntries, updateTask, addTask, reorderTasks, addPoint, okrs,
+    tasks, customers, meetingEntries, updateTask, addTask, reorderTasks, okrs,
     aiSettings,
   } = useAppStore();
-  const { isRunning, taskId: runningTaskId, startTimer, stopTimer } = useTimerContext();
   const [taskDetailId, setTaskDetailId] = useState(null);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
-  const [showTimerTaskForm, setShowTimerTaskForm] = useState(false);
-  const [autoSaveToast, setAutoSaveToast] = useState(null); // { pts, customerName } | null
   const [aiAssistOpen, setAiAssistOpen] = useState(false);
 
   // Voice Comms modal
@@ -2025,54 +1896,9 @@ export default function Triage() {
   };
 
 
-  // ── Auto-timer: start on task open, stop + auto-save points on close ───
-  // Wrapped in useCallback so handleOpenDetail's own useCallback dep array stays stable
-  const autoSaveSession = useCallback((session) => {
-    if (!session || session.elapsedSeconds < AUTO_TRACK_MIN_SECONDS) return;
-    const hours = session.elapsedSeconds / 3600;
-    const pts = Math.round(hours * AUTO_TRACK_RATE * 100) / 100;
-    const clientIds = session.clientIds || [];
-    // Create a point for each tagged client (or one with null if no clients)
-    if (clientIds.length > 0) {
-      clientIds.forEach(cid => {
-        addPoint({
-          customerId: cid,
-          points: Math.round((pts / clientIds.length) * 100) / 100,
-          hours: Math.round((hours / clientIds.length) * 100) / 100,
-          activityType: 'General Admin',
-          comment: `Auto-tracked: ${session.taskDescription || 'Task review'}`,
-          source: 'stopwatch',
-          pomodoroCycles: null,
-        });
-      });
-    } else {
-      addPoint({
-        customerId: null,
-        points: pts,
-        hours: Math.round(hours * 100) / 100,
-        activityType: 'General Admin',
-        comment: `Auto-tracked: ${session.taskDescription || 'Task review'}`,
-        source: 'stopwatch',
-        pomodoroCycles: null,
-      });
-    }
-    // Toast feedback so user knows points were captured
-    const cName = clientIds.length === 1
-      ? customers.find(c => c.id === clientIds[0])?.name || 'task'
-      : clientIds.length > 1 ? `${clientIds.length} clients` : 'task';
-    setAutoSaveToast({ pts, customerName: cName });
-    setTimeout(() => setAutoSaveToast(null), 3000);
-  }, [addPoint, customers]);
-
   const handleOpenDetail = useCallback((task) => {
-    // Auto-stop previous timer if running for a different task
-    if (isRunning && runningTaskId && runningTaskId !== task.id) {
-      autoSaveSession(stopTimer({ silent: true }));
-    }
-    // Always attempt start — startTimer's internal localStorage guard prevents double-start
-    startTimer(task.workType || 'deep_work', { clientIds: task.customerId ? [task.customerId] : [], taskId: task.id, taskDescription: task.description });
     setTaskDetailId(task.id);
-  }, [isRunning, runningTaskId, autoSaveSession, stopTimer, startTimer]);
+  }, []);
 
   // Stable handler passed to every SortableTaskRow — useCallback prevents rows from
   // re-rendering just because the parent re-rendered (works in tandem with memo())
@@ -2083,10 +1909,6 @@ export default function Triage() {
   }, [switchToClosedTab]);
 
   const handleCloseDetail = () => {
-    // Auto-stop timer if running for the current task
-    if (isRunning && runningTaskId === taskDetailId) {
-      autoSaveSession(stopTimer({ silent: true }));
-    }
     // If the task was marked done/archived while in the detail view, switch to Closed tab
     const closedTask = tasks.find(t => t.id === taskDetailId);
     if (closedTask && (closedTask.status === 'done' || closedTask.status === 'archived')) {
@@ -2106,11 +1928,6 @@ export default function Triage() {
   };
 
   // ─── Weekly Update Log handlers ───────────────────────────────────────────────
-
-  // ─── Close timer task form when timer starts from elsewhere ───────────────
-  useEffect(() => {
-    if (isRunning) setShowTimerTaskForm(false);
-  }, [isRunning]);
 
   // ── Task Detail sub-view ───────────────────────────────────────────────────
   if (taskDetailId) {
@@ -2150,24 +1967,9 @@ export default function Triage() {
               filtered ↓
             </button>
           )}
-          {/* Focus Time button — opens quick task form, or starts unlinked timer */}
-          {!isRunning && (
-            <button
-              onClick={() => { setShowTimerTaskForm(v => !v); setShowQuickAdd(false); }}
-              className={`ml-auto flex items-center gap-[6px] px-3.5 py-[7px] rounded-[6px] text-[13px] font-medium border transition-[all_0.15s_ease] ${
-                showTimerTaskForm
-                  ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
-                  : 'bg-card border-border text-muted-foreground hover:bg-card-hover hover:text-foreground'
-              }`}
-              title="Create a focus task and start timer"
-            >
-              <Timer size={12} />
-              Focus Time
-            </button>
-          )}
           <button
             onClick={() => setShowLogMeeting(true)}
-            className="flex items-center gap-[6px] px-3.5 py-[7px] rounded-[6px] text-[13px] font-medium border border-border bg-card text-muted-foreground hover:bg-card-hover hover:text-foreground transition-[all_0.15s_ease]"
+            className="ml-auto flex items-center gap-[6px] px-3.5 py-[7px] rounded-[6px] text-[13px] font-medium border border-border bg-card text-muted-foreground hover:bg-card-hover hover:text-foreground transition-[all_0.15s_ease]"
           >
             <Video size={12} /> Log Meeting
           </button>
@@ -2178,8 +1980,8 @@ export default function Triage() {
             <Sparkles size={12} /> AI Assist
           </button>
           <button
-            onClick={() => { setShowQuickAdd(v => !v); setShowTimerTaskForm(false); }}
-            className={`${isRunning ? 'ml-auto' : ''} flex items-center gap-[6px] px-3.5 py-[7px] rounded-[6px] text-[13px] font-medium transition-[all_0.15s_ease] ${
+            onClick={() => setShowQuickAdd(v => !v)}
+            className={`flex items-center gap-[6px] px-3.5 py-[7px] rounded-[6px] text-[13px] font-medium transition-[all_0.15s_ease] ${
               showQuickAdd
                 ? 'bg-primary text-primary-foreground shadow-md'
                 : 'bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 hover:shadow-md'
@@ -2189,28 +1991,6 @@ export default function Triage() {
             Task
           </button>
         </div>
-
-        {/* Focus timer quick-create form */}
-        {showTimerTaskForm && (
-          <TimerQuickTaskForm
-            customers={customers}
-            onSubmit={(description, customerId) => {
-              const newTask = addTask({
-                customerId: customerId || null,
-                description,
-                workType: 'deep_work',
-                status: 'open',
-              });
-              startTimer('deep_work', { clientIds: customerId ? [customerId] : [], taskId: newTask.id, taskDescription: newTask.description });
-              setShowTimerTaskForm(false);
-            }}
-            onStartWithoutTask={() => {
-              startTimer('deep_work');
-              setShowTimerTaskForm(false);
-            }}
-            onCancel={() => setShowTimerTaskForm(false)}
-          />
-        )}
 
         {/* Quick add task form */}
         {showQuickAdd && (
@@ -2467,7 +2247,7 @@ export default function Triage() {
                   View All Tasks
                 </button>
                 <button
-                  onClick={() => { setShowQuickAdd(v => !v); setShowTimerTaskForm(false); }}
+                  onClick={() => setShowQuickAdd(v => !v)}
                   className="flex items-center gap-[6px] px-3.5 py-[7px] rounded-[6px] text-[13px] font-medium bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 hover:shadow-md transition-[all_0.15s_ease]"
                 >
                   + Add Task
@@ -2618,16 +2398,6 @@ export default function Triage() {
       </div>
 
     </div>
-
-    {/* Auto-save toast — appears bottom-right when timer session is saved */}
-    {autoSaveToast && (
-      <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 text-sm
-                      text-status-success bg-card border border-status-success/20 rounded-xl
-                      px-4 py-2.5 shadow-lg pointer-events-none">
-        <Check size={14} />
-        Auto-saved {autoSaveToast.pts} pts · {autoSaveToast.customerName}
-      </div>
-    )}
 
     {/* Voice FAB — portalled to escape motion.div transform context */}
     {createPortal(

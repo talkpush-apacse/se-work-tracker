@@ -4,12 +4,11 @@ import { POMODORO_CONFIG, POMODORO_INTERVALS, TIMER_MODES } from '../constants';
 const TIMER_KEY = 'gpt-active-timer';
 const MAX_SECONDS = 8 * 60 * 60; // 8 hours
 
-const VALID_TIMER_MODES = new Set(Object.values(TIMER_MODES));
 const VALID_POMODORO_INTERVALS = new Set(Object.values(POMODORO_INTERVALS));
 
 function createDefaultTimerState(overrides = {}) {
   return {
-    mode: TIMER_MODES.STOPWATCH,
+    mode: TIMER_MODES.POMODORO,
     isRunning: false,
     workType: null,
     clientIds: [],
@@ -54,10 +53,10 @@ function getPomodoroIntervalSeconds(interval) {
   return Math.floor(getPomodoroIntervalMs(interval) / 1000);
 }
 
-function resetPomodoroFields(state, mode = state.mode) {
+function resetPomodoroFields(state) {
   return {
     ...state,
-    mode,
+    mode: TIMER_MODES.POMODORO,
     pomodoroInterval: null,
     pomodoroIntervalEndsAt: null,
     pomodoroCompletedCycles: 0,
@@ -85,20 +84,17 @@ function sanitizeTimerState(rawState) {
     shouldPersist = true;
   }
 
-  // Legacy stopwatch payloads did not have a mode field.
-  if (!legacyState.mode) {
-    legacyState.mode = TIMER_MODES.STOPWATCH;
-    shouldPersist = true;
+  // Stopwatch mode has been removed — Pomodoro is the only supported timer.
+  // Drop any legacy stopwatch (or unknown-mode) session to an idle Pomodoro state
+  // so old persisted timers don't resurface.
+  if (legacyState.mode !== TIMER_MODES.POMODORO) {
+    if (legacyState.mode) {
+      warnTimerState('Discarding legacy non-Pomodoro timer state.', legacyState.mode);
+    }
+    return { state: createDefaultTimerState(), shouldPersist: true };
   }
 
-  if (!VALID_TIMER_MODES.has(legacyState.mode)) {
-    warnTimerState('Unknown timer mode. Resetting to stopwatch defaults.', legacyState.mode);
-    legacyState.mode = TIMER_MODES.STOPWATCH;
-    legacyState.isRunning = false;
-    shouldPersist = true;
-  }
-
-  next.mode = legacyState.mode;
+  next.mode = TIMER_MODES.POMODORO;
   next.isRunning = Boolean(legacyState.isRunning);
   next.workType = typeof legacyState.workType === 'string' && legacyState.workType
     ? legacyState.workType
@@ -136,14 +132,6 @@ function sanitizeTimerState(rawState) {
     ? legacyState.pomodoroPausedAt
     : null;
 
-  if (next.mode === TIMER_MODES.STOPWATCH) {
-    if (next.isRunning && !next.startedAt) {
-      warnTimerState('Stopwatch state is missing startedAt. Resetting timer state.', legacyState);
-      return { state: createDefaultTimerState({ mode: TIMER_MODES.STOPWATCH }), shouldPersist: true };
-    }
-    return { state: resetPomodoroFields(next, TIMER_MODES.STOPWATCH), shouldPersist };
-  }
-
   if (!next.startedAt && next.pomodoroStartedAt) {
     next.startedAt = new Date(next.pomodoroStartedAt).toISOString();
     shouldPersist = true;
@@ -151,7 +139,7 @@ function sanitizeTimerState(rawState) {
 
   if (next.isRunning && (!next.pomodoroInterval || !next.pomodoroIntervalEndsAt || !next.pomodoroStartedAt || !next.startedAt)) {
     warnTimerState('Pomodoro state is incomplete. Resetting to pomodoro defaults.', legacyState);
-    return { state: createDefaultTimerState({ mode: TIMER_MODES.POMODORO }), shouldPersist: true };
+    return { state: createDefaultTimerState(), shouldPersist: true };
   }
 
   if (!next.isRunning) {
@@ -188,37 +176,19 @@ function saveTimerState(state) {
   }
 }
 
-function calcStopwatchElapsed(startedAt) {
-  return Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000);
-}
-
 function getSessionWallClockSeconds(state, now = Date.now()) {
-  if (!state?.isRunning) return 0;
-
-  if (state.mode === TIMER_MODES.POMODORO) {
-    if (!state.pomodoroStartedAt) return 0;
-    return Math.floor((now - state.pomodoroStartedAt) / 1000);
-  }
-
-  if (!state.startedAt) return 0;
-  return calcStopwatchElapsed(state.startedAt);
+  if (!state?.isRunning || !state.pomodoroStartedAt) return 0;
+  return Math.floor((now - state.pomodoroStartedAt) / 1000);
 }
 
 function getDisplaySeconds(state) {
-  if (!state?.isRunning) return 0;
-
-  if (state.mode === TIMER_MODES.POMODORO) {
-    if (!state.pomodoroIntervalEndsAt) return 0;
-    const now = state.pomodoroPausedAt ?? Date.now();
-    return Math.max(0, Math.ceil((state.pomodoroIntervalEndsAt - now) / 1000));
-  }
-
-  if (!state.startedAt) return 0;
-  return Math.min(calcStopwatchElapsed(state.startedAt), MAX_SECONDS);
+  if (!state?.isRunning || !state.pomodoroIntervalEndsAt) return 0;
+  const now = state.pomodoroPausedAt ?? Date.now();
+  return Math.max(0, Math.ceil((state.pomodoroIntervalEndsAt - now) / 1000));
 }
 
 function getCurrentWorkElapsedSeconds(state, now = Date.now()) {
-  if (!state || state.mode !== TIMER_MODES.POMODORO || state.pomodoroInterval !== POMODORO_INTERVALS.WORK || !state.pomodoroIntervalEndsAt) {
+  if (!state || state.pomodoroInterval !== POMODORO_INTERVALS.WORK || !state.pomodoroIntervalEndsAt) {
     return 0;
   }
 
@@ -263,7 +233,6 @@ function advancePomodoroState(state, { transitionAt, completeCurrentWork = true 
 function resolvePomodoroTransitions(state, now, onIntervalEnd) {
   if (
     !state
-    || state.mode !== TIMER_MODES.POMODORO
     || !state.isRunning
     || state.pomodoroPausedAt
     || !state.pomodoroInterval
@@ -308,30 +277,27 @@ function buildStoppedSession(state, elapsedSeconds) {
   };
 }
 
-function createIdleState(mode) {
-  return createDefaultTimerState({ mode });
+function createIdleState() {
+  return createDefaultTimerState();
 }
 
 function clearStoppedPomodoroState(state) {
-  return resetPomodoroFields(
-    {
-      ...state,
-      isRunning: false,
-      workType: null,
-      clientIds: [],
-      taskId: null,
-      taskDescription: null,
-      okrId: null,
-      notionTaskId: null,
-      notionTaskName: null,
-      notionAccount: null,
-      notionOkr: null,
-      notionOkrPageId: null,
-      pendingTasks: [],
-      startedAt: null,
-    },
-    TIMER_MODES.POMODORO
-  );
+  return resetPomodoroFields({
+    ...state,
+    isRunning: false,
+    workType: null,
+    clientIds: [],
+    taskId: null,
+    taskDescription: null,
+    okrId: null,
+    notionTaskId: null,
+    notionTaskName: null,
+    notionAccount: null,
+    notionOkr: null,
+    notionOkrPageId: null,
+    pendingTasks: [],
+    startedAt: null,
+  });
 }
 
 export function useTimer() {
@@ -364,28 +330,11 @@ export function useTimer() {
     setElapsedSeconds(getDisplaySeconds(nextState));
   }, []);
 
-  const stopStopwatch = useCallback(({ silent = false } = {}) => {
-    clearInterval_();
-
-    const current = loadTimerState();
-    if (!current.isRunning || current.mode !== TIMER_MODES.STOPWATCH) return null;
-
-    const elapsed = Math.min(calcStopwatchElapsed(current.startedAt), MAX_SECONDS);
-    const session = buildStoppedSession(current, elapsed);
-    const nextState = createIdleState(TIMER_MODES.STOPWATCH);
-
-    saveTimerState(nextState);
-    syncState(nextState);
-
-    if (!silent) setStoppedSession(session);
-    return session;
-  }, [clearInterval_, syncState]);
-
   const stopPomodoro = useCallback(({ silent = false } = {}) => {
     clearInterval_();
 
     const current = loadTimerState();
-    if (!current.isRunning || current.mode !== TIMER_MODES.POMODORO) return null;
+    if (!current.isRunning) return null;
 
     const now = Date.now();
     const { state: resolvedState, transitioned } = resolvePomodoroTransitions(current, now, onIntervalEndRef.current);
@@ -402,7 +351,7 @@ export function useTimer() {
 
     const session = buildStoppedSession(normalizedState, accumulatedSeconds);
     const nextState = silent
-      ? createIdleState(TIMER_MODES.POMODORO)
+      ? createIdleState()
       : {
           ...normalizedState,
           isRunning: false,
@@ -420,12 +369,8 @@ export function useTimer() {
     const current = loadTimerState();
     if (!current.isRunning) return null;
 
-    if (current.mode === TIMER_MODES.POMODORO) {
-      return stopPomodoro(options);
-    }
-
-    return stopStopwatch(options);
-  }, [stopPomodoro, stopStopwatch]);
+    return stopPomodoro(options);
+  }, [stopPomodoro]);
 
   const tick = useCallback(() => {
     const current = loadTimerState();
@@ -441,13 +386,11 @@ export function useTimer() {
       return;
     }
 
-    if (current.mode === TIMER_MODES.POMODORO) {
-      const { state: nextState, transitioned } = resolvePomodoroTransitions(current, Date.now(), onIntervalEndRef.current);
-      if (transitioned) {
-        saveTimerState(nextState);
-        syncState(nextState);
-        return;
-      }
+    const { state: nextState, transitioned } = resolvePomodoroTransitions(current, Date.now(), onIntervalEndRef.current);
+    if (transitioned) {
+      saveTimerState(nextState);
+      syncState(nextState);
+      return;
     }
 
     setElapsedSeconds(getDisplaySeconds(current));
@@ -501,63 +444,6 @@ export function useTimer() {
     return () => window.removeEventListener('storage', handler);
   }, [clearInterval_, startTick, syncState]);
 
-  const setMode = useCallback((mode) => {
-    if (!VALID_TIMER_MODES.has(mode)) {
-      warnTimerState('Attempted to set an unknown timer mode.', mode);
-      return;
-    }
-
-    const current = loadTimerState();
-    if (current.isRunning) {
-      warnTimerState('Cannot switch timer mode while the timer is running.', current.mode);
-      return;
-    }
-
-    const nextState = mode === TIMER_MODES.POMODORO
-      ? createIdleState(TIMER_MODES.POMODORO)
-      : createIdleState(TIMER_MODES.STOPWATCH);
-
-    saveTimerState(nextState);
-    syncState(nextState);
-  }, [syncState]);
-
-  const startTimer = useCallback((workType, {
-    clientIds = [],
-    taskId = null,
-    taskDescription = null,
-    okrId = null,
-    notionTaskId = null,
-    notionTaskName = null,
-    notionAccount = null,
-    notionOkr = null,
-    notionOkrPageId = null,
-  } = {}) => {
-    const existing = loadTimerState();
-    if (existing.isRunning) return;
-
-    const startedAt = new Date().toISOString();
-    const nextState = createDefaultTimerState({
-      mode: TIMER_MODES.STOPWATCH,
-      isRunning: true,
-      workType,
-      clientIds,
-      taskId,
-      taskDescription,
-      okrId,
-      notionTaskId,
-      notionTaskName,
-      notionAccount,
-      notionOkr,
-      notionOkrPageId,
-      pendingTasks: [],
-      startedAt,
-    });
-
-    saveTimerState(nextState);
-    syncState(nextState);
-    startTick();
-  }, [startTick, syncState]);
-
   const startPomodoro = useCallback(({
     workType = 'deep_work',
     clientIds = [],
@@ -609,7 +495,7 @@ export function useTimer() {
 
   const pausePomodoro = useCallback(() => {
     const current = loadTimerState();
-    if (!current.isRunning || current.mode !== TIMER_MODES.POMODORO || current.pomodoroPausedAt) return;
+    if (!current.isRunning || current.pomodoroPausedAt) return;
 
     const nextState = {
       ...current,
@@ -622,7 +508,7 @@ export function useTimer() {
 
   const resumePomodoro = useCallback(() => {
     const current = loadTimerState();
-    if (!current.isRunning || current.mode !== TIMER_MODES.POMODORO || !current.pomodoroPausedAt || !current.pomodoroIntervalEndsAt) return;
+    if (!current.isRunning || !current.pomodoroPausedAt || !current.pomodoroIntervalEndsAt) return;
 
     const now = Date.now();
     const pauseDuration = now - current.pomodoroPausedAt;
@@ -639,7 +525,7 @@ export function useTimer() {
 
   const skipInterval = useCallback(() => {
     const current = loadTimerState();
-    if (!current.isRunning || current.mode !== TIMER_MODES.POMODORO || !current.pomodoroInterval) return;
+    if (!current.isRunning || !current.pomodoroInterval) return;
 
     const nextState = advancePomodoroState(current, {
       transitionAt: Date.now(),
@@ -669,7 +555,7 @@ export function useTimer() {
     setStoppedSession(null);
 
     const current = loadTimerState();
-    if (current.mode === TIMER_MODES.POMODORO && !current.isRunning) {
+    if (!current.isRunning) {
       const nextState = clearStoppedPomodoroState(current);
       saveTimerState(nextState);
       syncState(nextState);
@@ -683,7 +569,7 @@ export function useTimer() {
   return {
     mode: timerState.mode,
     isRunning: timerState.isRunning,
-    isPaused: timerState.mode === TIMER_MODES.POMODORO && !!timerState.pomodoroPausedAt,
+    isPaused: !!timerState.pomodoroPausedAt,
     workType: timerState.workType ?? null,
     clientIds: timerState.clientIds ?? [],
     taskId: timerState.taskId ?? null,
@@ -704,9 +590,7 @@ export function useTimer() {
     pomodoroStartedAt: timerState.pomodoroStartedAt ?? null,
     pomodoroPausedAt: timerState.pomodoroPausedAt ?? null,
     clearStoppedSession,
-    setMode,
     setOnIntervalEnd,
-    startTimer,
     stopTimer,
     addPendingTask,
     startPomodoro,

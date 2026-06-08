@@ -3,13 +3,6 @@ import { createPortal } from 'react-dom';
 import {
   Timer,
   Square,
-  Brain,
-  Users,
-  MessageSquare,
-  ClipboardList,
-  Plus,
-  X,
-  Check,
   Play,
   Pause,
   SkipForward,
@@ -22,31 +15,14 @@ import { useAppStore } from '../context/StoreContext';
 import {
   POMODORO_CONFIG,
   POMODORO_INTERVALS,
-  TIMER_MODES,
-  WORK_TYPE_LABELS,
-  WORK_TYPE_COLORS,
 } from '../constants';
 import SaveSessionModal from './SaveSessionModal';
 import StartTimerModal from './StartTimerModal';
 import { Button } from './ui/button';
 
-const WORK_TYPE_ICONS = {
-  deep_work: Brain,
-  meetings: Users,
-  comms: MessageSquare,
-  admin: ClipboardList,
-};
-
 const NOTIFICATION_PROMPT_KEY = 'gpt-pomodoro-notification-prompted';
 const CHECK_IN_INTERVAL_SECONDS = 2 * 3600; // show check-in modal every 2 hours
 const CHECK_IN_AUTO_STOP_SECONDS = 5 * 60;  // auto-stop after 5 min with no response
-
-function formatHMS(totalSeconds) {
-  const h = Math.floor(totalSeconds / 3600);
-  const m = Math.floor((totalSeconds % 3600) / 60);
-  const s = totalSeconds % 60;
-  return [h, m, s].map(n => String(n).padStart(2, '0')).join(':');
-}
 
 function formatMMSS(totalSeconds) {
   const minutes = Math.floor(totalSeconds / 60);
@@ -113,17 +89,12 @@ function getPomodoroAlertCopy(prevInterval, nextInterval) {
 
 export default function TimerWidget() {
   const {
-    mode,
     isRunning,
     isPaused,
-    workType,
     clientIds,
-    pendingTasks,
     stoppedSession,
     clearStoppedSession,
     stopTimer,
-    addPendingTask,
-    setMode,
     setOnIntervalEnd,
     startPomodoro,
     stopPomodoro,
@@ -132,25 +103,17 @@ export default function TimerWidget() {
     skipInterval,
     pomodoroInterval,
     pomodoroCompletedCycles,
-    startedAt,
     pomodoroStartedAt,
   } = useTimerContext();
   const elapsedSeconds = useTimerDisplay();
   const { customers } = useAppStore();
 
   const [showSave, setShowSave] = useState(false);
-  const [showPopover, setShowPopover] = useState(false);
-  const [showStopwatchStart, setShowStopwatchStart] = useState(false);
   const [showPomodoroStart, setShowPomodoroStart] = useState(false);
-  const [newDesc, setNewDesc] = useState('');
-  const [newClientId, setNewClientId] = useState('');
-  const [justAdded, setJustAdded] = useState(false);
   const [sidebarSlot, setSidebarSlot] = useState(null);
   const [showCheckIn, setShowCheckIn] = useState(false);
   const [checkInCountdown, setCheckInCountdown] = useState(5 * 60);
 
-  const inputRef = useRef(null);
-  const popoverRef = useRef(null);
   const audioRef = useRef(null);
   const audioUnlockedRef = useRef(false);
   const titlePulseRef = useRef(null);
@@ -158,11 +121,7 @@ export default function TimerWidget() {
   const lastCheckInBoundaryRef = useRef(0);
   const checkInCountdownRef = useRef(null);
 
-  const activeWorkType = isRunning ? workType : stoppedSession?.workType;
   const activeClientIds = isRunning ? clientIds : (stoppedSession?.clientIds || []);
-  const Icon = WORK_TYPE_ICONS[activeWorkType] || Timer;
-  const colors = WORK_TYPE_COLORS[activeWorkType] || WORK_TYPE_COLORS.deep_work;
-  const stopwatchLabel = WORK_TYPE_LABELS[activeWorkType] || 'Stopwatch';
 
   const clientCount = activeClientIds.length;
   const clientLabel = clientCount === 1
@@ -170,12 +129,6 @@ export default function TimerWidget() {
     : clientCount > 1
       ? `${clientCount} clients`
       : null;
-
-  const sortedCustomers = [...customers].sort((a, b) => {
-    if (a.pinned && !b.pinned) return -1;
-    if (!a.pinned && b.pinned) return 1;
-    return a.name.localeCompare(b.name);
-  });
 
   const pomodoroMeta = getPomodoroMeta(pomodoroInterval || POMODORO_INTERVALS.WORK);
   const cycleFillCount = pomodoroCompletedCycles > 0 && pomodoroCompletedCycles % POMODORO_CONFIG.CYCLES_BEFORE_LONG_BREAK === 0
@@ -322,18 +275,14 @@ export default function TimerWidget() {
       setShowCheckIn(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startedAt, pomodoroStartedAt]);
+  }, [pomodoroStartedAt]);
 
   // Fire check-in modal at every 2-hour wall-clock boundary (2h, 4h, 6h)
   useEffect(() => {
     if (!isRunning || showCheckIn) return;
 
     let wallClockSeconds = 0;
-    if (mode === TIMER_MODES.POMODORO) {
-      if (pomodoroStartedAt) wallClockSeconds = Math.floor((Date.now() - pomodoroStartedAt) / 1000);
-    } else {
-      if (startedAt) wallClockSeconds = Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000);
-    }
+    if (pomodoroStartedAt) wallClockSeconds = Math.floor((Date.now() - pomodoroStartedAt) / 1000);
 
     const boundary = Math.floor(wallClockSeconds / CHECK_IN_INTERVAL_SECONDS);
     if (boundary < 1 || boundary > 3) return;
@@ -363,8 +312,8 @@ export default function TimerWidget() {
       });
     }, 1000);
   }, [
-    isRunning, elapsedSeconds, showCheckIn, mode,
-    startedAt, pomodoroStartedAt,
+    isRunning, elapsedSeconds, showCheckIn,
+    pomodoroStartedAt,
     startTitlePulse, playBell, showBrowserNotification, stopTitlePulse, stopTimer,
   ]);
 
@@ -388,7 +337,6 @@ export default function TimerWidget() {
   useEffect(() => {
     if (stoppedSession) {
       setShowSave(true);
-      setShowPopover(false);
       stopTitlePulse();
       clearCheckInCountdown();
       setShowCheckIn(false);
@@ -404,27 +352,6 @@ export default function TimerWidget() {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [stopTitlePulse]);
 
-  useEffect(() => {
-    if (showPopover) {
-      setNewClientId(clientIds.length === 1 ? String(clientIds[0]) : '');
-      setNewDesc('');
-      setTimeout(() => inputRef.current?.focus(), 50);
-    }
-  }, [clientIds, showPopover]);
-
-  useEffect(() => {
-    if (!showPopover) return;
-
-    const handler = (e) => {
-      if (popoverRef.current && !popoverRef.current.contains(e.target)) {
-        setShowPopover(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [showPopover]);
-
   useEffect(() => stopTitlePulse, [stopTitlePulse]);
 
   useEffect(() => {
@@ -435,43 +362,6 @@ export default function TimerWidget() {
   const handleSaveClose = () => {
     setShowSave(false);
     clearStoppedSession();
-  };
-
-  const handleAddTask = () => {
-    const desc = newDesc.trim();
-    if (!desc) return;
-
-    addPendingTask({ description: desc, clientId: newClientId || '', okrId: '' });
-    setNewDesc('');
-    setNewClientId(clientIds.length === 1 ? String(clientIds[0]) : '');
-    setJustAdded(true);
-
-    setTimeout(() => {
-      setJustAdded(false);
-      inputRef.current?.focus();
-    }, 800);
-  };
-
-  const handleTaskKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleAddTask();
-    }
-    if (e.key === 'Escape') setShowPopover(false);
-  };
-
-  const handleModeChange = async (nextMode) => {
-    if (isRunning || nextMode === mode) return;
-
-    stopTitlePulse();
-
-    if (nextMode === TIMER_MODES.POMODORO) {
-      console.warn('[pomo] handleModeChange: requesting notification permission');
-      await maybeRequestNotificationPermission();
-      console.warn('[pomo] handleModeChange: notification permission done');
-    }
-
-    setMode(nextMode);
   };
 
   const handlePomodoroStart = async ({ workType: nextWorkType, clientIds: nextClientIds, okrId, notionTask }) => {
@@ -523,197 +413,10 @@ export default function TimerWidget() {
     skipInterval();
   };
 
-  const handleStopwatchStop = () => {
-    stopTitlePulse();
-    stopTimer();
-  };
-
-  const renderModeToggle = (compact = false) => (
-    <div className={`grid grid-cols-2 gap-1 rounded-xl bg-secondary/70 p-1 ${compact ? 'text-[11px]' : ''}`}>
-      <button
-        type="button"
-        onClick={() => handleModeChange(TIMER_MODES.STOPWATCH)}
-        disabled={isRunning}
-        className={`rounded-lg font-semibold transition-all ${
-          compact ? 'px-2 py-1.5 text-[11px]' : 'px-3 py-2 text-xs'
-        } ${
-          mode === TIMER_MODES.STOPWATCH
-            ? 'bg-card text-foreground shadow-sm'
-            : 'text-muted-foreground hover:text-foreground'
-        } disabled:cursor-not-allowed disabled:opacity-60`}
-      >
-        Stopwatch
-      </button>
-      <button
-        type="button"
-        onClick={() => handleModeChange(TIMER_MODES.POMODORO)}
-        disabled={isRunning}
-        className={`rounded-lg font-semibold transition-all ${
-          compact ? 'px-2 py-1.5 text-[11px]' : 'px-3 py-2 text-xs'
-        } ${
-          mode === TIMER_MODES.POMODORO
-            ? 'bg-card text-foreground shadow-sm'
-            : 'text-muted-foreground hover:text-foreground'
-        } disabled:cursor-not-allowed disabled:opacity-60`}
-      >
-        Pomodoro
-      </button>
-    </div>
-  );
-
-  const renderStopwatchBody = (compact = false) => {
-    if (!isRunning) {
-      return (
-        <div className={compact ? 'space-y-2' : 'space-y-3'}>
-          <div className={`rounded-xl border border-border bg-secondary/35 ${compact ? 'px-3 py-3' : 'px-4 py-4'}`}>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Stopwatch</p>
-            <p className={`mt-2 font-mono font-bold tabular-nums text-foreground ${compact ? 'text-2xl' : 'text-3xl'}`}>00:00:00</p>
-            <p className={`mt-2 leading-relaxed text-muted-foreground ${compact ? 'text-[11px]' : 'text-xs'}`}>
-              Use the regular timer for open-ended work. You can still start it from task cards, quick start, or here.
-            </p>
-          </div>
-
-          <Button
-            size="sm"
-            className="w-full rounded-xl"
-            onClick={() => {
-              stopTitlePulse();
-              setShowStopwatchStart(true);
-            }}
-          >
-            <Play size={14} />
-            Start Stopwatch
-          </Button>
-        </div>
-      );
-    }
-
-    return (
-      <div className={compact ? 'space-y-2' : 'space-y-3'}>
-        <div className={`rounded-xl border border-border bg-secondary/35 ${compact ? 'px-3 py-3' : 'px-4 py-4'}`}>
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="relative flex h-2.5 w-2.5 flex-shrink-0">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-status-success opacity-60" />
-                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-status-success" />
-                </span>
-                <p className={`font-semibold uppercase tracking-[0.18em] text-muted-foreground ${compact ? 'text-[11px]' : 'text-xs'}`}>Stopwatch</p>
-              </div>
-              <p className={`mt-2 font-semibold text-foreground ${compact ? 'text-[13px]' : 'text-sm'}`}>{stopwatchLabel}</p>
-              {clientLabel && <p className={`mt-0.5 text-muted-foreground ${compact ? 'text-[11px]' : 'text-xs'}`}>{clientLabel}</p>}
-            </div>
-            <span className={`rounded-full border font-semibold ${compact ? 'px-2 py-0.5 text-[9px]' : 'px-2.5 py-1 text-[10px]'} ${colors.bg} ${colors.text} ${colors.border}`}>
-              Live
-            </span>
-          </div>
-
-          <div className={`flex items-end justify-between gap-3 ${compact ? 'mt-3' : 'mt-4'}`}>
-            <span className={`font-mono font-bold tabular-nums text-foreground ${compact ? 'text-[2.25rem]' : 'text-3xl'}`}>
-              {formatHMS(elapsedSeconds)}
-            </span>
-            <Icon size={16} className="text-muted-foreground" />
-          </div>
-        </div>
-
-        <div className="relative" ref={popoverRef}>
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              className="rounded-xl"
-              onClick={() => {
-                stopTitlePulse();
-                setShowPopover(prev => !prev);
-              }}
-            >
-              <Plus size={14} />
-              Task{pendingTasks.length > 0 ? ` (${pendingTasks.length})` : ''}
-            </Button>
-            <Button
-              variant="destructive"
-              size="sm"
-              className="rounded-xl"
-              onClick={handleStopwatchStop}
-            >
-              <Square size={14} fill="currentColor" />
-              Stop
-            </Button>
-          </div>
-
-          {showPopover && (
-            <div className="absolute left-0 right-0 top-full z-50 mt-2 rounded-2xl border border-border bg-card p-3 shadow-lg">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Log A Task
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setShowPopover(false)}
-                  className="text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  <X size={13} />
-                </button>
-              </div>
-
-              {pendingTasks.length > 0 && (
-                <div className="mt-2 space-y-1.5">
-                  {pendingTasks.map((task, index) => (
-                    <div key={`${task.description}-${index}`} className="flex items-start gap-1.5 rounded-lg bg-secondary/60 px-2.5 py-1.5">
-                      <Check size={10} className="mt-0.5 flex-shrink-0 text-status-success" />
-                      <span className="line-clamp-1 text-[11px] leading-snug text-muted-foreground">{task.description}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="mt-2 flex gap-2">
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={newDesc}
-                  onChange={e => setNewDesc(e.target.value)}
-                  onKeyDown={handleTaskKeyDown}
-                  placeholder="What are you working on?"
-                  className="flex-1 rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring/40"
-                />
-                <button
-                  type="button"
-                  onClick={handleAddTask}
-                  disabled={!newDesc.trim()}
-                  className={`flex items-center justify-center rounded-xl px-3 py-2 text-xs font-bold transition-all ${
-                    justAdded
-                      ? 'bg-status-success text-white'
-                      : newDesc.trim()
-                        ? 'bg-secondary text-foreground hover:bg-secondary/80'
-                        : 'cursor-not-allowed bg-secondary/40 text-muted-foreground/40'
-                  }`}
-                >
-                  {justAdded ? <Check size={13} /> : <Plus size={13} />}
-                </button>
-              </div>
-
-              {customers.length > 0 && (
-                <select
-                  value={newClientId}
-                  onChange={e => setNewClientId(e.target.value)}
-                  className="mt-2 h-8 w-full rounded-xl border border-border bg-background px-2.5 text-[11px] text-foreground focus:border-ring focus:outline-none"
-                >
-                  <option value="">No client</option>
-                  {sortedCustomers.map(customer => (
-                    <option key={customer.id} value={customer.id}>{customer.name}</option>
-                  ))}
-                </select>
-              )}
-
-              <p className="mt-2 text-[10px] text-muted-foreground/70">
-                Press Enter to queue a task note for the save modal.
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-    );
+  const handleNotificationPrompt = async () => {
+    console.warn('[pomo] requesting notification permission');
+    await maybeRequestNotificationPermission();
+    console.warn('[pomo] notification permission done');
   };
 
   const renderPomodoroBody = (compact = false) => {
@@ -754,8 +457,9 @@ export default function TimerWidget() {
           <Button
             size="sm"
             className="w-full rounded-xl"
-            onClick={() => {
+            onClick={async () => {
               stopTitlePulse();
+              await handleNotificationPrompt();
               setShowPomodoroStart(true);
             }}
           >
@@ -858,23 +562,15 @@ export default function TimerWidget() {
         <div>
           <p className={`font-semibold uppercase tracking-[0.18em] text-muted-foreground ${compact ? 'text-[10px]' : 'text-xs'}`}>Focus Timer</p>
           <p className={`mt-0.5 text-muted-foreground ${compact ? 'text-[11px]' : 'text-sm'}`}>
-            {mode === TIMER_MODES.POMODORO ? 'Structured focus cycles' : 'Freeform time tracking'}
+            Structured focus cycles
           </p>
         </div>
-        {mode === TIMER_MODES.POMODORO && (
-          <span className={`rounded-full border font-semibold ${compact ? 'px-2 py-0.5 text-[9px]' : 'px-2.5 py-1 text-[10px]'} ${getPomodoroMeta(isRunning ? pomodoroInterval : POMODORO_INTERVALS.WORK).pill}`}>
-            Pomodoro
-          </span>
-        )}
+        <span className={`rounded-full border font-semibold ${compact ? 'px-2 py-0.5 text-[9px]' : 'px-2.5 py-1 text-[10px]'} ${getPomodoroMeta(isRunning ? pomodoroInterval : POMODORO_INTERVALS.WORK).pill}`}>
+          Pomodoro
+        </span>
       </div>
 
-      {renderModeToggle(compact)}
-      {isRunning && (
-        <p className={`text-muted-foreground ${compact ? 'text-[10px]' : 'text-[11px]'}`}>
-          Stop the current timer to switch modes.
-        </p>
-      )}
-      {mode === TIMER_MODES.POMODORO ? renderPomodoroBody(compact) : renderStopwatchBody(compact)}
+      {renderPomodoroBody(compact)}
     </div>
   );
 
@@ -889,14 +585,6 @@ export default function TimerWidget() {
           {renderCard(true)}
         </div>,
         sidebarSlot
-      )}
-
-      {showStopwatchStart && (
-        <StartTimerModal
-          title="Start Stopwatch"
-          submitLabel="Start Stopwatch"
-          onClose={() => setShowStopwatchStart(false)}
-        />
       )}
 
       {showPomodoroStart && (

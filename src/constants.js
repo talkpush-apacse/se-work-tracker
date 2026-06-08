@@ -196,12 +196,10 @@ export const STRESS_LEVELS = [
   { level: 5, emoji: '🤯', label: 'Overwhelming', desc: 'Survival mode. Reactive all day, significant anxiety.' },
 ];
 
-// Points-per-hour rate for auto-tracked task sessions (2150 / 160 hours)
+// Points-per-hour rate for timed Pomodoro sessions (2150 / 160 hours)
 export const AUTO_TRACK_RATE = 2150 / 160; // 13.4375
-export const AUTO_TRACK_MIN_SECONDS = 30;  // Ignore sessions shorter than 30s
 
 export const TIMER_MODES = {
-  STOPWATCH: 'stopwatch',
   POMODORO: 'pomodoro',
 };
 
