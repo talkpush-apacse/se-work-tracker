@@ -1,11 +1,9 @@
 import { useState, useMemo, useRef } from 'react';
-import { Trophy, Zap, Clock, Flame, Activity, TrendingUp, Star, Plus, Timer, Users, Brain } from 'lucide-react';
+import { Trophy, Zap, Clock, Flame, Activity, TrendingUp, Star, Plus, Users, Brain } from 'lucide-react';
 import { useAppStore } from '../context/StoreContext';
-import { useTimerContext } from '../context/TimerContext';
 import { startOfWeek, format } from 'date-fns';
 import { getThisWeekRange, filterPointsByRange, formatRelative, formatDateTime, getStreakDays } from '../utils/dateHelpers';
 import AddPointsModal from '../components/AddPointsModal';
-import ConfirmDialog from '../components/ConfirmDialog';
 import { WORK_TYPES, WORK_TYPE_LABELS, WORK_TYPE_COLORS } from '../constants';
 import { StatCard } from '../components/StatCard';
 import PomosView from '../components/PomosView';
@@ -32,10 +30,8 @@ function CustomerBadge({ customerId, customers, size = 'sm' }) {
 
 export default function Dashboard({ onNavigate }) {
   const { customers, okrs, points, tasks, timeLogs, getWorkTypeTargets } = useAppStore();
-  const { isRunning, clientIds: runningClientIds, startTimer, stopTimer } = useTimerContext();
   const [activeTab, setActiveTab] = useState('pomos');
   const [addModal, setAddModal] = useState(null); // holds customer object for AddPointsModal
-  const [timerConflict, setTimerConflict] = useState(null); // holds the customer to start after conflict
   const [flashId, setFlashId] = useState(null);
 
   // Week stats — only recompute when points array changes
@@ -281,27 +277,6 @@ export default function Dashboard({ onNavigate }) {
                           <p className="text-[11px] text-muted-foreground">{customer.totalHours.toFixed(1)}h</p>
                         )}
                       </div>
-                      {/* Timer button */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (isRunning && !runningClientIds.includes(customer.id)) {
-                            setTimerConflict(customer);
-                          } else if (!isRunning) {
-                            startTimer('deep_work', { clientIds: [customer.id] });
-                          }
-                          // If already running for THIS customer, widget is visible — no action needed
-                        }}
-                        aria-label={runningClientIds.includes(customer.id) ? `Timer running for ${customer.name}` : `Start timer for ${customer.name}`}
-                        className={`p-1.5 rounded-lg transition-colors flex-shrink-0 ${
-                          runningClientIds.includes(customer.id)
-                            ? 'bg-brand-sage/30 text-brand-sage cursor-default'
-                            : 'bg-muted/50 hover:bg-brand-sage/20 text-muted-foreground hover:text-brand-sage'
-                        }`}
-                        title={runningClientIds.includes(customer.id) ? 'Timer running' : 'Start timer'}
-                      >
-                        <Timer size={13} />
-                      </button>
                       {/* Add points button */}
                       <button
                         onClick={(e) => { e.stopPropagation(); setAddModal(customer); }}
@@ -398,15 +373,6 @@ export default function Dashboard({ onNavigate }) {
         />
       )}
 
-      {timerConflict && (
-        <ConfirmDialog
-          title="Timer Already Running"
-          message={`A timer is already running. Stop it first (you'll be prompted to save), then start a new timer for "${timerConflict.name}".`}
-          danger={false}
-          onConfirm={() => { stopTimer(); setTimerConflict(null); }}
-          onCancel={() => setTimerConflict(null)}
-        />
-      )}
         </>
       )}
 

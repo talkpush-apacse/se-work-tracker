@@ -130,12 +130,8 @@ export default function SaveSessionModal({ session, onClose }) {
     const workTypeLabel = WORK_TYPE_LABELS[workType] || '';
 
     // Resolve pomo tagging fields from the session payload
-    const source = session.mode === 'pomodoro' ? 'pomodoro'
-      : session.mode === 'stopwatch' ? 'stopwatch'
-      : null;
-    const pomodoroCycles = session.mode === 'pomodoro'
-      ? (session.pomodoroCompletedCycles ?? null)
-      : null;
+    const source = 'pomodoro';
+    const pomodoroCycles = session.pomodoroCompletedCycles ?? null;
 
     // Create one time_log + one point entry per task row
     taskRows.forEach((row, i) => {

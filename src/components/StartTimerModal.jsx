@@ -3,7 +3,6 @@ import { Timer, Check, Search, X, RotateCw } from 'lucide-react';
 import Modal from './Modal';
 import WorkTypeSelector from './WorkTypeSelector';
 import { useAppStore } from '../context/StoreContext';
-import { useTimerContext } from '../context/TimerContext';
 import { Button } from './ui/button';
 import { fetchNotionTasks } from '../lib/api';
 
@@ -11,13 +10,12 @@ export default function StartTimerModal({
   onClose,
   preselectedClientIds = [],
   preselectedWorkType = null,
-  title = 'Start Timer',
-  submitLabel = 'Start Timer',
-  helperText = 'Timer runs until you click Stop (max 12 hours). Survives page refresh. You can edit before saving.',
-  onStart = null,
+  title = 'Start Pomodoro',
+  submitLabel = 'Start Pomodoro',
+  helperText = 'Pomodoro uses the 25 / 5 / 15 cadence, auto-advances between intervals, and only work time is saved.',
+  onStart,
 }) {
   const { customers, okrs } = useAppStore();
-  const { startTimer } = useTimerContext();
   const [workType, setWorkType] = useState(preselectedWorkType || '');
   const [selectedClientIds, setSelectedClientIds] = useState(() => new Set(preselectedClientIds));
   const [okrId, setOkrId] = useState('');
@@ -115,20 +113,7 @@ export default function StartTimerModal({
         : null,
     };
 
-    if (onStart) {
-      onStart(payload);
-    } else {
-      startTimer(workType, {
-        clientIds: payload.clientIds,
-        okrId: payload.okrId,
-        notionTaskId: payload.notionTask?.id ?? null,
-        notionTaskName: payload.notionTask?.task_name ?? null,
-        notionAccount: payload.notionTask?.account ?? null,
-        notionOkr: payload.notionTask?.okr ?? null,
-        notionOkrPageId: payload.notionTask?.okrPageId ?? null,
-      });
-    }
-
+    onStart(payload);
     onClose();
   };
 

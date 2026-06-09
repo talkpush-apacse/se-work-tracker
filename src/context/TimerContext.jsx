@@ -34,7 +34,6 @@ export function TimerProvider({ children }) {
   useEffect(() => {
     if (!import.meta.env.DEV || typeof window === 'undefined') return undefined;
 
-    window.setMode = timer.setMode;
     window.startPomodoro = timer.startPomodoro;
     window.stopPomodoro = timer.stopPomodoro;
     window.pausePomodoro = timer.pausePomodoro;
@@ -64,7 +63,6 @@ export function TimerProvider({ children }) {
     });
 
     return () => {
-      delete window.setMode;
       delete window.startPomodoro;
       delete window.stopPomodoro;
       delete window.pausePomodoro;
@@ -77,7 +75,7 @@ export function TimerProvider({ children }) {
     timer.okrId, timer.notionTaskId, timer.notionTaskName, timer.notionAccount,
     timer.pendingTasks, timer.startedAt, timer.pomodoroInterval, timer.pomodoroIntervalEndsAt,
     timer.pomodoroCompletedCycles, timer.pomodoroAccumulatedWorkSeconds, timer.pomodoroStartedAt,
-    timer.pomodoroPausedAt, timer.elapsedSeconds, timer.stoppedSession, timer.setMode,
+    timer.pomodoroPausedAt, timer.elapsedSeconds, timer.stoppedSession,
     timer.startPomodoro, timer.stopPomodoro, timer.pausePomodoro, timer.resumePomodoro,
     timer.skipInterval,
   ]);
@@ -108,9 +106,7 @@ export function TimerProvider({ children }) {
       pomodoroStartedAt: timer.pomodoroStartedAt,
       pomodoroPausedAt: timer.pomodoroPausedAt,
       clearStoppedSession: timer.clearStoppedSession,
-      setMode: timer.setMode,
       setOnIntervalEnd: timer.setOnIntervalEnd,
-      startTimer: timer.startTimer,
       stopTimer: timer.stopTimer,
       addPendingTask: timer.addPendingTask,
       startPomodoro: timer.startPomodoro,
@@ -124,8 +120,8 @@ export function TimerProvider({ children }) {
       timer.okrId, timer.notionTaskId, timer.notionTaskName, timer.notionAccount, timer.notionOkr, timer.notionOkrPageId,
       timer.pendingTasks, timer.startedAt, timer.stoppedSession, timer.pomodoroInterval,
       timer.pomodoroIntervalEndsAt, timer.pomodoroCompletedCycles, timer.pomodoroAccumulatedWorkSeconds,
-      timer.pomodoroStartedAt, timer.pomodoroPausedAt, timer.clearStoppedSession, timer.setMode,
-      timer.setOnIntervalEnd, timer.startTimer, timer.stopTimer, timer.addPendingTask,
+      timer.pomodoroStartedAt, timer.pomodoroPausedAt, timer.clearStoppedSession,
+      timer.setOnIntervalEnd, timer.stopTimer, timer.addPendingTask,
       timer.startPomodoro, timer.stopPomodoro, timer.pausePomodoro, timer.resumePomodoro,
       timer.skipInterval,
     ]
@@ -141,7 +137,7 @@ export function TimerProvider({ children }) {
 }
 
 /**
- * Returns stable control values and actions for stopwatch + pomodoro state.
+ * Returns stable control values and actions for pomodoro timer state.
  * Does NOT re-render on every timer tick — only on start/stop/session events.
  */
 export function useTimerContext() {
